@@ -84,14 +84,22 @@ void initState() {
   if (!mounted) return;
 
   if (shouldOpenFollowUps) {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const FollowUpScreen(),
+  final targetId =
+      await LocalNotificationService
+          .consumePendingFollowUpId();
+
+  if (!mounted) return;
+
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (_) => FollowUpScreen(
+        targetPrescriptionId: targetId,
       ),
-    );
-    return;
-  }
+    ),
+  );
+  return;
+}
 
   Navigator.pushReplacement(
     context,
@@ -103,6 +111,7 @@ void initState() {
     ),
   );
 }
+
 
   Future<bool> _checkOnlineLicense() async {
     final licenseResult = await _licenseApiService.getStatus();

@@ -7,7 +7,12 @@ import '../../prescription/screens/patient_history_screen.dart';
 import '../../notifications/services/local_notification_service.dart';
 
 class FollowUpScreen extends StatefulWidget {
-  const FollowUpScreen({super.key});
+  final int? targetPrescriptionId;
+
+  const FollowUpScreen({
+    super.key,
+    this.targetPrescriptionId,
+  });
 
   @override
   State<FollowUpScreen> createState() => _FollowUpScreenState();
@@ -237,13 +242,24 @@ class _FollowUpScreenState extends State<FollowUpScreen>
     final note = item['follow_up_note']?.toString() ?? '';
     final date = _formatDate(item['follow_up_date']?.toString() ?? '');
     final rxNo = item['prescription_no']?.toString() ?? '';
+    final isTarget =
+    item['id'] == widget.targetPrescriptionId;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+  margin: const EdgeInsets.only(bottom: 12),
+  color: isTarget
+      ? Colors.amber.shade50
+      : null,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-      ),
-      elevation: 1,
+  borderRadius: BorderRadius.circular(18),
+  side: isTarget
+      ? BorderSide(
+          color: Colors.orange.shade700,
+          width: 2,
+        )
+      : BorderSide.none,
+),
+      elevation: isTarget ? 5 : 1,
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(

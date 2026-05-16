@@ -7,6 +7,9 @@ class LocalNotificationService {
   static const String pendingFollowUpKey =
       'pending_open_followups';
 
+  static const String pendingFollowUpIdKey =
+      'pending_followup_id';
+
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
@@ -24,7 +27,18 @@ class LocalNotificationService {
       settings,
       onDidReceiveNotificationResponse: (response) async {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool(pendingFollowUpKey, true);
+
+        await prefs.setBool(
+          pendingFollowUpKey,
+          true,
+        );
+
+        if (response.payload != null) {
+          await prefs.setInt(
+            pendingFollowUpIdKey,
+            int.tryParse(response.payload!) ?? 0,
+          );
+        }
       },
     );
 
@@ -33,7 +47,23 @@ class LocalNotificationService {
 
     if (launchDetails?.didNotificationLaunchApp == true) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(pendingFollowUpKey, true);
+
+      await prefs.setBool(
+        pendingFollowUpKey,
+        true,
+      );
+
+      final payload =
+          launchDetails
+              ?.notificationResponse
+              ?.payload;
+
+      if (payload != null) {
+        await prefs.setInt(
+          pendingFollowUpIdKey,
+          int.tryParse(payload) ?? 0,
+        );
+      }
     }
 
     final androidPlugin =
@@ -51,6 +81,21 @@ class LocalNotificationService {
 
     if (value) {
       await prefs.remove(pendingFollowUpKey);
+    }
+
+    return value;
+  }
+
+  static Future<int?> consumePendingFollowUpId() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final value =
+        prefs.getInt(pendingFollowUpIdKey);
+
+    await prefs.remove(pendingFollowUpIdKey);
+
+    if (value == null || value == 0) {
+      return null;
     }
 
     return value;
@@ -86,7 +131,10 @@ class LocalNotificationService {
       id,
       'Follow-Up Reminder',
       '$patientName${reason.isNotEmpty ? ' - $reason' : ''}',
-      tz.TZDateTime.from(scheduledDate, tz.local),
+      tz.TZDateTime.from(
+        scheduledDate,
+        tz.local,
+      ),
       const NotificationDetails(
         android: AndroidNotificationDetails(
           'follow_up_channel',
@@ -105,7 +153,8 @@ class LocalNotificationService {
       androidScheduleMode:
           AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
+          UILocalNotificationDateInterpretation
+              .absoluteTime,
     );
   }
 

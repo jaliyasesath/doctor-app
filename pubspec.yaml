@@ -48,7 +48,7 @@ dependencies:
   url_launcher: ^6.3.1
 
   # PRINTER
-  blue_thermal_printer: ^1.2.3
+  #blue_thermal_printer: ^1.2.3
 
   # PDF
   pdf: ^3.10.8
