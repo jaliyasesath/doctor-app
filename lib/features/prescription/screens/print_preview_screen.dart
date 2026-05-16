@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+//import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
@@ -26,16 +26,16 @@ class PrintPreviewScreen extends StatefulWidget {
 }
 
 class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
-  final BlueThermalPrinter printer = BlueThermalPrinter.instance;
+  //final BlueThermalPrinter printer = BlueThermalPrinter.instance;
 
-  bool _isTryingAutoConnect = true;
-  bool _isPrinterConnected = false;
+  // bool _isTryingAutoConnect = true;
+  // bool _isPrinterConnected = false;
   bool _isLoadingRx = true;
   bool _isLoadingDoctor = true;
   bool _isSharingPdf = false;
   bool _isSharingWhatsApp = false;
 
-  String? _savedPrinterAddress;
+  //String? _savedPrinterAddress;
 
   String rxNo = '';
   String qrValue = '';
@@ -113,53 +113,9 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
   }
 
   Future<void> _autoConnectPrinter() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedAddress = prefs.getString('printer_address');
-
-      if (!mounted) return;
-
-      setState(() => _savedPrinterAddress = savedAddress);
-
-      if (savedAddress == null || savedAddress.isEmpty) {
-        setState(() {
-          _isTryingAutoConnect = false;
-          _isPrinterConnected = false;
-        });
-        return;
-      }
-
-      final bondedDevices = await printer.getBondedDevices();
-
-      BluetoothDevice? savedDevice;
-      for (final device in bondedDevices) {
-        if (device.address == savedAddress) {
-          savedDevice = device;
-          break;
-        }
-      }
-
-      if (savedDevice != null) {
-        await printer.connect(savedDevice);
-      }
-
-      final connected = await printer.isConnected ?? false;
-
-      if (!mounted) return;
-
-      setState(() {
-        _isTryingAutoConnect = false;
-        _isPrinterConnected = connected;
-      });
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _isTryingAutoConnect = false;
-        _isPrinterConnected = false;
-      });
-    }
-  }
+  // Bluetooth printer disabled temporarily for iOS testing
+  return;
+}
 
   List<Map<String, String>> _getPdfItems() {
     return PrescriptionStore.items.map((item) {
@@ -279,134 +235,134 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
     }
   }
 
-  Future<void> _printNow() async {
-    final items = PrescriptionStore.items;
-    final currentDate =
-        widget.passedDate ?? DateTime.now().toString().substring(0, 10);
+  // Future<void> _printNow() async {
+  //   final items = PrescriptionStore.items;
+  //   final currentDate =
+  //       widget.passedDate ?? DateTime.now().toString().substring(0, 10);
 
-    try {
-      if (_isLoadingRx || rxNo.isEmpty || qrValue.isEmpty) {
-        if (!mounted) return;
+  //   try {
+  //     if (_isLoadingRx || rxNo.isEmpty || qrValue.isEmpty) {
+  //       if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('RX number is still loading')),
-        );
-        return;
-      }
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('RX number is still loading')),
+  //       );
+  //       return;
+  //     }
 
-      final isConnected = await printer.isConnected ?? false;
+  //     final isConnected = await printer.isConnected ?? false;
 
-      if (!isConnected) {
-        if (!mounted) return;
+  //     if (!isConnected) {
+  //       if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please connect printer first')),
-        );
-        return;
-      }
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('Please connect printer first')),
+  //       );
+  //       return;
+  //     }
 
-      printer.printCustom(medicalCenterName.toUpperCase(), 2, 1);
-      printer.printCustom('Dr. $doctorName', 1, 1);
+  //     printer.printCustom(medicalCenterName.toUpperCase(), 2, 1);
+  //     printer.printCustom('Dr. $doctorName', 1, 1);
 
-      if (specialization.isNotEmpty) {
-        printer.printCustom(specialization, 0, 1);
-      }
+  //     if (specialization.isNotEmpty) {
+  //       printer.printCustom(specialization, 0, 1);
+  //     }
 
-      if (clinicAddress.isNotEmpty) {
-        printer.printCustom(clinicAddress, 0, 1);
-      }
+  //     if (clinicAddress.isNotEmpty) {
+  //       printer.printCustom(clinicAddress, 0, 1);
+  //     }
 
-      printer.printNewLine();
-      printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printNewLine();
+  //     printer.printCustom('--------------------------------', 0, 1);
 
-      printer.printCustom('Date: $currentDate', 0, 0);
-      printer.printCustom('Rx: $rxNo', 0, 2);
-      printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printCustom('Date: $currentDate', 0, 0);
+  //     printer.printCustom('Rx: $rxNo', 0, 2);
+  //     printer.printCustom('--------------------------------', 0, 1);
 
-      printer.printCustom('PATIENT DETAILS', 1, 0);
+  //     printer.printCustom('PATIENT DETAILS', 1, 0);
 
-      if (PrescriptionStore.patientName.isNotEmpty) {
-        printer.printCustom('Name: ${PrescriptionStore.patientName}', 0, 0);
-      }
-      if (PrescriptionStore.patientAge.isNotEmpty) {
-        printer.printCustom('Age: ${PrescriptionStore.patientAge}', 0, 0);
-      }
-      if (PrescriptionStore.patientGender.isNotEmpty) {
-        printer.printCustom('Gender: ${PrescriptionStore.patientGender}', 0, 0);
-      }
+  //     if (PrescriptionStore.patientName.isNotEmpty) {
+  //       printer.printCustom('Name: ${PrescriptionStore.patientName}', 0, 0);
+  //     }
+  //     if (PrescriptionStore.patientAge.isNotEmpty) {
+  //       printer.printCustom('Age: ${PrescriptionStore.patientAge}', 0, 0);
+  //     }
+  //     if (PrescriptionStore.patientGender.isNotEmpty) {
+  //       printer.printCustom('Gender: ${PrescriptionStore.patientGender}', 0, 0);
+  //     }
 
-      printer.printCustom('--------------------------------', 0, 1);
-      printer.printCustom('PRESCRIPTION', 1, 1);
-      printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printCustom('PRESCRIPTION', 1, 1);
+  //     printer.printCustom('--------------------------------', 0, 1);
 
-      int index = 1;
-      for (final item in items) {
-        printer.printCustom('$index. ${item.medicineName}', 1, 0);
-        printer.printCustom(
-          '${item.dosage} • ${item.frequency} • ${item.duration}',
-          0,
-          0,
-        );
+  //     int index = 1;
+  //     for (final item in items) {
+  //       printer.printCustom('$index. ${item.medicineName}', 1, 0);
+  //       printer.printCustom(
+  //         '${item.dosage} • ${item.frequency} • ${item.duration}',
+  //         0,
+  //         0,
+  //       );
 
-        if (item.instructions.isNotEmpty) {
-          printer.printCustom(item.instructions, 0, 0);
-        }
+  //       if (item.instructions.isNotEmpty) {
+  //         printer.printCustom(item.instructions, 0, 0);
+  //       }
 
-        printer.printNewLine();
-        index++;
-      }
+  //       printer.printNewLine();
+  //       index++;
+  //     }
 
-      printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printCustom('--------------------------------', 0, 1);
 
-      // Thermal printers may not support signature image reliably,
-      // so text stamp remains the stable output.
-      printer.printCustom('Dr. $doctorName', 1, 1);
+  //     // Thermal printers may not support signature image reliably,
+  //     // so text stamp remains the stable output.
+  //     printer.printCustom('Dr. $doctorName', 1, 1);
 
-      if (qualifications.isNotEmpty) {
-        printer.printCustom(qualifications, 0, 1);
-      }
+  //     if (qualifications.isNotEmpty) {
+  //       printer.printCustom(qualifications, 0, 1);
+  //     }
 
-      if (profession.isNotEmpty) {
-        printer.printCustom(profession, 0, 1);
-      }
+  //     if (profession.isNotEmpty) {
+  //       printer.printCustom(profession, 0, 1);
+  //     }
 
-      if (slmcRegNo.isNotEmpty) {
-        printer.printCustom('SLMC Reg. No: $slmcRegNo', 0, 1);
-      }
+  //     if (slmcRegNo.isNotEmpty) {
+  //       printer.printCustom('SLMC Reg. No: $slmcRegNo', 0, 1);
+  //     }
 
-      if (affiliation.isNotEmpty) {
-        printer.printCustom(affiliation, 0, 1);
-      }
+  //     if (affiliation.isNotEmpty) {
+  //       printer.printCustom(affiliation, 0, 1);
+  //     }
 
-      if (contactNumber.isNotEmpty) {
-        printer.printCustom('Tel: $contactNumber', 0, 1);
-      }
+  //     if (contactNumber.isNotEmpty) {
+  //       printer.printCustom('Tel: $contactNumber', 0, 1);
+  //     }
 
-      printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printCustom('--------------------------------', 0, 1);
 
-      printer.printCustom('Prescription QR', 1, 1);
-      await printer.printQRcode(qrValue, 220, 220, 1);
-      printer.printCustom(qrValue, 0, 1);
-      printer.printCustom('--------------------------------', 0, 1);
-      printer.printCustom('GET WELL SOON', 1, 1);
-      printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printCustom('Prescription QR', 1, 1);
+  //     await printer.printQRcode(qrValue, 220, 220, 1);
+  //     printer.printCustom(qrValue, 0, 1);
+  //     printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printCustom('GET WELL SOON', 1, 1);
+  //     printer.printCustom('--------------------------------', 0, 1);
 
-      printer.printNewLine();
-      printer.printNewLine();
+  //     printer.printNewLine();
+  //     printer.printNewLine();
 
-      if (!mounted) return;
+  //     if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Print sent with QR ($rxNo)')),
-      );
-    } catch (e) {
-      if (!mounted) return;
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Print sent with QR ($rxNo)')),
+  //     );
+  //   } catch (e) {
+  //     if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Print failed: $e')),
-      );
-    }
-  }
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Print failed: $e')),
+  //     );
+  //   }
+  // }
 
   bool _hasValidSignature() {
     return signaturePath.isNotEmpty && File(signaturePath).existsSync();
@@ -491,240 +447,22 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
         title: const Text('Print Preview'),
       ),
       body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Container(
-              color: Colors.grey[300],
-              child: Column(
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    color: Colors.white,
-                    child: _isTryingAutoConnect
-                        ? const Row(
-                            children: [
-                              SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                              SizedBox(width: 10),
-                              Text('Trying to connect saved printer...'),
-                            ],
-                          )
-                        : Text(
-                            _isPrinterConnected
-                                ? 'Printer connected'
-                                : _savedPrinterAddress == null
-                                    ? 'No saved printer found'
-                                    : 'Saved printer not connected',
-                            style: TextStyle(
-                              color: _isPrinterConnected
-                                  ? Colors.green
-                                  : Colors.red,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                  ),
-                  Expanded(
-                    child: Center(
-                      child: SingleChildScrollView(
-                        child: Container(
-                          width: 300,
-                          padding: const EdgeInsets.all(12),
-                          color: Colors.white,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Center(
-                                child: Column(
-                                  children: [
-                                    Text(
-                                      medicalCenterName,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Dr. $doctorName',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                    if (specialization.isNotEmpty)
-                                      Text(
-                                        specialization,
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                    if (clinicAddress.isNotEmpty)
-                                      Text(
-                                        clinicAddress,
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Date: $currentDate',
-                                    style: const TextStyle(fontSize: 11),
-                                  ),
-                                  Text(
-                                    'Rx: $rxNo',
-                                    style: const TextStyle(fontSize: 11),
-                                  ),
-                                ],
-                              ),
-                              const Divider(),
-                              const Text(
-                                'Patient Details',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Name: ${PrescriptionStore.patientName}',
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                              Text(
-                                'Age: ${PrescriptionStore.patientAge}',
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                              Text(
-                                'Gender: ${PrescriptionStore.patientGender}',
-                                style: const TextStyle(fontSize: 11),
-                              ),
-                              const Divider(),
-                              const Center(
-                                child: Text(
-                                  'Prescription',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              const Divider(),
-                              ...items.asMap().entries.map((entry) {
-                                final index = entry.key + 1;
-                                final item = entry.value;
-
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '$index. ${item.medicineName}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${item.dosage} • ${item.frequency} • ${item.duration}',
-                                      ),
-                                      if (item.instructions.isNotEmpty)
-                                        Text(
-                                          item.instructions,
-                                          style: const TextStyle(fontSize: 12),
-                                        ),
-                                    ],
-                                  ),
-                                );
-                              }),
-                              _doctorStampPreview(),
-                              const SizedBox(height: 24),
-
-const Center(
-  child: Column(
-    children: [
-      Text(
-        'Doctor Stamp',
-        style: TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 12,
-        ),
-      ),
-      SizedBox(height: 12),
-      Divider(
-        thickness: 1,
-        color: Colors.black54,
-      ),
-      SizedBox(height: 4),
-      Text(
-        'Signature / Manual Stamp',
-        style: TextStyle(
-          fontSize: 10,
-          color: Colors.grey,
-        ),
-      ),
-    ],
-  ),
-),
-                              const Center(
-                                child: Text(
-                                  'Prescription QR',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Center(
-                                child: QrImageView(
-                                  data: qrValue,
-                                  version: QrVersions.auto,
-                                  size: 110,
-                                  backgroundColor: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Center(
-                                child: Text(
-                                  qrValue,
-                                  style: const TextStyle(fontSize: 11),
-                                ),
-                              ),
-                              const Divider(),
-                              const Center(
-                                child: Text(
-                                  'GET WELL SOON',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              const Divider(),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+    ? const Center(child: CircularProgressIndicator())
+    : Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        color: Colors.white,
+        child: const Center(
+          child: Text(
+            'Bluetooth print disabled for iOS testing.\n\nUse PDF / WhatsApp sharing.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
             ),
+          ),
+        ),
+      ),
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
@@ -772,7 +510,7 @@ const Center(
                 child: ElevatedButton.icon(
                   icon: const Icon(Icons.print),
                   label: const Text('Print'),
-                  onPressed: _printNow,
+                  onPressed: null,
                 ),
               ),
             ),
