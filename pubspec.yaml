@@ -1,0 +1,74 @@
+name: doctor_app
+description: Doctor Prescription & OPD Management App
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.2.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.6
+
+  # NETWORK / API
+  http: ^1.2.2
+
+  # DATABASE
+  sqflite: ^2.3.3
+  path: ^1.9.0
+
+  # LOCAL STORAGE
+  shared_preferences: ^2.2.3
+
+  # NETWORK CHECK
+  connectivity_plus: ^6.0.5
+
+  # LOCAL HOTSPOT SERVER
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4
+
+  # LOCAL IP DETECTION
+  network_info_plus: ^5.0.3
+
+  # DEVICE INFO
+  device_info_plus: ^10.1.0
+
+  # BIOMETRIC AUTH
+  local_auth: ^3.0.1
+
+  # QR
+  mobile_scanner: ^5.1.1
+  qr_flutter: ^4.1.0
+
+  # SHARE / URL
+  share_plus: ^7.2.1
+  url_launcher: ^6.3.1
+
+  # PRINTER
+  blue_thermal_printer: ^1.2.3
+
+  # PDF
+  pdf: ^3.10.8
+  path_provider: ^2.1.4
+
+  # IMAGE PICKER
+  image_picker: ^1.1.2
+
+  # DATE / FORMAT
+  intl: ^0.19.0
+
+  # LOCAL NOTIFICATIONS
+  flutter_local_notifications: ^17.2.3
+  timezone: ^0.9.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

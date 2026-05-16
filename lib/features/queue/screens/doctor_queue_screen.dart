@@ -1,0 +1,474 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../../../data/local/database_helper.dart';
+import '../../patient/data/api_patient_service.dart';
+import '../../prescription/screens/prescription_list_screen.dart';
+
+class DoctorQueueScreen extends StatefulWidget {
+  const DoctorQueueScreen({super.key});
+
+  @override
+  State<DoctorQueueScreen> createState() => _DoctorQueueScreenState();
+}
+
+class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
+  Timer? _autoRefreshTimer;
+
+  final ApiPatientService _api = ApiPatientService();
+
+  bool _loading = true;
+  String _selectedTab = 'waiting';
+  String _error = '';
+
+  List<dynamic> _patients = [];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _loadWaiting();
+
+    _autoRefreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) {
+        if (!mounted) return;
+        _reloadCurrentTab(silent: true);
+      },
+    );
+  }
+
+  Future<void> _reloadCurrentTab({bool silent = false}) async {
+    if (_selectedTab == 'completed') {
+      await _loadCompleted(silent: silent);
+    } else if (_selectedTab == 'skipped') {
+      await _loadSkipped(silent: silent);
+    } else {
+      await _loadWaiting(silent: silent);
+    }
+  }
+
+  void _startLoading(String tab, {required bool silent}) {
+    if (!mounted) return;
+
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _patients = [];
+        _selectedTab = tab;
+        _error = '';
+      });
+    } else {
+      setState(() {
+        _selectedTab = tab;
+        _error = '';
+      });
+    }
+  }
+
+  List<Map<String, dynamic>> _mapLocalPatients(
+    List<Map<String, dynamic>> localPatients,
+    String defaultStatus,
+  ) {
+    return localPatients.map((p) {
+      return {
+        'id': p['id'],
+        'patientCode': p['server_id'] != null ? 'P${p['server_id']}' : 'OFF-${p['id']}',
+        'queueNo': p['queue_no'] ?? p['id'],
+        'queueStatus': p['queue_status'] ?? defaultStatus,
+        'patientName': p['patient_name'] ?? '',
+        'patientAge': p['patient_age'] ?? '',
+        'patientGender': p['patient_gender'] ?? '',
+        'phoneNumber': p['phone_number'] ?? '',
+        'address': p['address'] ?? '',
+      };
+    }).toList();
+  }
+
+  Future<void> _loadWaiting({bool silent = false}) async {
+    _startLoading('waiting', silent: silent);
+
+    try {
+      final data = await _api.getWaitingPatients();
+
+      if (!mounted) return;
+
+      setState(() {
+        _patients = data;
+        _loading = false;
+      });
+    } catch (_) {
+      try {
+        final db = await DatabaseHelper.instance.database;
+
+        final localPatients = await db.query(
+          'patients',
+          where: 'queue_status = ? OR queue_status = ?',
+          whereArgs: ['Waiting', 'Serving'],
+          orderBy: 'queue_no ASC, id ASC',
+        );
+
+        if (!mounted) return;
+
+        setState(() {
+          _patients = _mapLocalPatients(localPatients, 'Waiting');
+          _loading = false;
+          _error = '';
+        });
+      } catch (localError) {
+        if (!mounted) return;
+
+        setState(() {
+          _error = localError.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadCompleted({bool silent = false}) async {
+    _startLoading('completed', silent: silent);
+
+    try {
+      final data = await _api.getCompletedPatients();
+
+      if (!mounted) return;
+
+      setState(() {
+        _patients = data;
+        _loading = false;
+      });
+    } catch (_) {
+      try {
+        final db = await DatabaseHelper.instance.database;
+
+        final localPatients = await db.query(
+          'patients',
+          where: 'queue_status = ?',
+          whereArgs: ['Completed'],
+          orderBy: 'queue_no ASC, id ASC',
+        );
+
+        if (!mounted) return;
+
+        setState(() {
+          _patients = _mapLocalPatients(localPatients, 'Completed');
+          _loading = false;
+          _error = '';
+        });
+      } catch (localError) {
+        if (!mounted) return;
+
+        setState(() {
+          _error = localError.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadSkipped({bool silent = false}) async {
+    _startLoading('skipped', silent: silent);
+
+    try {
+      final data = await _api.getSkippedPatients();
+
+      if (!mounted) return;
+
+      setState(() {
+        _patients = data;
+        _loading = false;
+      });
+    } catch (_) {
+      try {
+        final db = await DatabaseHelper.instance.database;
+
+        final localPatients = await db.query(
+          'patients',
+          where: 'queue_status = ?',
+          whereArgs: ['Skipped'],
+          orderBy: 'queue_no ASC, id ASC',
+        );
+
+        if (!mounted) return;
+
+        setState(() {
+          _patients = _mapLocalPatients(localPatients, 'Skipped');
+          _loading = false;
+          _error = '';
+        });
+      } catch (localError) {
+        if (!mounted) return;
+
+        setState(() {
+          _error = localError.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _skipPatient(int id) async {
+    try {
+      await _api.skipPatient(id);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Patient skipped')),
+      );
+
+      await _loadWaiting(silent: false);
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Skip failed: $e')),
+      );
+    }
+  }
+
+  Widget _patientCard(Map<String, dynamic> p) {
+    final id = p['id'] as int;
+    final code = p['patientCode']?.toString() ?? '-';
+    final queueNo = p['queueNo']?.toString() ?? '-';
+    final name = p['patientName']?.toString() ?? '';
+    final age = p['patientAge']?.toString() ?? '';
+    final gender = p['patientGender']?.toString() ?? '';
+    final phone = p['phoneNumber']?.toString() ?? '';
+    final status = p['queueStatus']?.toString() ?? '';
+
+    final isServing = status == 'Serving';
+    final isCompleted = status == 'Completed';
+    final isSkipped = status == 'Skipped';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      color: isServing
+          ? Colors.green.shade50
+          : isCompleted
+              ? Colors.blue.shade50
+              : isSkipped
+                  ? Colors.orange.shade50
+                  : Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(child: Text(queueNo)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    name.isEmpty ? 'Unnamed Patient' : name,
+                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Chip(
+                  backgroundColor: isServing
+                      ? Colors.green
+                      : isCompleted
+                          ? Colors.blue
+                          : isSkipped
+                              ? Colors.orange
+                              : Colors.blueGrey,
+                  label: Text(
+                    status,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text('Patient ID: $code'),
+            Text('Age/Gender: $age / $gender'),
+            if (phone.isNotEmpty) Text('Phone: $phone'),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      if (!isCompleted && !isSkipped) {
+                        try {
+                          await _api.setServingPatient(id);
+                        } catch (_) {}
+                      }
+
+                      if (!mounted) return;
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => PrescriptionListScreen(
+                            patientName: name,
+                            patientAge: age,
+                            patientGender: gender,
+                            patientPhone: phone,
+                            patientAddress: p['address']?.toString() ?? '',
+                            existingPatientId: id,
+                          ),
+                        ),
+                      );
+
+                      await _reloadCurrentTab(silent: false);
+                    },
+                    icon: const Icon(Icons.open_in_new),
+                    label: Text(isCompleted ? 'View' : 'Open'),
+                  ),
+                ),
+                if (_selectedTab == 'waiting') ...[
+                  const SizedBox(width: 10),
+                  OutlinedButton.icon(
+                    onPressed: () => _skipPatient(id),
+                    icon: const Icon(Icons.skip_next),
+                    label: const Text('Skip'),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      try {
+                        await _api.completePatient(id);
+
+                        if (!mounted) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Patient completed')),
+                        );
+
+                        await _reloadCurrentTab(silent: false);
+                      } catch (e) {
+                        if (!mounted) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Complete failed: $e')),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.check),
+                    label: const Text('Complete'),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _body() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error.isNotEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Text(
+            _error,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red),
+          ),
+        ),
+      );
+    }
+
+    if (_patients.isEmpty) {
+      return Center(
+        child: Text(
+          _selectedTab == 'completed'
+              ? 'No completed patients'
+              : _selectedTab == 'skipped'
+                  ? 'No skipped patients'
+                  : 'No waiting patients',
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => _reloadCurrentTab(silent: false),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _patients.length,
+        itemBuilder: (_, index) {
+          final patient = Map<String, dynamic>.from(_patients[index] as Map);
+          return _patientCard(patient);
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = _selectedTab == 'completed'
+        ? 'Completed Patients'
+        : _selectedTab == 'skipped'
+            ? 'Skipped Patients'
+            : 'Today Queue';
+
+    return Scaffold(
+      backgroundColor: const Color(0xfff6f8fb),
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh',
+            onPressed: () => _reloadCurrentTab(silent: false),
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                  value: 'waiting',
+                  label: Text('Waiting'),
+                  icon: Icon(Icons.queue),
+                ),
+                ButtonSegment(
+                  value: 'completed',
+                  label: Text('Completed'),
+                  icon: Icon(Icons.check_circle_outline),
+                ),
+                ButtonSegment(
+                  value: 'skipped',
+                  label: Text('Skipped'),
+                  icon: Icon(Icons.skip_next),
+                ),
+              ],
+              selected: {_selectedTab},
+              onSelectionChanged: (value) {
+                final selected = value.first;
+
+                if (selected == 'completed') {
+                  _loadCompleted(silent: false);
+                } else if (selected == 'skipped') {
+                  _loadSkipped(silent: false);
+                } else {
+                  _loadWaiting(silent: false);
+                }
+              },
+            ),
+          ),
+          Expanded(child: _body()),
+        ],
+      ),
+    );
+  }
+}
