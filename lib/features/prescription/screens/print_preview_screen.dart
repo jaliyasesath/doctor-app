@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+//import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
@@ -30,7 +30,7 @@ class PrintPreviewScreen extends StatefulWidget {
 class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
   final WifiThermalPrinterService _wifiPrinter =
       WifiThermalPrinterService();
-  final BlueThermalPrinter printer = BlueThermalPrinter.instance;
+  //final BlueThermalPrinter printer = BlueThermalPrinter.instance;
 
   bool _isLoadingRx = true;
   bool _isLoadingDoctor = true;
@@ -110,31 +110,34 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
     });
   }
 
-  Future<void> _autoConnectPrinter() async {
-    if (!Platform.isAndroid) return;
+Future<void> _autoConnectPrinter() async {
+  return;
+}
+  // Future<void> _autoConnectPrinter() async {
+  //   if (!Platform.isAndroid) return;
 
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedAddress = prefs.getString('bluetooth_printer_address');
+  //   try {
+  //     final prefs = await SharedPreferences.getInstance();
+  //     final savedAddress = prefs.getString('bluetooth_printer_address');
 
-      if (savedAddress == null || savedAddress.isEmpty) return;
+  //     if (savedAddress == null || savedAddress.isEmpty) return;
 
-      final devices = await printer.getBondedDevices();
+  //     final devices = await printer.getBondedDevices();
 
-      BluetoothDevice? selected;
+  //     BluetoothDevice? selected;
 
-      for (final d in devices) {
-        if (d.address == savedAddress) {
-          selected = d;
-          break;
-        }
-      }
+  //     for (final d in devices) {
+  //       if (d.address == savedAddress) {
+  //         selected = d;
+  //         break;
+  //       }
+  //     }
 
-      if (selected != null) {
-        await printer.connect(selected);
-      }
-    } catch (_) {}
-  }
+  //     if (selected != null) {
+  //       await printer.connect(selected);
+  //     }
+  //   } catch (_) {}
+  // }
 
   List<Map<String, String>> _getPdfItems() {
     return PrescriptionStore.items.map((item) {
@@ -344,122 +347,129 @@ GET WELL SOON
     }
   }
 
-  Future<void> _printBluetoothAndroid() async {
-    final items = PrescriptionStore.items;
-    final currentDate =
-        widget.passedDate ?? DateTime.now().toString().substring(0, 10);
+Future<void> _printBluetoothAndroid() async {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Android Bluetooth print temporarily disabled'),
+    ),
+  );
+}
+  // Future<void> _printBluetoothAndroid() async {
+  //   final items = PrescriptionStore.items;
+  //   final currentDate =
+  //       widget.passedDate ?? DateTime.now().toString().substring(0, 10);
 
-    try {
-      final isConnected = await printer.isConnected ?? false;
+  //   try {
+  //     final isConnected = await printer.isConnected ?? false;
 
-      if (!isConnected) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please connect printer first')),
-        );
-        return;
-      }
+  //     if (!isConnected) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         const SnackBar(content: Text('Please connect printer first')),
+  //       );
+  //       return;
+  //     }
 
-      printer.printCustom(medicalCenterName.toUpperCase(), 2, 1);
-      printer.printCustom('Dr. $doctorName', 1, 1);
+  //     printer.printCustom(medicalCenterName.toUpperCase(), 2, 1);
+  //     printer.printCustom('Dr. $doctorName', 1, 1);
 
-      if (specialization.isNotEmpty) {
-        printer.printCustom(specialization, 0, 1);
-      }
+  //     if (specialization.isNotEmpty) {
+  //       printer.printCustom(specialization, 0, 1);
+  //     }
 
-      if (clinicAddress.isNotEmpty) {
-        printer.printCustom(clinicAddress, 0, 1);
-      }
+  //     if (clinicAddress.isNotEmpty) {
+  //       printer.printCustom(clinicAddress, 0, 1);
+  //     }
 
-      printer.printNewLine();
-      printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printNewLine();
+  //     printer.printCustom('--------------------------------', 0, 1);
 
-      printer.printCustom('Date: $currentDate', 0, 0);
-      printer.printCustom('Rx: $rxNo', 0, 2);
-      printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printCustom('Date: $currentDate', 0, 0);
+  //     printer.printCustom('Rx: $rxNo', 0, 2);
+  //     printer.printCustom('--------------------------------', 0, 1);
 
-      printer.printCustom('PATIENT DETAILS', 1, 0);
+  //     printer.printCustom('PATIENT DETAILS', 1, 0);
 
-      if (PrescriptionStore.patientName.isNotEmpty) {
-        printer.printCustom('Name: ${PrescriptionStore.patientName}', 0, 0);
-      }
+  //     if (PrescriptionStore.patientName.isNotEmpty) {
+  //       printer.printCustom('Name: ${PrescriptionStore.patientName}', 0, 0);
+  //     }
 
-      if (PrescriptionStore.patientAge.isNotEmpty) {
-        printer.printCustom('Age: ${PrescriptionStore.patientAge}', 0, 0);
-      }
+  //     if (PrescriptionStore.patientAge.isNotEmpty) {
+  //       printer.printCustom('Age: ${PrescriptionStore.patientAge}', 0, 0);
+  //     }
 
-      if (PrescriptionStore.patientGender.isNotEmpty) {
-        printer.printCustom('Gender: ${PrescriptionStore.patientGender}', 0, 0);
-      }
+  //     if (PrescriptionStore.patientGender.isNotEmpty) {
+  //       printer.printCustom('Gender: ${PrescriptionStore.patientGender}', 0, 0);
+  //     }
 
-      printer.printCustom('--------------------------------', 0, 1);
-      printer.printCustom('PRESCRIPTION', 1, 1);
-      printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printCustom('PRESCRIPTION', 1, 1);
+  //     printer.printCustom('--------------------------------', 0, 1);
 
-      int index = 1;
+  //     int index = 1;
 
-      for (final item in items) {
-        printer.printCustom('$index. ${item.medicineName}', 1, 0);
+  //     for (final item in items) {
+  //       printer.printCustom('$index. ${item.medicineName}', 1, 0);
 
-        printer.printCustom(
-          '${item.dosage} | ${item.frequency} | ${item.duration}',
-          0,
-          0,
-        );
+  //       printer.printCustom(
+  //         '${item.dosage} | ${item.frequency} | ${item.duration}',
+  //         0,
+  //         0,
+  //       );
 
-        if (item.instructions.isNotEmpty) {
-          printer.printCustom(item.instructions, 0, 0);
-        }
+  //       if (item.instructions.isNotEmpty) {
+  //         printer.printCustom(item.instructions, 0, 0);
+  //       }
 
-        printer.printNewLine();
-        index++;
-      }
+  //       printer.printNewLine();
+  //       index++;
+  //     }
 
-      printer.printCustom('--------------------------------', 0, 1);
-      printer.printCustom('Dr. $doctorName', 1, 1);
+  //     printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printCustom('Dr. $doctorName', 1, 1);
 
-      if (qualifications.isNotEmpty) {
-        printer.printCustom(qualifications, 0, 1);
-      }
+  //     if (qualifications.isNotEmpty) {
+  //       printer.printCustom(qualifications, 0, 1);
+  //     }
 
-      if (profession.isNotEmpty) {
-        printer.printCustom(profession, 0, 1);
-      }
+  //     if (profession.isNotEmpty) {
+  //       printer.printCustom(profession, 0, 1);
+  //     }
 
-      if (slmcRegNo.isNotEmpty) {
-        printer.printCustom('SLMC Reg. No: $slmcRegNo', 0, 1);
-      }
+  //     if (slmcRegNo.isNotEmpty) {
+  //       printer.printCustom('SLMC Reg. No: $slmcRegNo', 0, 1);
+  //     }
 
-      if (affiliation.isNotEmpty) {
-        printer.printCustom(affiliation, 0, 1);
-      }
+  //     if (affiliation.isNotEmpty) {
+  //       printer.printCustom(affiliation, 0, 1);
+  //     }
 
-      if (contactNumber.isNotEmpty) {
-        printer.printCustom('Tel: $contactNumber', 0, 1);
-      }
+  //     if (contactNumber.isNotEmpty) {
+  //       printer.printCustom('Tel: $contactNumber', 0, 1);
+  //     }
 
-      printer.printCustom('--------------------------------', 0, 1);
-      printer.printCustom('Prescription QR', 1, 1);
-      await printer.printQRcode(qrValue, 220, 220, 1);
-      printer.printCustom(qrValue, 0, 1);
-      printer.printCustom('--------------------------------', 0, 1);
-      printer.printCustom('GET WELL SOON', 1, 1);
-      printer.printCustom('--------------------------------', 0, 1);
-      printer.printNewLine();
-      printer.printNewLine();
+  //     printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printCustom('Prescription QR', 1, 1);
+  //     await printer.printQRcode(qrValue, 220, 220, 1);
+  //     printer.printCustom(qrValue, 0, 1);
+  //     printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printCustom('GET WELL SOON', 1, 1);
+  //     printer.printCustom('--------------------------------', 0, 1);
+  //     printer.printNewLine();
+  //     printer.printNewLine();
 
-      if (!mounted) return;
+  //     if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Print sent with QR ($rxNo)')),
-      );
-    } catch (e) {
-      if (!mounted) return;
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Print sent with QR ($rxNo)')),
+  //     );
+  //   } catch (e) {
+  //     if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Print failed: $e')),
-      );
-    }
-  }
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Print failed: $e')),
+  //     );
+  //   }
+  // }
 
   bool _hasValidSignature() {
     return signaturePath.isNotEmpty && File(signaturePath).existsSync();
