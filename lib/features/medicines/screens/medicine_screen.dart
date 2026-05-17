@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 
@@ -14,20 +14,44 @@ class _MedicineScreenState extends State<MedicineScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   int? doctorId;
-  bool loading = true;
-  List<Map<String, dynamic>> medicines = [];
+
+bool loading = true;
+bool _isLoadingMore = false;
+bool _hasMore = true;
+
+List<Map<String, dynamic>> medicines = [];
+
+final ScrollController _scrollController = ScrollController();
+
+final int _limit = 50;
+int _offset = 0;
+
+Timer? _searchDebounce;
 
   @override
-  void initState() {
-    super.initState();
-    _init();
-  }
+void initState() {
+  super.initState();
+
+  _init();
+
+  _scrollController.addListener(() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200.0 &&
+        !_isLoadingMore &&
+        !loading &&
+        _hasMore) {
+      _loadMoreMedicines();
+    }
+  });
+}
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
+void dispose() {
+  _searchController.dispose();
+  _scrollController.dispose();
+  _searchDebounce?.cancel();
+  super.dispose();
+}
 
   Future<void> _init() async {
     doctorId = await DoctorSession.getDoctorId();
@@ -35,37 +59,106 @@ class _MedicineScreenState extends State<MedicineScreen> {
   }
 
   Future<void> _loadMedicines() async {
-    if (doctorId == null) return;
+  if (doctorId == null) return;
 
-    final data = await DatabaseHelper.instance.getMedicinesByDoctor(doctorId!);
+  setState(() {
+    loading = true;
+    _offset = 0;
+    _hasMore = true;
+  });
+
+  final data =
+      await DatabaseHelper.instance.getMedicinesByDoctorPaged(
+    doctorId!,
+    limit: _limit,
+    offset: 0,
+  );
+
+  if (!mounted) return;
+
+  setState(() {
+    medicines = data;
+    _offset = data.length;
+    _hasMore = data.length == _limit;
+    loading = false;
+  });
+}
+
+Future<void> _loadMoreMedicines() async {
+  if (doctorId == null || !_hasMore) return;
+
+  setState(() => _isLoadingMore = true);
+
+  try {
+    final query = _searchController.text.trim();
+
+    final data = query.isEmpty
+        ? await DatabaseHelper.instance.getMedicinesByDoctorPaged(
+            doctorId!,
+            limit: _limit,
+            offset: _offset,
+          )
+        : await DatabaseHelper.instance.searchMedicinesByDoctorPaged(
+            doctorId!,
+            query,
+            limit: _limit,
+            offset: _offset,
+          );
 
     if (!mounted) return;
 
     setState(() {
-      medicines = data;
-      loading = false;
+      medicines.addAll(data);
+      _offset += data.length;
+      _hasMore = data.length == _limit;
+      _isLoadingMore = false;
     });
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() => _isLoadingMore = false);
   }
+}
 
   Future<void> _searchMedicine(String value) async {
-    if (doctorId == null) return;
+  if (doctorId == null) return;
 
-    if (value.trim().isEmpty) {
-      await _loadMedicines();
-      return;
-    }
+  final query = value.trim();
 
-    final data = await DatabaseHelper.instance.searchMedicinesByDoctor(
-      doctorId!,
-      value.trim(),
-    );
+  setState(() {
+    loading = true;
+    _offset = 0;
+    _hasMore = true;
+  });
+
+  try {
+    final data = query.isEmpty
+        ? await DatabaseHelper.instance.getMedicinesByDoctorPaged(
+            doctorId!,
+            limit: _limit,
+            offset: 0,
+          )
+        : await DatabaseHelper.instance.searchMedicinesByDoctorPaged(
+            doctorId!,
+            query,
+            limit: _limit,
+            offset: 0,
+          );
 
     if (!mounted) return;
 
     setState(() {
       medicines = data;
+      _offset = data.length;
+      _hasMore = data.length == _limit;
+      loading = false;
     });
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() => loading = false);
   }
+}
 
   Future<void> _openMedicineForm({Map<String, dynamic>? medicine}) async {
     final result = await Navigator.push(
@@ -151,7 +244,16 @@ class _MedicineScreenState extends State<MedicineScreen> {
               padding: const EdgeInsets.all(14),
               child: TextField(
                 controller: _searchController,
-                onChanged: _searchMedicine,
+                onChanged: (value) {
+  _searchDebounce?.cancel();
+
+  _searchDebounce = Timer(
+    const Duration(milliseconds: 350),
+    () {
+      _searchMedicine(value);
+    },
+  );
+},
                 decoration: InputDecoration(
                   hintText: 'Search medicine / group / brand',
                   prefixIcon: const Icon(Icons.search),
@@ -181,14 +283,25 @@ class _MedicineScreenState extends State<MedicineScreen> {
                           ),
                         )
                       : ListView.builder(
+  controller: _scrollController,
                           padding: const EdgeInsets.only(
                             left: 14,
                             right: 14,
                             bottom: 90,
                           ),
-                          itemCount: medicines.length,
+                          itemCount:
+    medicines.length + (_isLoadingMore ? 1 : 0),
                           itemBuilder: (context, index) {
-                            final med = medicines[index];
+                            if (index >= medicines.length) {
+  return const Padding(
+    padding: EdgeInsets.all(16),
+    child: Center(
+      child: CircularProgressIndicator(),
+    ),
+  );
+}
+
+final med = medicines[index];
                             final isFavorite =
                                 (med['is_favorite'] ?? 0) == 1;
                             final status =

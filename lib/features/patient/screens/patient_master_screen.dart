@@ -1,11 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 import '../../prescription/screens/patient_profile_screen.dart';
 import '../../sync/services/network_service.dart';
 import '../../sync/services/sync_service.dart';
 import 'patient_edit_screen.dart';
+
 
 class PatientMasterScreen extends StatefulWidget {
   const PatientMasterScreen({super.key});
@@ -18,16 +19,35 @@ class _PatientMasterScreenState extends State<PatientMasterScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   List<Map<String, dynamic>> _patients = [];
-  List<Map<String, dynamic>> _allPatients = [];
 
-  bool _isLoading = true;
-  int? _doctorId;
+bool _isLoading = true;
+bool _isLoadingMore = false;
+bool _hasMore = true;
+
+int? _doctorId;
+Timer? _searchDebounce;
+
+final ScrollController _scrollController = ScrollController();
+
+final int _limit = 30;
+int _offset = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _initAndLoad();
-  }
+void initState() {
+  super.initState();
+
+  _initAndLoad();
+
+  _scrollController.addListener(() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        !_isLoadingMore &&
+        !_isLoading &&
+        _hasMore) {
+      _loadMorePatients();
+    }
+  });
+}
 
   Future<void> _initAndLoad() async {
     final doctorId = await DoctorSession.getDoctorId();
@@ -49,68 +69,121 @@ class _PatientMasterScreenState extends State<PatientMasterScreen> {
   }
 
   Future<void> _loadPatients() async {
-    if (_doctorId == null) return;
+  if (_doctorId == null) return;
 
-    setState(() => _isLoading = true);
+  setState(() {
+    _isLoading = true;
+    _offset = 0;
+    _hasMore = true;
+  });
 
-    try {
-      final online = await NetworkService.isOnline();
+  try {
+    final online = await NetworkService.isOnline();
 
-      if (online) {
-        await SyncService().syncAll();
-      }
-
-      final data = await DatabaseHelper.instance.getPatientsByDoctor(_doctorId!);
-
-      if (!mounted) return;
-
-      setState(() {
-        _allPatients = data;
-        _patients = data;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() => _isLoading = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading patients: $e')),
-      );
+    if (online) {
+      await SyncService().syncAll();
     }
+
+    final data =
+        await DatabaseHelper.instance.getPatientsByDoctorPaged(
+      _doctorId!,
+      limit: _limit,
+      offset: 0,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _patients = data;
+      _offset = data.length;
+      _hasMore = data.length == _limit;
+      _isLoading = false;
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error loading patients: $e')),
+    );
   }
+}
+Future<void> _loadMorePatients() async {
+  if (_doctorId == null || !_hasMore) return;
+
+  setState(() => _isLoadingMore = true);
+
+  try {
+    final query = _searchController.text.trim();
+
+    final data = query.isEmpty
+        ? await DatabaseHelper.instance.getPatientsByDoctorPaged(
+            _doctorId!,
+            limit: _limit,
+            offset: _offset,
+          )
+        : await DatabaseHelper.instance.searchPatientsByDoctorPaged(
+            _doctorId!,
+            query,
+            limit: _limit,
+            offset: _offset,
+          );
+
+    if (!mounted) return;
+
+    setState(() {
+      _patients.addAll(data);
+      _offset += data.length;
+      _hasMore = data.length == _limit;
+      _isLoadingMore = false;
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() => _isLoadingMore = false);
+  }
+}
 
   Future<void> _searchPatients(String query) async {
-    if (_doctorId == null) return;
+  if (_doctorId == null) return;
 
-    final trimmed = query.trim();
+  final trimmed = query.trim();
 
-    if (trimmed.isEmpty) {
-      setState(() {
-        _patients = List<Map<String, dynamic>>.from(_allPatients);
-      });
-      return;
-    }
+  setState(() {
+    _isLoading = true;
+    _offset = 0;
+    _hasMore = true;
+  });
 
-    try {
-      final data = await DatabaseHelper.instance.searchPatientsByDoctor(
-        _doctorId!,
-        trimmed,
-      );
+  try {
+    final data = trimmed.isEmpty
+        ? await DatabaseHelper.instance.getPatientsByDoctorPaged(
+            _doctorId!,
+            limit: _limit,
+            offset: 0,
+          )
+        : await DatabaseHelper.instance.searchPatientsByDoctorPaged(
+            _doctorId!,
+            trimmed,
+            limit: _limit,
+            offset: 0,
+          );
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      setState(() {
-        _patients = data;
-      });
-    } catch (e) {
-      if (!mounted) return;
+    setState(() {
+      _patients = data;
+      _offset = data.length;
+      _hasMore = data.length == _limit;
+      _isLoading = false;
+    });
+  } catch (e) {
+    if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Search failed: $e')),
-      );
-    }
+    setState(() => _isLoading = false);
   }
+}
 
   Future<void> _deletePatient(int id) async {
     try {
@@ -294,10 +367,12 @@ class _PatientMasterScreenState extends State<PatientMasterScreen> {
   }
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
+void dispose() {
+  _searchController.dispose();
+  _scrollController.dispose();
+  _searchDebounce?.cancel();
+  super.dispose();
+}
 
   @override
   Widget build(BuildContext context) {
@@ -318,7 +393,15 @@ class _PatientMasterScreenState extends State<PatientMasterScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              onChanged: _searchPatients,
+              onChanged: (value) {
+  _searchDebounce?.cancel();
+  _searchDebounce = Timer(
+    const Duration(milliseconds: 350),
+    () {
+      _searchPatients(value);
+    },
+  );
+},
             ),
           ),
           Expanded(
@@ -337,11 +420,23 @@ class _PatientMasterScreenState extends State<PatientMasterScreen> {
                     : RefreshIndicator(
                         onRefresh: _refreshPatients,
                         child: ListView.builder(
+  controller: _scrollController,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                          itemCount: _patients.length,
+                          itemCount:
+    _patients.length + (_isLoadingMore ? 1 : 0),
                           itemBuilder: (context, index) {
-                            final patient = _patients[index];
-                            return _buildPatientCard(patient);
+                           if (index >= _patients.length) {
+  return const Padding(
+    padding: EdgeInsets.all(16),
+    child: Center(
+      child: CircularProgressIndicator(),
+    ),
+  );
+}
+
+final patient = _patients[index];
+
+return _buildPatientCard(patient);
                           },
                         ),
                       ),

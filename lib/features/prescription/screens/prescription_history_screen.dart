@@ -17,14 +17,34 @@ class PrescriptionHistoryScreen extends StatefulWidget {
 class _PrescriptionHistoryScreenState
     extends State<PrescriptionHistoryScreen> {
   List<Map<String, dynamic>> _prescriptions = [];
-  bool _isLoading = true;
-  int? _doctorId;
+
+bool _isLoading = true;
+bool _isLoadingMore = false;
+bool _hasMore = true;
+
+int? _doctorId;
+
+final ScrollController _scrollController = ScrollController();
+
+final int _limit = 30;
+int _offset = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _initAndLoad();
-  }
+void initState() {
+  super.initState();
+
+  _initAndLoad();
+
+  _scrollController.addListener(() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        !_isLoadingMore &&
+        !_isLoading &&
+        _hasMore) {
+      _loadMorePrescriptions();
+    }
+  });
+}
 
   Future<void> _initAndLoad() async {
     final doctorId = await DoctorSession.getDoctorId();
@@ -46,31 +66,69 @@ class _PrescriptionHistoryScreenState
     await _loadPrescriptions();
   }
 
-  Future<void> _loadPrescriptions() async {
-    if (_doctorId == null) return;
+ Future<void> _loadPrescriptions() async {
+  if (_doctorId == null) return;
 
-    setState(() => _isLoading = true);
+  setState(() {
+    _isLoading = true;
+    _offset = 0;
+    _hasMore = true;
+  });
 
-    try {
-      final data =
-          await DatabaseHelper.instance.getPrescriptionsByDoctor(_doctorId!);
+  try {
+    final data =
+        await DatabaseHelper.instance.getPrescriptionsByDoctorPaged(
+      _doctorId!,
+      limit: _limit,
+      offset: 0,
+    );
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      setState(() {
-        _prescriptions = data;
-        _isLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
+    setState(() {
+      _prescriptions = data;
+      _offset = data.length;
+      _hasMore = data.length == _limit;
+      _isLoading = false;
+    });
+  } catch (e) {
+    if (!mounted) return;
 
-      setState(() => _isLoading = false);
+    setState(() => _isLoading = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Load failed: $e')),
-      );
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Load failed: $e')),
+    );
   }
+}
+
+Future<void> _loadMorePrescriptions() async {
+  if (_doctorId == null || !_hasMore) return;
+
+  setState(() => _isLoadingMore = true);
+
+  try {
+    final data =
+        await DatabaseHelper.instance.getPrescriptionsByDoctorPaged(
+      _doctorId!,
+      limit: _limit,
+      offset: _offset,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _prescriptions.addAll(data);
+      _offset += data.length;
+      _hasMore = data.length == _limit;
+      _isLoadingMore = false;
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() => _isLoadingMore = false);
+  }
+}
 
   Future<void> _delete(int id) async {
     try {
@@ -268,6 +326,12 @@ class _PrescriptionHistoryScreenState
   }
 
   @override
+void dispose() {
+  _scrollController.dispose();
+  super.dispose();
+}
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -288,11 +352,23 @@ class _PrescriptionHistoryScreenState
               : RefreshIndicator(
                   onRefresh: _refresh,
                   child: ListView.builder(
+  controller: _scrollController,
                     padding: const EdgeInsets.all(12),
-                    itemCount: _prescriptions.length,
+                    itemCount:
+    _prescriptions.length + (_isLoadingMore ? 1 : 0),
                     itemBuilder: (context, index) {
-                      final item = _prescriptions[index];
-                      return _buildCard(item);
+                      if (index >= _prescriptions.length) {
+  return const Padding(
+    padding: EdgeInsets.all(16),
+    child: Center(
+      child: CircularProgressIndicator(),
+    ),
+  );
+}
+
+final item = _prescriptions[index];
+
+return _buildCard(item);
                     },
                   ),
                 ),

@@ -14,6 +14,7 @@ import '../../net_service/connection_mode_service.dart';
 import '../../notifications/services/local_notification_service.dart';
 import '../../followup/screens/follow_up_screen.dart';
 
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -326,11 +327,11 @@ if (doctorId != null) {
         return;
       }
 
-      final authenticated = await _localAuth.authenticate(
-        localizedReason: 'Authenticate to login',
-        biometricOnly: false,
-        persistAcrossBackgrounding: true,
-      );
+     final authenticated = await _localAuth.authenticate(
+  localizedReason: 'Use Face ID to login to Doctor App',
+  biometricOnly: false,
+  persistAcrossBackgrounding: true,
+);
 
       if (!authenticated) {
         if (!mounted) return;
@@ -387,13 +388,21 @@ if (doctorId != null) {
 
       final role = lastDoctor['role']?.toString() ?? 'Doctor';
       _navigateByRole(role);
-    } catch (e) {
-      if (!mounted) return;
+    } on LocalAuthException catch (e) {
+  if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Biometric login error: $e')),
-      );
-    }
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('Authentication failed: ${e.toString()}'),
+    ),
+  );
+} catch (e) {
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('Biometric login error: $e')),
+  );
+}
   }
 
   void _openRegistration() {

@@ -2,6 +2,10 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 class DatabaseHelper {
+
+  
+
+
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
 
@@ -19,7 +23,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-     version: 25,
+     version: 26,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -171,7 +175,9 @@ reminder_sent INTEGER DEFAULT 0
     created_at TEXT
   )
 ''');
+await _createIndexes(db);
   }
+  
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
 
@@ -430,6 +436,9 @@ if (oldVersion < 25) {
       'ALTER TABLE prescriptions ADD COLUMN reminder_sent INTEGER DEFAULT 0',
     );
   } catch (_) {}
+}
+if (oldVersion < 26) {
+  await _createIndexes(db);
 }
   }
 
@@ -1288,9 +1297,188 @@ Future<int> permanentlyDeleteMedicine(int id) async {
     );
   }
 
+  Future<void> _createIndexes(Database db) async {
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_patients_doctor_id ON patients(doctor_id)',
+  );
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_patients_doctor_name ON patients(doctor_id, patient_name)',
+  );
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_patients_doctor_phone ON patients(doctor_id, phone_number)',
+  );
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_patients_queue ON patients(doctor_id, queue_status, queue_date)',
+  );
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_prescriptions_doctor_id ON prescriptions(doctor_id)',
+  );
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_prescriptions_patient_doctor ON prescriptions(patient_id, doctor_id)',
+  );
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_prescriptions_date ON prescriptions(doctor_id, prescription_date)',
+  );
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_prescriptions_followup ON prescriptions(doctor_id, follow_up_status, follow_up_date)',
+  );
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_prescriptions_sync ON prescriptions(sync_status)',
+  );
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_medicines_doctor_name ON medicines(doctor_id, medicine_name)',
+  );
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_medicines_doctor_favorite ON medicines(doctor_id, is_favorite, medicine_name)',
+  );
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_medicines_sync ON medicines(sync_status)',
+  );
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_custom_instructions_doctor ON custom_instructions(doctor_id, usage_count)',
+  );
+
+  await db.execute(
+    'CREATE INDEX IF NOT EXISTS idx_prescription_items_prescription ON prescription_items(prescription_id)',
+  );
+}
+
+Future<List<Map<String, dynamic>>> getPatientsByDoctorPaged(
+  int doctorId, {
+  int limit = 30,
+  int offset = 0,
+}) async {
+  final db = await database;
+
+  return db.query(
+    'patients',
+    where: 'doctor_id = ?',
+    whereArgs: [doctorId],
+    orderBy: 'id DESC',
+    limit: limit,
+    offset: offset,
+  );
+}
+
+Future<List<Map<String, dynamic>>> searchPatientsByDoctorPaged(
+  int doctorId,
+  String query, {
+  int limit = 30,
+  int offset = 0,
+}) async {
+  final db = await database;
+  final q = '%${query.trim()}%';
+
+  return db.query(
+    'patients',
+    where: 'doctor_id = ? AND (patient_name LIKE ? OR phone_number LIKE ?)',
+    whereArgs: [doctorId, q, q],
+    orderBy: 'id DESC',
+    limit: limit,
+    offset: offset,
+  );
+}
+
+Future<List<Map<String, dynamic>>> getPrescriptionsByDoctorPaged(
+  int doctorId, {
+  int limit = 30,
+  int offset = 0,
+}) async {
+  final db = await database;
+
+  return db.query(
+    'prescriptions',
+    where: 'doctor_id = ?',
+    whereArgs: [doctorId],
+    orderBy: 'id DESC',
+    limit: limit,
+    offset: offset,
+  );
+}
+
+Future<List<Map<String, dynamic>>> getMedicinesByDoctorPaged(
+  int doctorId, {
+  int limit = 50,
+  int offset = 0,
+}) async {
+  final db = await database;
+
+  return db.query(
+    'medicines',
+    where: 'doctor_id = ? AND (is_deleted IS NULL OR is_deleted = 0)',
+    whereArgs: [doctorId],
+    orderBy: 'is_favorite DESC, medicine_name ASC',
+    limit: limit,
+    offset: offset,
+  );
+}
+Future<List<Map<String, dynamic>>> searchMedicinesByDoctorPaged(
+  int doctorId,
+  String query, {
+  int limit = 50,
+  int offset = 0,
+}) async {
+  final db = await database;
+  final q = '%${query.trim()}%';
+
+  return db.query(
+    'medicines',
+    where:
+        'doctor_id = ? AND (is_deleted IS NULL OR is_deleted = 0) AND (medicine_name LIKE ? OR generic_name LIKE ? OR brand_name LIKE ? OR drug_group LIKE ?)',
+    whereArgs: [doctorId, q, q, q, q],
+    orderBy: 'is_favorite DESC, medicine_name ASC',
+    limit: limit,
+    offset: offset,
+  );
+}
+
   // =========================
   // DASHBOARD
   // =========================
+
+  Future<int> getTodayPrescriptionCountByDoctor(int doctorId) async {
+  final db = await database;
+  final today = DateTime.now().toIso8601String().substring(0, 10);
+
+  final result = await db.rawQuery(
+    '''
+    SELECT COUNT(*) as count
+    FROM prescriptions
+    WHERE doctor_id = ? AND prescription_date = ?
+    ''',
+    [doctorId, today],
+  );
+
+  return Sqflite.firstIntValue(result) ?? 0;
+}
+
+Future<int> getTodayPatientCountByDoctor(int doctorId) async {
+  final db = await database;
+  final today = DateTime.now().toIso8601String().substring(0, 10);
+
+  final result = await db.rawQuery(
+    '''
+    SELECT COUNT(DISTINCT patient_id) as count
+    FROM prescriptions
+    WHERE doctor_id = ? AND prescription_date = ?
+    ''',
+    [doctorId, today],
+  );
+
+  return Sqflite.firstIntValue(result) ?? 0;
+}
 
   Future<int> getTodayPrescriptionCount() async {
     final db = await database;
@@ -1337,37 +1525,19 @@ Future<int> permanentlyDeleteMedicine(int id) async {
   }
 
   Future<List<Map<String, dynamic>>> getTopMedicines() async {
-    final db = await database;
-    final result = await db.query('prescriptions');
+  final db = await database;
 
-    final Map<String, int> medicineCount = {};
+  final result = await db.rawQuery('''
+    SELECT medicine_name as name, COUNT(*) as count
+    FROM prescription_items
+    WHERE medicine_name IS NOT NULL AND medicine_name != ''
+    GROUP BY medicine_name
+    ORDER BY count DESC
+    LIMIT 5
+  ''');
 
-    for (final row in result) {
-      final text = row['items_text']?.toString() ?? '';
-      final lines = text.split('\n');
-
-      for (final line in lines) {
-        if (line.trim().isEmpty) continue;
-
-        final parts = line.split(' | ');
-        final name = parts[0].trim();
-
-        if (name.isEmpty) continue;
-
-        medicineCount[name] = (medicineCount[name] ?? 0) + 1;
-      }
-    }
-
-    final sorted = medicineCount.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    return sorted.take(5).map((e) {
-      return {
-        'name': e.key,
-        'count': e.value,
-      };
-    }).toList();
-  }
+  return result;
+}
 
   // =========================
   // SERVER UPSERT
