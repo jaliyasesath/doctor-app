@@ -86,7 +86,7 @@ void initState() {
     if (!mounted) return;
 
     setState(() {
-      _prescriptions = data;
+      _prescriptions = List<Map<String, dynamic>>.from(data);
       _offset = data.length;
       _hasMore = data.length == _limit;
       _isLoading = false;
@@ -114,11 +114,16 @@ Future<void> _loadMorePrescriptions() async {
       limit: _limit,
       offset: _offset,
     );
+    debugPrint(
+  'Loaded more prescriptions: ${data.length}, offset: $_offset',
+);
 
     if (!mounted) return;
 
     setState(() {
-      _prescriptions.addAll(data);
+     _prescriptions =
+    List<Map<String, dynamic>>.from(_prescriptions)
+      ..addAll(data);
       _offset += data.length;
       _hasMore = data.length == _limit;
       _isLoadingMore = false;
@@ -335,7 +340,7 @@ void dispose() {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Prescription History'),
+        title: Text('Prescription History (${_prescriptions.length})'),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

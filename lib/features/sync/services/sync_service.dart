@@ -105,35 +105,25 @@ class SyncService {
   }
 
   Future<void> pullPatients(SyncResult result) async {
-    final doctorId = await DoctorSession.getDoctorId();
-    if (doctorId == null) {
-      result.lastError = 'Doctor session not found';
-      return;
-    }
-
-    try {
-      final patients = await _patientApi.getPatients();
-
-      for (final p in patients) {
-        await _db.upsertPatientFromServer(
-          doctorId: doctorId,
-          serverId: p['id'] as int,
-          patientName: (p['patientName'] ?? '').toString(),
-          patientAge: (p['patientAge'] ?? p['age'] ?? '').toString(),
-          patientGender: (p['patientGender'] ?? p['gender'] ?? '').toString(),
-          phoneNumber: p['phoneNumber']?.toString(),
-          address: p['address']?.toString(),
-          notes: p['notes']?.toString(),
-          updatedAt: p['updatedAt']?.toString(),
-          createdAt: p['createdAt']?.toString(),
-        );
-
-        result.pulledPatients++;
-      }
-    } catch (e) {
-      result.lastError = 'Pull patients error: $e';
-    }
+  final doctorId = await DoctorSession.getDoctorId();
+  if (doctorId == null) {
+    result.lastError = 'Doctor session not found';
+    return;
   }
+
+  try {
+    final patients = await _patientApi.getPatients();
+
+    await _db.bulkUpsertPatientsFromServer(
+      doctorId: doctorId,
+      patients: patients,
+    );
+
+    result.pulledPatients = patients.length;
+  } catch (e) {
+    result.lastError = 'Pull patients error: $e';
+  }
+}
 
   Future<void> pullPrescriptions(SyncResult result) async {
     final doctorId = await DoctorSession.getDoctorId();
@@ -170,6 +160,11 @@ class SyncService {
         );
 
         result.pulledPrescriptions++;
+        if (result.pulledPrescriptions % 100 == 0) {
+  await Future.delayed(
+    const Duration(milliseconds: 1),
+  );
+}
       }
     } catch (e) {
       result.lastError = 'Pull prescriptions error: $e';
@@ -204,6 +199,11 @@ class SyncService {
         );
 
         result.pulledMedicines++;
+        if (result.pulledMedicines % 100 == 0) {
+  await Future.delayed(
+    const Duration(milliseconds: 1),
+  );
+}
       }
     } catch (e) {
       result.lastError = 'Pull medicines error: $e';

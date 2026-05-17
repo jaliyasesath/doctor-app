@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 
@@ -12,46 +13,34 @@ class MedicineScreen extends StatefulWidget {
 
 class _MedicineScreenState extends State<MedicineScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   int? doctorId;
 
-bool loading = true;
-bool _isLoadingMore = false;
-bool _hasMore = true;
+  bool loading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
 
-List<Map<String, dynamic>> medicines = [];
+  List<Map<String, dynamic>> medicines = [];
 
-final ScrollController _scrollController = ScrollController();
+  final int _limit = 50;
+  int _offset = 0;
 
-final int _limit = 50;
-int _offset = 0;
-
-Timer? _searchDebounce;
+  Timer? _searchDebounce;
 
   @override
-void initState() {
-  super.initState();
-
-  _init();
-
-  _scrollController.addListener(() {
-    if (_scrollController.position.pixels >=
-            _scrollController.position.maxScrollExtent - 200.0 &&
-        !_isLoadingMore &&
-        !loading &&
-        _hasMore) {
-      _loadMoreMedicines();
-    }
-  });
-}
+  void initState() {
+    super.initState();
+    _init();
+  }
 
   @override
-void dispose() {
-  _searchController.dispose();
-  _scrollController.dispose();
-  _searchDebounce?.cancel();
-  super.dispose();
-}
+  void dispose() {
+    _searchController.dispose();
+    _scrollController.dispose();
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
 
   Future<void> _init() async {
     doctorId = await DoctorSession.getDoctorId();
@@ -59,106 +48,118 @@ void dispose() {
   }
 
   Future<void> _loadMedicines() async {
-  if (doctorId == null) return;
+    if (doctorId == null) return;
 
-  setState(() {
-    loading = true;
-    _offset = 0;
-    _hasMore = true;
-  });
+    setState(() {
+      loading = true;
+      _offset = 0;
+      _hasMore = true;
+    });
 
-  final data =
-      await DatabaseHelper.instance.getMedicinesByDoctorPaged(
-    doctorId!,
-    limit: _limit,
-    offset: 0,
-  );
+    try {
+      final data = await DatabaseHelper.instance.getMedicinesByDoctorPaged(
+        doctorId!,
+        limit: _limit,
+        offset: 0,
+      );
 
+      if (!mounted) return;
+
+      setState(() {
+        medicines = List<Map<String, dynamic>>.from(data);
+        _offset = data.length;
+        _hasMore = data.length == _limit;
+        loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => loading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Load medicines failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _loadMoreMedicines() async {
+    if (doctorId == null || !_hasMore || _isLoadingMore || loading) return;
+
+    setState(() => _isLoadingMore = true);
+
+    try {
+      final query = _searchController.text.trim();
+
+      final data = query.isEmpty
+          ? await DatabaseHelper.instance.getMedicinesByDoctorPaged(
+              doctorId!,
+              limit: _limit,
+              offset: _offset,
+            )
+          : await DatabaseHelper.instance.searchMedicinesByDoctorPaged(
+              doctorId!,
+              query,
+              limit: _limit,
+              offset: _offset,
+            );
+            debugPrint('Loaded more medicines: ${data.length}, offset: $_offset');
+
+      if (!mounted) return;
+
+      setState(() {
+        medicines = List<Map<String, dynamic>>.from(medicines)..addAll(data);
+        _offset += data.length;
+        _hasMore = data.length == _limit;
+        _isLoadingMore = false;
+      });
+    } catch (e) {
   if (!mounted) return;
 
-  setState(() {
-    medicines = data;
-    _offset = data.length;
-    _hasMore = data.length == _limit;
-    loading = false;
-  });
+  setState(() => _isLoadingMore = false);
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text('Load more failed: $e')),
+  );
 }
-
-Future<void> _loadMoreMedicines() async {
-  if (doctorId == null || !_hasMore) return;
-
-  setState(() => _isLoadingMore = true);
-
-  try {
-    final query = _searchController.text.trim();
-
-    final data = query.isEmpty
-        ? await DatabaseHelper.instance.getMedicinesByDoctorPaged(
-            doctorId!,
-            limit: _limit,
-            offset: _offset,
-          )
-        : await DatabaseHelper.instance.searchMedicinesByDoctorPaged(
-            doctorId!,
-            query,
-            limit: _limit,
-            offset: _offset,
-          );
-
-    if (!mounted) return;
-
-    setState(() {
-      medicines.addAll(data);
-      _offset += data.length;
-      _hasMore = data.length == _limit;
-      _isLoadingMore = false;
-    });
-  } catch (e) {
-    if (!mounted) return;
-
-    setState(() => _isLoadingMore = false);
   }
-}
 
   Future<void> _searchMedicine(String value) async {
-  if (doctorId == null) return;
+    if (doctorId == null) return;
 
-  final query = value.trim();
-
-  setState(() {
-    loading = true;
-    _offset = 0;
-    _hasMore = true;
-  });
-
-  try {
-    final data = query.isEmpty
-        ? await DatabaseHelper.instance.getMedicinesByDoctorPaged(
-            doctorId!,
-            limit: _limit,
-            offset: 0,
-          )
-        : await DatabaseHelper.instance.searchMedicinesByDoctorPaged(
-            doctorId!,
-            query,
-            limit: _limit,
-            offset: 0,
-          );
-
-    if (!mounted) return;
+    final query = value.trim();
 
     setState(() {
-      medicines = data;
-      _offset = data.length;
-      _hasMore = data.length == _limit;
-      loading = false;
+      loading = true;
+      _offset = 0;
+      _hasMore = true;
     });
-  } catch (e) {
-    if (!mounted) return;
 
-    setState(() => loading = false);
+    try {
+      final data = query.isEmpty
+          ? await DatabaseHelper.instance.getMedicinesByDoctorPaged(
+              doctorId!,
+              limit: _limit,
+              offset: 0,
+            )
+          : await DatabaseHelper.instance.searchMedicinesByDoctorPaged(
+              doctorId!,
+              query,
+              limit: _limit,
+              offset: 0,
+            );
+
+      if (!mounted) return;
+
+      setState(() {
+        medicines = List<Map<String, dynamic>>.from(data);
+        _offset = data.length;
+        _hasMore = data.length == _limit;
+        loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => loading = false);
+    }
   }
-}
 
   Future<void> _openMedicineForm({Map<String, dynamic>? medicine}) async {
     final result = await Navigator.push(
@@ -220,11 +221,137 @@ Future<void> _loadMoreMedicines() async {
     return Colors.orange;
   }
 
+  Widget _buildMedicineCard(Map<String, dynamic> med) {
+    final isFavorite = (med['is_favorite'] ?? 0) == 1;
+    final status = med['sync_status']?.toString() ?? 'pending';
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: ListTile(
+        leading: IconButton(
+          icon: Icon(
+            isFavorite ? Icons.star : Icons.star_border,
+            color: isFavorite ? Colors.amber : Colors.grey,
+          ),
+          onPressed: () => _toggleFavorite(med),
+        ),
+        title: Text(
+          med['medicine_name']?.toString() ?? '',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if ((med['generic_name'] ?? '').toString().isNotEmpty)
+              Text('Generic: ${med['generic_name']}'),
+            if ((med['drug_group'] ?? '').toString().isNotEmpty)
+              Text(
+                'Group: ${med['drug_group']}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            if ((med['strength'] ?? '').toString().isNotEmpty)
+              Text('Strength: ${med['strength']}'),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(
+                  Icons.sync,
+                  size: 14,
+                  color: _statusColor(status),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  status,
+                  style: TextStyle(
+                    color: _statusColor(status),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) {
+            if (value == 'edit') {
+              _openMedicineForm(medicine: med);
+            } else if (value == 'delete') {
+              _deleteMedicine(med['id'] as int);
+            }
+          },
+          itemBuilder: (_) => const [
+            PopupMenuItem(
+              value: 'edit',
+              child: Text('Edit'),
+            ),
+            PopupMenuItem(
+              value: 'delete',
+              child: Text('Delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMedicineList() {
+    return NotificationListener<ScrollNotification>(
+      onNotification: (scrollInfo) {
+        if (scrollInfo.metrics.extentAfter < 300 &&
+            !_isLoadingMore &&
+            !loading &&
+            _hasMore) {
+          _loadMoreMedicines();
+        }
+        return false;
+      },
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.only(
+          left: 14,
+          right: 14,
+          bottom: 90,
+        ),
+        itemCount: medicines.length + (_isLoadingMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index >= medicines.length) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final med = medicines[index];
+          return _buildMedicineCard(med);
+        },
+      ),
+    );
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () {
+        _searchMedicine(value);
+      },
+    );
+  }
+
+  Future<void> _clearSearch() async {
+    _searchController.clear();
+    await _loadMedicines();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Medicines'),
+        title: Text('Medicines (${medicines.length})'),
         actions: [
           IconButton(
             onPressed: () => _openMedicineForm(),
@@ -244,16 +371,7 @@ Future<void> _loadMoreMedicines() async {
               padding: const EdgeInsets.all(14),
               child: TextField(
                 controller: _searchController,
-                onChanged: (value) {
-  _searchDebounce?.cancel();
-
-  _searchDebounce = Timer(
-    const Duration(milliseconds: 350),
-    () {
-      _searchMedicine(value);
-    },
-  );
-},
+                onChanged: _onSearchChanged,
                 decoration: InputDecoration(
                   hintText: 'Search medicine / group / brand',
                   prefixIcon: const Icon(Icons.search),
@@ -261,10 +379,7 @@ Future<void> _loadMoreMedicines() async {
                       ? null
                       : IconButton(
                           icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            _loadMedicines();
-                          },
+                          onPressed: _clearSearch,
                         ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -282,117 +397,7 @@ Future<void> _loadMoreMedicines() async {
                             textAlign: TextAlign.center,
                           ),
                         )
-                      : ListView.builder(
-  controller: _scrollController,
-                          padding: const EdgeInsets.only(
-                            left: 14,
-                            right: 14,
-                            bottom: 90,
-                          ),
-                          itemCount:
-    medicines.length + (_isLoadingMore ? 1 : 0),
-                          itemBuilder: (context, index) {
-                            if (index >= medicines.length) {
-  return const Padding(
-    padding: EdgeInsets.all(16),
-    child: Center(
-      child: CircularProgressIndicator(),
-    ),
-  );
-}
-
-final med = medicines[index];
-                            final isFavorite =
-                                (med['is_favorite'] ?? 0) == 1;
-                            final status =
-                                med['sync_status']?.toString() ?? 'pending';
-
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: ListTile(
-                                leading: IconButton(
-                                  icon: Icon(
-                                    isFavorite
-                                        ? Icons.star
-                                        : Icons.star_border,
-                                    color:
-                                        isFavorite ? Colors.amber : Colors.grey,
-                                  ),
-                                  onPressed: () => _toggleFavorite(med),
-                                ),
-                                title: Text(
-                                  med['medicine_name']?.toString() ?? '',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if ((med['generic_name'] ?? '')
-                                        .toString()
-                                        .isNotEmpty)
-                                      Text(
-                                          'Generic: ${med['generic_name']}'),
-                                    if ((med['drug_group'] ?? '')
-                                        .toString()
-                                        .isNotEmpty)
-                                      Text(
-                                        'Group: ${med['drug_group']}',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    if ((med['strength'] ?? '')
-                                        .toString()
-                                        .isNotEmpty)
-                                      Text('Strength: ${med['strength']}'),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.sync,
-                                          size: 14,
-                                          color: _statusColor(status),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          status,
-                                          style: TextStyle(
-                                            color: _statusColor(status),
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    if (value == 'edit') {
-                                      _openMedicineForm(medicine: med);
-                                    } else if (value == 'delete') {
-                                      _deleteMedicine(med['id'] as int);
-                                    }
-                                  },
-                                  itemBuilder: (_) => const [
-                                    PopupMenuItem(
-                                      value: 'edit',
-                                      child: Text('Edit'),
-                                    ),
-                                    PopupMenuItem(
-                                      value: 'delete',
-                                      child: Text('Delete'),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                      : _buildMedicineList(),
             ),
           ],
         ),

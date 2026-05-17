@@ -1589,6 +1589,52 @@ Future<int> getTodayPatientCountByDoctor(int doctorId) async {
       );
     }
   }
+  Future<void> bulkUpsertPatientsFromServer({
+  required int doctorId,
+  required List<dynamic> patients,
+}) async {
+  final db = await database;
+
+  await db.transaction((txn) async {
+    for (final item in patients) {
+      final p = Map<String, dynamic>.from(item as Map);
+
+      final serverId = p['id'] as int;
+
+      final existing = await txn.query(
+        'patients',
+        where: 'server_id = ? AND doctor_id = ?',
+        whereArgs: [serverId, doctorId],
+        limit: 1,
+      );
+
+      final data = {
+        'server_id': serverId,
+        'doctor_id': doctorId,
+        'patient_name': (p['patientName'] ?? '').toString(),
+        'patient_age': (p['patientAge'] ?? p['age'] ?? '').toString(),
+        'patient_gender': (p['patientGender'] ?? p['gender'] ?? '').toString(),
+        'phone_number': p['phoneNumber']?.toString(),
+        'address': p['address']?.toString(),
+        'notes': p['notes']?.toString(),
+        'sync_status': 'synced',
+        'updated_at': p['updatedAt']?.toString() ?? DateTime.now().toIso8601String(),
+        'created_at': p['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
+      };
+
+      if (existing.isEmpty) {
+        await txn.insert('patients', data);
+      } else {
+        await txn.update(
+          'patients',
+          data,
+          where: 'id = ?',
+          whereArgs: [existing.first['id']],
+        );
+      }
+    }
+  });
+}
 
   Future<void> upsertPrescriptionFromServer({
     required int doctorId,

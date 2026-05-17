@@ -613,9 +613,11 @@ _buildPatientTimelineCard(),
                       child: const Text('No previous visits found'),
                     )
                   else
-                    ..._prescriptions.map(
-                      (item) => _buildPrescriptionCard(item),
-                    ),
+  Column(
+    children: _prescriptions
+        .map((item) => _buildPrescriptionCard(item))
+        .toList(),
+  ),
                 ],
               ),
             ),

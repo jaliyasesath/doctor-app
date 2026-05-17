@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 import 'patient_profile_screen.dart';
@@ -15,8 +15,12 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   List<Map<String, dynamic>> _results = [];
+
   bool _isLoading = false;
+
   int? _doctorId;
+
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -136,10 +140,11 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
   }
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
+void dispose() {
+  _searchController.dispose();
+  _searchDebounce?.cancel();
+  super.dispose();
+}
 
   Widget _buildPatientTile(Map<String, dynamic> item) {
     final phone = _getPhone(item);
@@ -175,7 +180,16 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              onChanged: (_) => _search(),
+              onChanged: (_) {
+  _searchDebounce?.cancel();
+
+  _searchDebounce = Timer(
+    const Duration(milliseconds: 350),
+    () {
+      _search();
+    },
+  );
+},
             ),
           ),
           if (_isLoading)

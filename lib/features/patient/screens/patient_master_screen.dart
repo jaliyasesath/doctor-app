@@ -78,12 +78,6 @@ void initState() {
   });
 
   try {
-    final online = await NetworkService.isOnline();
-
-    if (online) {
-      await SyncService().syncAll();
-    }
-
     final data =
         await DatabaseHelper.instance.getPatientsByDoctorPaged(
       _doctorId!,
@@ -94,7 +88,7 @@ void initState() {
     if (!mounted) return;
 
     setState(() {
-      _patients = data;
+      _patients = List<Map<String, dynamic>>.from(data);
       _offset = data.length;
       _hasMore = data.length == _limit;
       _isLoading = false;
@@ -133,7 +127,9 @@ Future<void> _loadMorePatients() async {
     if (!mounted) return;
 
     setState(() {
-      _patients.addAll(data);
+      _patients =
+    List<Map<String, dynamic>>.from(_patients)
+      ..addAll(data);
       _offset += data.length;
       _hasMore = data.length == _limit;
       _isLoadingMore = false;
@@ -173,7 +169,8 @@ Future<void> _loadMorePatients() async {
     if (!mounted) return;
 
     setState(() {
-      _patients = data;
+      _patients = List<Map<String, dynamic>>.from(data);
+      
       _offset = data.length;
       _hasMore = data.length == _limit;
       _isLoading = false;
@@ -378,7 +375,7 @@ void dispose() {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Patient Master'),
+        title: Text('Patient Master (${_patients.length})'),
       ),
       body: Column(
         children: [
