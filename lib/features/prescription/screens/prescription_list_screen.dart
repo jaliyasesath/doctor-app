@@ -1940,144 +1940,249 @@ Future<void> _deleteClinicalOption({
     });
   }
 
-  Widget _buildFollowUpSection() {
-  return Card(
-    elevation: 0,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
+  Widget _buildPatientDetailsSection() {
+  return ExpansionTile(
+    initiallyExpanded: false,
+    tilePadding: EdgeInsets.zero,
+    title: const Row(
+      children: [
+        Icon(Icons.person_outline, color: Colors.blue),
+        SizedBox(width: 8),
+        Text(
+          'Patient Details',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ],
     ),
-    child: Padding(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    subtitle: Text(
+      '${_patientNameController.text} • ${_patientAgeController.text} • $_selectedGender',
+    ),
+    children: [
+  const SizedBox(height: 12),
 
-          const Row(
+  TextField(
+    controller: _patientNameController,
+    decoration: InputDecoration(
+      labelText: 'Patient Name',
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+    ),
+    onChanged: (_) => _savePatientDetailsToStore(),
+  ),
+
+  const SizedBox(height: 12),
+
+  Row(
+    children: [
+      Expanded(
+        child: TextField(
+          controller: _patientAgeController,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: 'Age',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          onChanged: (_) => _savePatientDetailsToStore(),
+        ),
+      ),
+
+      const SizedBox(width: 10),
+
+      Expanded(
+        child: DropdownButtonFormField<String>(
+          value: _selectedGender,
+          decoration: InputDecoration(
+            labelText: 'Gender',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          items: const [
+            DropdownMenuItem(
+              value: 'Male',
+              child: Text('Male'),
+            ),
+            DropdownMenuItem(
+              value: 'Female',
+              child: Text('Female'),
+            ),
+          ],
+          onChanged: (value) {
+            if (value == null) return;
+
+            setState(() {
+              _selectedGender = value;
+            });
+
+            _savePatientDetailsToStore();
+          },
+        ),
+      ),
+    ],
+  ),
+
+  const SizedBox(height: 12),
+
+  TextField(
+    controller: _patientPhoneController,
+    keyboardType: TextInputType.phone,
+    decoration: InputDecoration(
+      labelText: 'Phone Number',
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+    ),
+    onChanged: (_) => _savePatientDetailsToStore(),
+  ),
+
+  const SizedBox(height: 12),
+
+  TextField(
+    controller: _patientAddressController,
+    maxLines: 2,
+    decoration: InputDecoration(
+      labelText: 'Address',
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+    ),
+    onChanged: (_) => _savePatientDetailsToStore(),
+  ),
+
+  const SizedBox(height: 12),
+
+  TextField(
+    controller: _patientNotesController,
+    maxLines: 3,
+    decoration: InputDecoration(
+      labelText: 'Patient Notes',
+      hintText: 'Allergy / Chronic disease notes',
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+    ),
+    onChanged: (_) => _savePatientDetailsToStore(),
+  ),
+],
+  );
+}
+
+  Widget _buildFollowUpSection() {
+  return ExpansionTile(
+    initiallyExpanded: false,
+    tilePadding: EdgeInsets.zero,
+    title: const Row(
+      children: [
+        Icon(
+          Icons.notifications_active,
+          color: Colors.orange,
+        ),
+        SizedBox(width: 8),
+        Text(
+          'Follow-Up Reminder',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ],
+    ),
+    subtitle: Text(
+      _followUpDate == null
+          ? 'Tap to add follow-up reminder'
+          : 'Follow-up: ${_followUpDate!.toString().substring(0, 10)}',
+    ),
+    children: [
+      const SizedBox(height: 12),
+
+      InkWell(
+        onTap: () async {
+          final picked = await showDatePicker(
+            context: context,
+            initialDate: DateTime.now().add(
+              const Duration(days: 7),
+            ),
+            firstDate: DateTime.now(),
+            lastDate: DateTime(2100),
+          );
+
+          if (picked == null) return;
+
+          setState(() {
+            _followUpDate = picked;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 14,
+          ),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.black12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
             children: [
-              Icon(
-                Icons.notifications_active,
-                color: Colors.orange,
-              ),
-              SizedBox(width: 8),
+              const Icon(Icons.calendar_month),
+              const SizedBox(width: 10),
               Text(
-                'Follow-Up Reminder',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
+                _followUpDate == null
+                    ? 'Select Follow-Up Date'
+                    : _followUpDate!.toString().substring(0, 10),
               ),
             ],
           ),
-
-          const SizedBox(height: 14),
-
-          InkWell(
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate:
-                    DateTime.now().add(
-                  const Duration(days: 7),
-                ),
-                firstDate: DateTime.now(),
-                lastDate: DateTime(2100),
-              );
-
-              if (picked == null) return;
-
-              setState(() {
-                _followUpDate = picked;
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 14,
-              ),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: Colors.black12,
-                ),
-                borderRadius:
-                    BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.calendar_month),
-                  const SizedBox(width: 10),
-                  Text(
-                    _followUpDate == null
-                        ? 'Select Follow-Up Date'
-                        : _followUpDate!
-                            .toString()
-                            .substring(0, 10),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          TextField(
-            controller: _followUpNoteController,
-            decoration: InputDecoration(
-              labelText: 'Follow-Up Reason',
-              hintText:
-                  'BP Review / Diabetes Review',
-              border: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(12),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          CheckboxListTile(
-            value: _enableAppReminder,
-            onChanged: (v) {
-              setState(() {
-                _enableAppReminder =
-                    v ?? false;
-              });
-            },
-            title: const Text(
-              'App Notification',
-            ),
-            contentPadding: EdgeInsets.zero,
-          ),
-
-          CheckboxListTile(
-            value: _enableWhatsappReminder,
-            onChanged: (v) {
-              setState(() {
-                _enableWhatsappReminder =
-                    v ?? false;
-              });
-            },
-            title: const Text(
-              'WhatsApp Reminder',
-            ),
-            contentPadding: EdgeInsets.zero,
-          ),
-
-          CheckboxListTile(
-            value: _enableSmsReminder,
-            onChanged: (v) {
-              setState(() {
-                _enableSmsReminder =
-                    v ?? false;
-              });
-            },
-            title: const Text(
-              'SMS Reminder (Future)',
-            ),
-            contentPadding: EdgeInsets.zero,
-          ),
-        ],
+        ),
       ),
-    ),
+
+      const SizedBox(height: 12),
+
+      TextField(
+        controller: _followUpNoteController,
+        decoration: InputDecoration(
+          labelText: 'Follow-Up Reason',
+          hintText: 'BP Review / Diabetes Review',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+
+      const SizedBox(height: 12),
+
+      CheckboxListTile(
+        value: _enableAppReminder,
+        onChanged: (v) {
+          setState(() {
+            _enableAppReminder = v ?? false;
+          });
+        },
+        title: const Text('App Notification'),
+        contentPadding: EdgeInsets.zero,
+      ),
+
+      CheckboxListTile(
+        value: _enableWhatsappReminder,
+        onChanged: (v) {
+          setState(() {
+            _enableWhatsappReminder = v ?? false;
+          });
+        },
+        title: const Text('WhatsApp Reminder'),
+        contentPadding: EdgeInsets.zero,
+      ),
+
+      CheckboxListTile(
+        value: _enableSmsReminder,
+        onChanged: (v) {
+          setState(() {
+            _enableSmsReminder = v ?? false;
+          });
+        },
+        title: const Text('SMS Reminder (Future)'),
+        contentPadding: EdgeInsets.zero,
+      ),
+    ],
   );
 }
 
@@ -2086,6 +2191,7 @@ Future<void> _deleteClinicalOption({
     final items = PrescriptionStore.items;
 
     return Scaffold(
+  resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: Text(_isEditMode ? 'Edit Prescription' : 'Prescription'),
         actions: [
@@ -2143,91 +2249,13 @@ Future<void> _deleteClinicalOption({
                           ),
                         ),
                       ],
-                      TextField(
-                        controller: _patientNameController,
-                        decoration: InputDecoration(
-                          labelText: 'Patient Name *',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onChanged: (_) => _savePatientDetailsToStore(),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _patientAgeController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'Patient Age *',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onChanged: (_) => _savePatientDetailsToStore(),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: _selectedGender,
-                        decoration: InputDecoration(
-                          labelText: 'Gender *',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'Male', child: Text('Male')),
-                          DropdownMenuItem(
-                            value: 'Female',
-                            child: Text('Female'),
-                          ),
-                          DropdownMenuItem(value: 'Other', child: Text('Other')),
-                        ],
-                        onChanged: (value) {
-                          if (value == null) return;
-                          setState(() => _selectedGender = value);
-                          _savePatientDetailsToStore();
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _patientPhoneController,
-                        keyboardType: TextInputType.phone,
-                        decoration: InputDecoration(
-                          labelText: 'Phone Number (optional)',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onChanged: (_) => _savePatientDetailsToStore(),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _patientAddressController,
-                        maxLines: 2,
-                        decoration: InputDecoration(
-                          labelText: 'Address (optional)',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onChanged: (_) => _savePatientDetailsToStore(),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _patientNotesController,
-                        maxLines: 2,
-                        decoration: InputDecoration(
-                          labelText: 'Patient Notes (optional)',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onChanged: (_) => _savePatientDetailsToStore(),
-                      ),
-                      const SizedBox(height: 14),
-                      _buildSmartMedicalAssist(),
-                      const SizedBox(height: 14),
-                      _buildVisitDetailsSection(),
+                      _buildPatientDetailsSection(),
+const SizedBox(height: 14),
+
+_buildSmartMedicalAssist(),
+const SizedBox(height: 14),
+
+_buildVisitDetailsSection(),
                       const SizedBox(height: 14),
 _buildFollowUpSection(),
                       const SizedBox(height: 14),
@@ -2365,36 +2393,42 @@ _buildFollowUpSection(),
         ],
       ),
       bottomNavigationBar: items.isEmpty
-          ? null
-          : Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        icon: Icon(_isEditMode ? Icons.update : Icons.save),
-                        label:
-                            Text(_isEditMode ? 'Update Prescription' : 'Save'),
-                        onPressed: _savePrescriptionToDb,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: SizedBox(
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        icon: const Icon(Icons.print),
-                        label: const Text('Print Preview'),
-                        onPressed: _openPrintPreview,
-                      ),
-                    ),
-                  ),
-                ],
+    ? null
+    : Padding(
+        padding: EdgeInsets.only(
+          left: 12,
+          right: 12,
+          top: 12,
+          bottom: MediaQuery.of(context).viewInsets.bottom > 0
+              ? MediaQuery.of(context).viewInsets.bottom + 12
+              : 12,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 50,
+                child: ElevatedButton.icon(
+                  icon: Icon(_isEditMode ? Icons.update : Icons.save),
+                  label: Text(_isEditMode ? 'Update Prescription' : 'Save'),
+                  onPressed: _savePrescriptionToDb,
+                ),
               ),
             ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: SizedBox(
+                height: 50,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.print),
+                  label: const Text('Print Preview'),
+                  onPressed: _openPrintPreview,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
