@@ -206,26 +206,39 @@ class ApiMedicineService {
     }
   }
 
-  Future<List<dynamic>> getMedicines() async {
-    try {
-      final token = await _getToken();
+ Future<List<dynamic>> getMedicines({
+  int page = 1,
+  int pageSize = 100,
+  String? updatedAfter,
+}) async {
+  try {
+    final token = await _getToken();
 
-      final response = await http
-          .get(
-            _uri('/Medicines'),
-            headers: _headers(token ?? ''),
-          )
-          .timeout(const Duration(seconds: 15));
+    final query =
+        '/Medicines?page=$page&pageSize=$pageSize'
+        '${updatedAfter != null ? '&updatedAfter=$updatedAfter' : ''}';
 
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body)
-            as List<dynamic>;
+    final response = await http
+        .get(
+          _uri(query),
+          headers: _headers(token ?? ''),
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+
+      if (decoded is Map && decoded['data'] != null) {
+        return decoded['data'] as List<dynamic>;
       }
 
-      return [];
-    } catch (e) {
-      print('Get medicines error: $e');
-      return [];
+      return decoded as List<dynamic>;
     }
+
+    return [];
+  } catch (e) {
+    print('Get medicines error: $e');
+    return [];
   }
+}
 }

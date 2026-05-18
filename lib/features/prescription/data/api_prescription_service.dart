@@ -35,22 +35,42 @@ class ApiPrescriptionService {
   // =========================
   // GET ALL PRESCRIPTIONS
   // =========================
-  Future<List<Map<String, dynamic>>> getPrescriptions() async {
-    final response = await _api.get('/Prescriptions');
+ Future<List<Map<String, dynamic>>> getPrescriptions({
+  int page = 1,
+  int pageSize = 100,
+  String? updatedAfter,
+}) async {
+  final query =
+      '/Prescriptions?page=$page&pageSize=$pageSize'
+      '${updatedAfter != null ? '&updatedAfter=$updatedAfter' : ''}';
 
-    return List<Map<String, dynamic>>.from(response);
+  final response = await _api.get(query);
+
+  if (response is Map && response['data'] != null) {
+    return List<Map<String, dynamic>>.from(response['data']);
   }
+
+  return List<Map<String, dynamic>>.from(response);
+}
 
   // =========================
   // GET BY PATIENT
   // =========================
-  Future<List<Map<String, dynamic>>> getPrescriptionsByPatient(
-    int patientId,
-  ) async {
-    final response = await _api.get('/Prescriptions/patient/$patientId');
+ Future<List<Map<String, dynamic>>> getPrescriptionsByPatient(
+  int patientId, {
+  int page = 1,
+  int pageSize = 100,
+}) async {
+  final response = await _api.get(
+    '/Prescriptions/patient/$patientId?page=$page&pageSize=$pageSize',
+  );
 
-    return List<Map<String, dynamic>>.from(response);
+  if (response is Map && response['data'] != null) {
+    return List<Map<String, dynamic>>.from(response['data']);
   }
+
+  return List<Map<String, dynamic>>.from(response);
+}
 
   // =========================
   // DELETE

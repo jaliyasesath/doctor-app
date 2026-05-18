@@ -6,6 +6,7 @@ import '../../prescription/data/api_prescription_service.dart';
 import 'network_service.dart';
 import '../../medicines/data/api_medicine_service.dart';
 import '../../prescription/data/api_instruction_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SyncResult {
   int doctorSuccess = 0;
@@ -106,41 +107,101 @@ class SyncService {
 
   Future<void> pullPatients(SyncResult result) async {
   final doctorId = await DoctorSession.getDoctorId();
+
   if (doctorId == null) {
     result.lastError = 'Doctor session not found';
     return;
   }
 
   try {
-    final patients = await _patientApi.getPatients();
+    final prefs = await SharedPreferences.getInstance();
 
-    await _db.bulkUpsertPatientsFromServer(
-      doctorId: doctorId,
-      patients: patients,
+    final lastSyncAt = prefs.getString('last_patients_sync_at');
+
+    int page = 1;
+    const pageSize = 100;
+
+    final syncStartedAt = DateTime.now().toUtc().toIso8601String();
+
+    while (true) {
+      final patients = await _patientApi.getPatients(
+        page: page,
+        pageSize: pageSize,
+        updatedAfter: lastSyncAt,
+      );
+
+      if (patients.isEmpty) {
+        break;
+      }
+
+      await _db.bulkUpsertPatientsFromServer(
+        doctorId: doctorId,
+        patients: patients,
+      );
+
+      result.pulledPatients += patients.length;
+
+      page++;
+
+      await Future.delayed(
+        const Duration(milliseconds: 1),
+      );
+    }
+
+    await prefs.setString(
+      'last_patients_sync_at',
+      syncStartedAt,
     );
-
-    result.pulledPatients = patients.length;
   } catch (e) {
     result.lastError = 'Pull patients error: $e';
   }
 }
 
-  Future<void> pullPrescriptions(SyncResult result) async {
-    final doctorId = await DoctorSession.getDoctorId();
-    if (doctorId == null) {
-      result.lastError = 'Doctor session not found';
-      return;
-    }
+  
 
-    try {
-      final prescriptions = await _prescriptionApi.getPrescriptions();
+  Future<void> pullPrescriptions(SyncResult result) async {
+  final doctorId = await DoctorSession.getDoctorId();
+
+  if (doctorId == null) {
+    result.lastError = 'Doctor session not found';
+    return;
+  }
+
+  try {
+    final prefs = await SharedPreferences.getInstance();
+
+    final lastSyncAt =
+        prefs.getString('last_prescriptions_sync_at');
+
+    int page = 1;
+    const pageSize = 100;
+
+    final syncStartedAt =
+        DateTime.now().toUtc().toIso8601String();
+
+    while (true) {
+      final prescriptions =
+          await _prescriptionApi.getPrescriptions(
+        page: page,
+        pageSize: pageSize,
+        updatedAfter: lastSyncAt,
+      );
+
+      if (prescriptions.isEmpty) {
+        break;
+      }
 
       for (final rx in prescriptions) {
         final items = rx['items'] as List<dynamic>? ?? [];
 
         final itemsText = items.map((item) {
           final m = Map<String, dynamic>.from(item);
-          return '${m['medicineName'] ?? ''} | ${m['dosage'] ?? ''} | ${m['frequency'] ?? ''} | ${m['duration'] ?? ''} | ${m['instructions'] ?? ''}';
+
+          return '${m['medicineName'] ?? ''} | '
+              '${m['dosage'] ?? ''} | '
+              '${m['frequency'] ?? ''} | '
+              '${m['duration'] ?? ''} | '
+              '${m['instructions'] ?? ''}';
         }).join('\n');
 
         await _db.upsertPrescriptionFromServer(
@@ -151,7 +212,8 @@ class SyncService {
           patientAge: (rx['patientAge'] ?? '').toString(),
           patientGender: (rx['patientGender'] ?? '').toString(),
           prescriptionNo: (rx['prescriptionNo'] ?? '').toString(),
-          prescriptionDate: (rx['prescriptionDate'] ?? '').toString(),
+          prescriptionDate:
+              (rx['prescriptionDate'] ?? '').toString(),
           itemsText: itemsText,
           complaint: rx['complaint']?.toString(),
           diagnosis: rx['diagnosis']?.toString(),
@@ -160,26 +222,53 @@ class SyncService {
         );
 
         result.pulledPrescriptions++;
+
         if (result.pulledPrescriptions % 100 == 0) {
-  await Future.delayed(
-    const Duration(milliseconds: 1),
-  );
-}
+          await Future.delayed(
+            const Duration(milliseconds: 1),
+          );
+        }
       }
-    } catch (e) {
-      result.lastError = 'Pull prescriptions error: $e';
+
+      page++;
     }
+
+    await prefs.setString(
+      'last_prescriptions_sync_at',
+      syncStartedAt,
+    );
+  } catch (e) {
+    result.lastError = 'Pull prescriptions error: $e';
   }
+}
 
   Future<void> pullMedicines(SyncResult result) async {
-    final doctorId = await DoctorSession.getDoctorId();
-    if (doctorId == null) {
-      result.lastError = 'Doctor session not found';
-      return;
-    }
+  final doctorId = await DoctorSession.getDoctorId();
 
-    try {
-      final medicines = await _medicineApi.getMedicines();
+  if (doctorId == null) {
+    result.lastError = 'Doctor session not found';
+    return;
+  }
+
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final lastSyncAt = prefs.getString('last_medicines_sync_at');
+
+    int page = 1;
+    const pageSize = 100;
+
+    final syncStartedAt = DateTime.now().toUtc().toIso8601String();
+
+    while (true) {
+      final medicines = await _medicineApi.getMedicines(
+        page: page,
+        pageSize: pageSize,
+        updatedAfter: lastSyncAt,
+      );
+
+      if (medicines.isEmpty) {
+        break;
+      }
 
       for (final m in medicines) {
         final map = Map<String, dynamic>.from(m as Map);
@@ -199,17 +288,26 @@ class SyncService {
         );
 
         result.pulledMedicines++;
+
         if (result.pulledMedicines % 100 == 0) {
-  await Future.delayed(
-    const Duration(milliseconds: 1),
-  );
-}
+          await Future.delayed(
+            const Duration(milliseconds: 1),
+          );
+        }
       }
-    } catch (e) {
-      result.lastError = 'Pull medicines error: $e';
-      print('Pull medicines error: $e');
+
+      page++;
     }
+
+    await prefs.setString(
+      'last_medicines_sync_at',
+      syncStartedAt,
+    );
+  } catch (e) {
+    result.lastError = 'Pull medicines error: $e';
+    print('Pull medicines error: $e');
   }
+}
 
   Future<void> syncDoctors(SyncResult result) async {
     final pendingDoctors = await _db.getPendingDoctors();

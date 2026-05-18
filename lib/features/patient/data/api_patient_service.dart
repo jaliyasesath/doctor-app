@@ -119,19 +119,36 @@ class ApiPatientService {
     return response.statusCode >= 200 && response.statusCode < 300;
   }
 
-  Future<List<dynamic>> getPatients() async {
-    final token = await _getToken();
+  Future<List<dynamic>> getPatients({
+  int page = 1,
+  int pageSize = 100,
+  String? updatedAfter,
+}) async {
+  final token = await _getToken();
 
-    final response = await http
-        .get(_uri('/Patients'), headers: _headers(token ?? ''))
-        .timeout(const Duration(seconds: 15));
+  final query =
+      '/Patients?page=$page&pageSize=$pageSize'
+      '${updatedAfter != null ? '&updatedAfter=$updatedAfter' : ''}';
 
-    if (_isSuccess(response)) {
-      return jsonDecode(response.body) as List<dynamic>;
+  final response = await http
+      .get(
+        _uri(query),
+        headers: _headers(token ?? ''),
+      )
+      .timeout(const Duration(seconds: 15));
+
+  if (_isSuccess(response)) {
+    final decoded = jsonDecode(response.body);
+
+    if (decoded is Map && decoded['data'] != null) {
+      return decoded['data'] as List<dynamic>;
     }
 
-    throw Exception('Failed to load patients (${response.statusCode})');
+    return decoded as List<dynamic>;
   }
+
+  throw Exception('Failed to load patients (${response.statusCode})');
+}
 
   Future<Map<String, dynamic>> getPatientById(int id) async {
     final token = await _getToken();
@@ -147,22 +164,36 @@ class ApiPatientService {
     throw Exception('Failed to load patient (${response.statusCode})');
   }
 
-  Future<List<dynamic>> searchPatients(String term) async {
-    final token = await _getToken();
+ Future<List<dynamic>> searchPatients(
+  String term, {
+  int page = 1,
+  int pageSize = 100,
+}) async {
+  final token = await _getToken();
 
-    final response = await http
-        .get(
-          _uri('/Patients/search?term=$term'),
-          headers: _headers(token ?? ''),
-        )
-        .timeout(const Duration(seconds: 15));
+  final encodedTerm = Uri.encodeQueryComponent(term);
 
-    if (_isSuccess(response)) {
-      return jsonDecode(response.body) as List<dynamic>;
+  final response = await http
+      .get(
+        _uri(
+          '/Patients/search?term=$encodedTerm&page=$page&pageSize=$pageSize',
+        ),
+        headers: _headers(token ?? ''),
+      )
+      .timeout(const Duration(seconds: 15));
+
+  if (_isSuccess(response)) {
+    final decoded = jsonDecode(response.body);
+
+    if (decoded is Map && decoded['data'] != null) {
+      return decoded['data'] as List<dynamic>;
     }
 
-    throw Exception('Failed to search patients (${response.statusCode})');
+    return decoded as List<dynamic>;
   }
+
+  throw Exception('Failed to search patients (${response.statusCode})');
+}
 
   Future<void> deletePatient(int id) async {
     final token = await _getToken();
