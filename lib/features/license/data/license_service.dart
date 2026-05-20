@@ -18,7 +18,7 @@ class LicenseService {
   static const List<String> validLifetimeKeys = [
     'DOCAPP-LIFE-2026',
     'CLINIC-UNLOCK-999',
-    'DOCTOR-PRO-LIFETIME',
+    'DOCTOR-PRO-LIFETIME',  
   ];
 
   static Future<void> ensureInstallTime() async {
