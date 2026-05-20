@@ -28,17 +28,13 @@ class _LicenseActivateScreenState extends State<LicenseActivateScreen> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     final result = await LicenseService.activateLicense(key);
 
     if (!mounted) return;
 
-    setState(() {
-      _isLoading = false;
-    });
+    setState(() => _isLoading = false);
 
     if (result == 'invalid_key') {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -47,12 +43,11 @@ class _LicenseActivateScreenState extends State<LicenseActivateScreen> {
       return;
     }
 
-    if (result == 'already_bound_to_other_device') {
+    if (result == 'already_bound' ||
+        result == 'already_bound_to_other_device') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'This license is already bound to another device',
-          ),
+          content: Text('This license is already bound to another device'),
         ),
       );
       return;
@@ -63,6 +58,20 @@ class _LicenseActivateScreenState extends State<LicenseActivateScreen> {
     );
 
     Navigator.pop(context, true);
+  }
+
+  void _refreshSubscription() {
+    Navigator.pop(context, true);
+  }
+
+  void _showPlanMessage(String plan) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '$plan selected. Please contact admin after payment.',
+        ),
+      ),
+    );
   }
 
   @override
@@ -79,45 +88,116 @@ class _LicenseActivateScreenState extends State<LicenseActivateScreen> {
             child: Card(
               child: Padding(
                 padding: const EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.verified_outlined,
-                      size: 56,
-                      color: Colors.green,
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Enter Lifetime License Key',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.verified_outlined,
+                        size: 56,
+                        color: Colors.green,
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _licenseController,
-                      decoration: InputDecoration(
-                        labelText: 'License Key',
-                        hintText: 'Ex: xxx',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Activate License',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _activate,
-                        child: _isLoading
-                            ? const CircularProgressIndicator()
-                            : const Text('Activate'),
+
+                      const SizedBox(height: 16),
+
+                      TextField(
+                        controller: _licenseController,
+                        decoration: InputDecoration(
+                          labelText: 'License Key',
+                          hintText: 'Ex: DOCAPP-LIFE-2026',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+
+                      const SizedBox(height: 16),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: _isLoading ? null : _activate,
+                          icon: _isLoading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.lock_open),
+                          label: const Text('Activate License'),
+                        ),
+                      ),
+
+                      const SizedBox(height: 22),
+                      const Divider(),
+                      const SizedBox(height: 14),
+
+                      const Text(
+                        'Subscription Plans',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      const Text(
+                        'For monthly or yearly subscription, please contact admin after payment. Then tap Refresh Subscription.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.black54),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                _showPlanMessage('Monthly Plan');
+                              },
+                              icon: const Icon(Icons.calendar_month),
+                              label: const Text('Monthly'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                _showPlanMessage('Yearly Plan');
+                              },
+                              icon: const Icon(Icons.event_available),
+                              label: const Text('Yearly'),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          onPressed: _refreshSubscription,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Refresh Subscription'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

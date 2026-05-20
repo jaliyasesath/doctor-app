@@ -1,9 +1,9 @@
 import 'dart:io';
-import 'package:shared_preferences/shared_preferences.dart';
 
-// 🔥 IMPORTANT
-// device_info_plus optional import (safe handling)
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+
+import 'api_subscription_service.dart';
 
 class LicenseService {
   static const String _installTimeKey = 'license_install_time';
@@ -11,20 +11,16 @@ class LicenseService {
   static const String _licenseKeyKey = 'license_key';
   static const String _boundDeviceIdKey = 'bound_device_id';
 
-  // 🔥 TEST MODE (10 minutes)
-  // later change to: Duration(days: 7)
-  static const Duration trialDuration = Duration(days: 7);
+  //static const Duration trialDuration = Duration(days: 7);
+  static const Duration trialDuration = Duration(minutes: 1);
+  //static const Duration trialDuration = Duration(seconds: 30);
 
-  // Demo keys
   static const List<String> validLifetimeKeys = [
     'DOCAPP-LIFE-2026',
     'CLINIC-UNLOCK-999',
     'DOCTOR-PRO-LIFETIME',
   ];
 
-  // =========================
-  // INSTALL TIME
-  // =========================
   static Future<void> ensureInstallTime() async {
     final prefs = await SharedPreferences.getInstance();
     final existing = prefs.getString(_installTimeKey);
@@ -44,9 +40,6 @@ class LicenseService {
     return DateTime.tryParse(raw);
   }
 
-  // =========================
-  // LICENSE STATE
-  // =========================
   static Future<bool> isActivated() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool(_activatedKey) ?? false;
@@ -62,17 +55,12 @@ class LicenseService {
     return prefs.getString(_boundDeviceIdKey);
   }
 
-  // =========================
-  // DEVICE ID (SAFE VERSION)
-  // =========================
   static Future<String> getCurrentDeviceId() async {
     try {
       final deviceInfo = DeviceInfoPlugin();
 
       if (Platform.isAndroid) {
         final android = await deviceInfo.androidInfo;
-
-        // safer unique combo
         return 'android-${android.id}-${android.model}-${android.brand}';
       }
 
@@ -97,15 +85,11 @@ class LicenseService {
       }
 
       return 'unknown-device';
-    } catch (e) {
-      // 🔥 fallback (if plugin fails)
+    } catch (_) {
       return 'fallback-device';
     }
   }
 
-  // =========================
-  // TRIAL LOGIC
-  // =========================
   static Future<Duration?> getRemainingTrialTime() async {
     await ensureInstallTime();
 
@@ -133,13 +117,17 @@ class LicenseService {
     return remaining == null ? false : remaining <= Duration.zero;
   }
 
-  // =========================
-  // ACTIVATION (DEVICE BOUND)
-  // =========================
-  /// returns:
-  /// 'success'
-  /// 'invalid_key'
-  /// 'already_bound'
+  static Future<bool> hasActiveSubscription() async {
+    try {
+      final api = ApiSubscriptionService();
+      final result = await api.getMySubscription();
+
+      return result['canUseApp'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<String> activateLicense(String inputKey) async {
     final normalized = inputKey.trim();
 
@@ -152,13 +140,11 @@ class LicenseService {
 
     final savedBoundDeviceId = prefs.getString(_boundDeviceIdKey);
 
-    // already bound to another device
     if (savedBoundDeviceId != null &&
         savedBoundDeviceId != currentDeviceId) {
       return 'already_bound';
     }
 
-    // bind device
     await prefs.setBool(_activatedKey, true);
     await prefs.setString(_licenseKeyKey, normalized);
     await prefs.setString(_boundDeviceIdKey, currentDeviceId);
@@ -177,17 +163,11 @@ class LicenseService {
     return bound == current;
   }
 
-  // =========================
-  // RESET (TESTING)
-  // =========================
   static Future<void> clearLicenseForTesting() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   }
 
-  // =========================
-  // FORMAT TIME
-  // =========================
   static String formatDuration(Duration duration) {
     if (duration <= Duration.zero) return 'Expired';
 

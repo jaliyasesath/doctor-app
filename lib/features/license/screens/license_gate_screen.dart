@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+
 import '../../auth/screens/login_screen.dart';
 import '../data/license_service.dart';
 import 'license_activate_screen.dart';
@@ -16,6 +17,9 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
   bool _activated = false;
   bool _expired = false;
   bool _deviceAuthorized = true;
+  bool _subscriptionActive = false;
+  bool _checkingSubscription = false;
+
   Duration _remaining = Duration.zero;
   Timer? _timer;
 
@@ -37,7 +41,11 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
     final activated = await LicenseService.isActivated();
     final expired = await LicenseService.isTrialExpired();
     final remaining = await LicenseService.getRemainingTrialTime();
-    final deviceAuthorized = await LicenseService.isCurrentDeviceAuthorized();
+    final deviceAuthorized =
+        await LicenseService.isCurrentDeviceAuthorized();
+
+    final subscriptionActive =
+        await LicenseService.hasActiveSubscription();
 
     if (!mounted) return;
 
@@ -46,16 +54,18 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
       _expired = expired;
       _remaining = remaining ?? Duration.zero;
       _deviceAuthorized = deviceAuthorized;
+      _subscriptionActive = subscriptionActive;
       _loading = false;
     });
 
-    if (!activated && !expired) {
+    if (!activated && !subscriptionActive && !expired) {
       _startTimer();
     }
   }
 
   void _startTimer() {
     _timer?.cancel();
+
     _timer = Timer.periodic(const Duration(seconds: 1), (_) async {
       final expired = await LicenseService.isTrialExpired();
       final remaining = await LicenseService.getRemainingTrialTime();
@@ -86,11 +96,37 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
     }
   }
 
+  Future<void> _refreshSubscription() async {
+    setState(() {
+      _checkingSubscription = true;
+    });
+
+    final active = await LicenseService.hasActiveSubscription();
+
+    if (!mounted) return;
+
+    setState(() {
+      _subscriptionActive = active;
+      _checkingSubscription = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          active
+              ? 'Subscription active'
+              : 'No active subscription found',
+        ),
+      ),
+    );
+  }
+
   Future<void> _resetTrialForTesting() async {
     await LicenseService.clearLicenseForTesting();
     await _loadStatus();
 
     if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Trial reset for testing')),
     );
@@ -150,7 +186,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
       );
     }
 
-    if (_activated) {
+    if ((_activated && _deviceAuthorized) || _subscriptionActive) {
       return const LoginScreen();
     }
 
@@ -182,20 +218,53 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
                       ),
                       const SizedBox(height: 10),
                       const Text(
-                        'Your trial period has ended. Enter your lifetime license key to continue using the app.',
+                        'Your trial period has ended. Please activate or renew your subscription to continue using the app.',
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 20),
+
                       SizedBox(
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton.icon(
+                          onPressed: _checkingSubscription
+                              ? null
+                              : _refreshSubscription,
+                          icon: _checkingSubscription
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.refresh),
+                          label: const Text('Refresh Subscription'),
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: OutlinedButton.icon(
                           onPressed: _openActivation,
                           icon: const Icon(Icons.verified_outlined),
                           label: const Text('Activate License'),
                         ),
                       ),
+
+                      const SizedBox(height: 16),
+
+                      const Text(
+                        'Plans: Monthly / Yearly\nPlease contact admin after payment.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.black54),
+                      ),
+
                       const SizedBox(height: 10),
+
                       TextButton(
                         onPressed: _resetTrialForTesting,
                         child: const Text('Reset Trial (Testing)'),
@@ -244,6 +313,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
                       ),
                     ),
                     const SizedBox(height: 18),
+
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -259,12 +329,25 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
                         child: const Text('Continue Trial'),
                       ),
                     ),
+
                     const SizedBox(height: 10),
+
+                    OutlinedButton(
+                      onPressed: _checkingSubscription
+                          ? null
+                          : _refreshSubscription,
+                      child: const Text('Refresh Subscription'),
+                    ),
+
+                    const SizedBox(height: 10),
+
                     OutlinedButton(
                       onPressed: _openActivation,
-                      child: const Text('Activate Lifetime License'),
+                      child: const Text('Activate License'),
                     ),
+
                     const SizedBox(height: 10),
+
                     TextButton(
                       onPressed: _resetTrialForTesting,
                       child: const Text('Reset Trial (Testing)'),
