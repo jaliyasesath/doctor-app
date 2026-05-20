@@ -22,6 +22,7 @@ import '../../net_service/auto_api_resolver.dart';
 import '../../local_server/screens/doctor_hotspot_qr_screen.dart';
 import '../../patient/data/api_patient_service.dart';
 import 'dart:async';
+import '../../license/screens/admin_subscription_screen.dart';
 
 import '../../followup/screens/follow_up_screen.dart';
 
@@ -262,6 +263,10 @@ void initState() {
       case 'Thermal Print Setup':
         screen = const PrinterScreen();
         break;
+        
+        case 'Admin Subscriptions':
+  screen = const AdminSubscriptionScreen();
+  break;
        
 
 case 'Follow-Ups':
@@ -552,6 +557,11 @@ Widget _summaryCard(
   final items = [
     _buildCard('OPD Fast Mode', Icons.flash_on, Colors.red),
     _buildCard('Analytics', Icons.bar_chart, Colors.deepPurple),
+    _buildCard(
+  'Admin Subscriptions',
+  Icons.workspace_premium,
+  Colors.deepPurple,
+),
     _buildCard('Medicines', Icons.medication, Colors.blue),
     _buildCard('Today Queue', Icons.queue, Colors.deepOrange),
     _buildCard('Follow-Ups', Icons.notifications_active, Colors.orange),
