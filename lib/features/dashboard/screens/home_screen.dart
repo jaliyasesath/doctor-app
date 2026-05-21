@@ -96,6 +96,17 @@ void initState() {
 
   Future<void> _checkLicenseOnDashboard() async {
   setState(() => _isCheckingLicense = true);
+  final trialExpired = await LicenseService.isTrialExpired();
+
+if (trialExpired) {
+  setState(() {
+    _licenseValid = false;
+    _licenseMessage = 'Trial expired. Please activate subscription.';
+    _isCheckingLicense = false;
+  });
+
+  return;
+}
 
   try {
     final result = await _licenseApiService.getStatus();
@@ -621,11 +632,11 @@ Widget _summaryCard(
   final items = [
     _buildCard('OPD Fast Mode', Icons.flash_on, Colors.red),
     _buildCard('Analytics', Icons.bar_chart, Colors.deepPurple),
-    _buildCard(
-  'Admin Subscriptions',
-  Icons.workspace_premium,
-  Colors.deepPurple,
-),
+//     _buildCard(
+//   'Admin Subscriptions',
+//   Icons.workspace_premium,
+//   Colors.deepPurple,
+// ),
     _buildCard('Medicines', Icons.medication, Colors.blue),
     _buildCard('Today Queue', Icons.queue, Colors.deepOrange),
     _buildCard('Follow-Ups', Icons.notifications_active, Colors.orange),
