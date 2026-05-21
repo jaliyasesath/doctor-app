@@ -25,6 +25,8 @@ import 'dart:async';
 import '../../license/screens/admin_subscription_screen.dart';
 
 import '../../followup/screens/follow_up_screen.dart';
+import '../../license/screens/license_gate_screen.dart';
+import '../../license/data/license_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -47,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _connectionOnline = false;
 String _connectionMode = '';
 String _activeBaseUrl = '';
+Timer? _licenseTimer;
 
 Map<String, dynamic> _queueSummary = {
   'waiting': 0,
@@ -62,6 +65,13 @@ void initState() {
   _refreshConnectionStatus();
   _checkLicenseOnDashboard();
   _loadQueueSummary();
+  _licenseTimer = Timer.periodic(
+  const Duration(minutes: 1),
+  (_) {
+    if (!mounted) return;
+    _checkLicenseOnDashboard();
+  },
+);
  
 
   _summaryTimer = Timer.periodic(
@@ -85,51 +95,105 @@ void initState() {
   }
 
   Future<void> _checkLicenseOnDashboard() async {
-    setState(() => _isCheckingLicense = true);
+  setState(() => _isCheckingLicense = true);
 
-    try {
-      final result = await _licenseApiService.getStatus();
+  try {
+    final result = await _licenseApiService.getStatus();
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      if (result['success'] != true) {
+    if (result['success'] != true) {
+      final cachedValid =
+          await LicenseService.isCachedSubscriptionValid();
+
+      if (cachedValid) {
+        final cached =
+            await LicenseService.getCachedSubscription();
+
         setState(() {
-          _licenseValid = false;
-          _licenseMessage = result['message']?.toString() ?? 'License expired';
+          _licenseValid = true;
+          _planName = cached['planName']?.toString() ?? 'Cached';
+          _daysRemaining =
+              int.tryParse(cached['daysRemaining']?.toString() ?? '0') ?? 0;
+          _licenseMessage =
+              'Offline license active - $_daysRemaining days remaining';
           _isCheckingLicense = false;
         });
+
         return;
       }
 
-      final data = Map<String, dynamic>.from(result['data'] as Map);
-
-      final isActive = data['isActive'] == true;
-      final isExpired = data['isExpired'] == true;
-      final days = int.tryParse(data['daysRemaining']?.toString() ?? '0') ?? 0;
-
-      setState(() {
-        _licenseValid = isActive && !isExpired;
-        _planName = data['planName']?.toString() ?? '';
-        _daysRemaining = days;
-        _licenseMessage = _licenseValid
-            ? '$_planName active - $_daysRemaining days remaining'
-            : 'License expired. Please renew subscription.';
-        _isCheckingLicense = false;
-      });
-
-      if (_licenseValid && days <= 7) {
-        _showExpiryWarning(days);
-      }
-    } catch (e) {
-      if (!mounted) return;
-
       setState(() {
         _licenseValid = false;
-        _licenseMessage = 'License check failed: $e';
+        _licenseMessage =
+            result['message']?.toString() ?? 'License expired';
         _isCheckingLicense = false;
       });
+
+      return;
     }
+
+    final data = Map<String, dynamic>.from(result['data'] as Map);
+
+    final isActive = data['isActive'] == true;
+    final isExpired = data['isExpired'] == true;
+    final days =
+        int.tryParse(data['daysRemaining']?.toString() ?? '0') ?? 0;
+
+    final endDateRaw = data['endDate']?.toString();
+    final endDate =
+        endDateRaw == null ? null : DateTime.tryParse(endDateRaw);
+
+    if (isActive && !isExpired && endDate != null) {
+      await LicenseService.saveSubscriptionCache(
+        planName: data['planName']?.toString() ?? '',
+        endDate: endDate,
+        daysRemaining: days,
+      );
+    }
+
+    setState(() {
+      _licenseValid = isActive && !isExpired;
+      _planName = data['planName']?.toString() ?? '';
+      _daysRemaining = days;
+      _licenseMessage = _licenseValid
+          ? '$_planName active - $_daysRemaining days remaining'
+          : 'License expired. Please renew subscription.';
+      _isCheckingLicense = false;
+    });
+
+    if (_licenseValid && days <= 7) {
+      _showExpiryWarning(days);
+    }
+  } catch (e) {
+    if (!mounted) return;
+
+    final cachedValid =
+        await LicenseService.isCachedSubscriptionValid();
+
+    if (cachedValid) {
+      final cached = await LicenseService.getCachedSubscription();
+
+      setState(() {
+        _licenseValid = true;
+        _planName = cached['planName']?.toString() ?? 'Cached';
+        _daysRemaining =
+            int.tryParse(cached['daysRemaining']?.toString() ?? '0') ?? 0;
+        _licenseMessage =
+            'Offline license active - $_daysRemaining days remaining';
+        _isCheckingLicense = false;
+      });
+
+      return;
+    }
+
+    setState(() {
+      _licenseValid = false;
+      _licenseMessage = 'License check failed: $e';
+      _isCheckingLicense = false;
+    });
   }
+}
 
   void _showExpiryWarning(int days) {
     Future.delayed(const Duration(milliseconds: 400), () {
@@ -164,7 +228,7 @@ void initState() {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => const LicenseGateScreen()),
       (route) => false,
     );
   }
@@ -264,9 +328,9 @@ void initState() {
         screen = const PrinterScreen();
         break;
         
-        case 'Admin Subscriptions':
-  screen = const AdminSubscriptionScreen();
-  break;
+  //       case 'Admin Subscriptions':
+  // screen = const AdminSubscriptionScreen();
+  // break;
        
 
 case 'Follow-Ups':
@@ -729,6 +793,7 @@ Widget _summaryCard(
 @override
 void dispose() {
   _summaryTimer?.cancel();
+  _licenseTimer?.cancel();
   super.dispose();
 }
 
