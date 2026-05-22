@@ -257,24 +257,45 @@ Future<void> _autoConnectPrinter() async {
     }
   }
 
-  Future<void> _printNow() async {
-    if (_isLoadingRx || _isLoadingDoctor || rxNo.isEmpty || qrValue.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please wait, document is loading')),
-      );
-      return;
-    }
-
-    if (Platform.isIOS) {
-      await _printWifiIos();
-    } else if (Platform.isAndroid) {
-      await _printBluetoothAndroid();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Printing is not supported on this device')),
-      );
-    }
+ Future<void> _printNow() async {
+  if (_isLoadingRx || _isLoadingDoctor || rxNo.isEmpty || qrValue.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please wait, document is loading')),
+    );
+    return;
   }
+
+  if (Platform.isIOS) {
+    await _printWifiIos();
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Printing is available on iOS WiFi printer only'),
+      ),
+    );
+  }
+}
+
+  
+
+  // Future<void> _printNow() async {
+  //   if (_isLoadingRx || _isLoadingDoctor || rxNo.isEmpty || qrValue.isEmpty) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Please wait, document is loading')),
+  //     );
+  //     return;
+  //   }
+
+  //   if (Platform.isIOS) {
+  //     await _printWifiIos();
+  //   } else if (Platform.isAndroid) {
+  //     await _printBluetoothAndroid();
+  //   } else {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Printing is not supported on this device')),
+  //     );
+  //   }
+  // }
 
   Future<void> _printWifiIos() async {
     final prefs = await SharedPreferences.getInstance();
@@ -347,13 +368,13 @@ GET WELL SOON
     }
   }
 
-Future<void> _printBluetoothAndroid() async {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Android Bluetooth print temporarily disabled'),
-    ),
-  );
-}
+// Future<void> _printBluetoothAndroid() async {
+//   ScaffoldMessenger.of(context).showSnackBar(
+//     const SnackBar(
+//       content: Text('Android Bluetooth print temporarily disabled'),
+//     ),
+//   );
+// }
   // Future<void> _printBluetoothAndroid() async {
   //   final items = PrescriptionStore.items;
   //   final currentDate =

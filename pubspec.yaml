@@ -47,7 +47,7 @@ dependencies:
   share_plus: ^7.2.1
   url_launcher: ^6.3.1
 
-  # PRINTER
+  # BLUETOOTH PRINTER
   #blue_thermal_printer: ^1.2.3
 
   # PDF
