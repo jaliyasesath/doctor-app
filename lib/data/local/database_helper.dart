@@ -764,6 +764,25 @@ Future<void> replacePrescriptionItems(
   );
 
   await insertPrescriptionItems(prescriptionId, items);
+
+  final itemsText = items.map((item) {
+    return '${item['medicine_name'] ?? item['medicineName'] ?? ''} | '
+        '${item['dosage'] ?? ''} | '
+        '${item['frequency'] ?? ''} | '
+        '${item['duration'] ?? ''} | '
+        '${item['instructions'] ?? ''}';
+  }).join('\n');
+
+  await db.update(
+    'prescriptions',
+    {
+      'items_text': itemsText,
+      'sync_status': 'pending',
+      'updated_at': DateTime.now().toIso8601String(),
+    },
+    where: 'id = ?',
+    whereArgs: [prescriptionId],
+  );
 }
 
 Future<List<Map<String, dynamic>>> getPrescriptionItems(

@@ -1,86 +1,126 @@
-// import 'dart:io';
+//import 'dart:io';
 
-// import 'package:blue_thermal_printer/blue_thermal_printer.dart';
-// import 'package:flutter/material.dart';
-// import 'package:shared_preferences/shared_preferences.dart';
+//import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-// class PrinterSettingsScreen extends StatefulWidget {
-//   const PrinterSettingsScreen({super.key});
+class PrinterSettingsScreen extends StatefulWidget {
+  const PrinterSettingsScreen({super.key});
 
-//   @override
-//   State<PrinterSettingsScreen> createState() => _PrinterSettingsScreenState();
-// }
+  @override
+  State<PrinterSettingsScreen> createState() => _PrinterSettingsScreenState();
+}
 
-// class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
-//   final TextEditingController _ipController = TextEditingController();
+class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
+  final TextEditingController _ipController = TextEditingController();
 
-//   final BlueThermalPrinter _bluetoothPrinter =
-//       BlueThermalPrinter.instance;
+  // final BlueThermalPrinter _bluetoothPrinter =
+  //     BlueThermalPrinter.instance;
 
-//   List<BluetoothDevice> _devices = [];
-//   BluetoothDevice? _selectedDevice;
+  // List<BluetoothDevice> _devices = [];
+  // BluetoothDevice? _selectedDevice;
 
-//   bool _loadingDevices = false;
+  // bool _loadingDevices = false;
+  // bool _isConnecting = false;
 
-//   @override
-//   void initState() {
-//     super.initState();
-//     _loadSettings();
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
 
-//     if (Platform.isAndroid) {
-//       _loadBluetoothDevices();
-//     }
+    // if (Platform.isAndroid) {
+    //   _loadBluetoothDevices();
+    // }
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    _ipController.text = prefs.getString('wifi_printer_ip') ?? '';
+
+    // final savedAddress =
+    //     prefs.getString('bluetooth_printer_address') ?? '';
+
+    // if (savedAddress.isNotEmpty && _devices.isNotEmpty) {
+    //   _selectedDevice = _devices.firstWhere(
+    //     (d) => d.address == savedAddress,
+    //     orElse: () => _devices.first,
+    //   );
+    // }
+
+    if (mounted) setState(() {});
+  }
+
+  // Future<void> _loadBluetoothDevices() async {
+  //   setState(() => _loadingDevices = true);
+
+  //   try {
+  //     final devices = await _bluetoothPrinter.getBondedDevices();
+
+  //     if (!mounted) return;
+
+  //     setState(() {
+  //       _devices = devices;
+  //       _loadingDevices = false;
+  //     });
+
+  //     await _loadSettings();
+  //   } catch (e) {
+  //     if (!mounted) return;
+
+  //     setState(() => _loadingDevices = false);
+
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Bluetooth devices load failed: $e')),
+  //     );
+  //   }
+  // }
+
+  // Future<void> _saveBluetoothPrinter() async {
+  //   if (_selectedDevice == null) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('Select Bluetooth printer')),
+  //     );
+  //     return;
+  //   }
+
+  //   final prefs = await SharedPreferences.getInstance();
+
+  //   await prefs.setString(
+  //     'bluetooth_printer_address',
+  //     _selectedDevice!.address ?? '',
+  //   );
+
+  //   await prefs.setString(
+  //     'bluetooth_printer_name',
+  //     _selectedDevice!.name ?? 'Bluetooth Printer',
+  //   );
+
+  //   if (!mounted) return;
+
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     const SnackBar(content: Text('Bluetooth printer saved')),
+  //   );
+
+  //   Navigator.pop(context);
+  // }
+
+//   Future<void> _connectBluetoothPrinter() async {
+//   if (_selectedDevice == null) {
+//     ScaffoldMessenger.of(context).showSnackBar(
+//       const SnackBar(content: Text('Select Bluetooth printer')),
+//     );
+//     return;
 //   }
 
-//   Future<void> _loadSettings() async {
-//     final prefs = await SharedPreferences.getInstance();
+//   try {
+//     setState(() => _isConnecting = true);
 
-//     _ipController.text = prefs.getString('wifi_printer_ip') ?? '';
+//     final isConnected =
+//         await _bluetoothPrinter.isConnected ?? false;
 
-//     final savedAddress =
-//         prefs.getString('bluetooth_printer_address') ?? '';
-
-//     if (savedAddress.isNotEmpty && _devices.isNotEmpty) {
-//       _selectedDevice = _devices.firstWhere(
-//         (d) => d.address == savedAddress,
-//         orElse: () => _devices.first,
-//       );
-//     }
-
-//     if (mounted) setState(() {});
-//   }
-
-//   Future<void> _loadBluetoothDevices() async {
-//     setState(() => _loadingDevices = true);
-
-//     try {
-//       final devices = await _bluetoothPrinter.getBondedDevices();
-
-//       if (!mounted) return;
-
-//       setState(() {
-//         _devices = devices;
-//         _loadingDevices = false;
-//       });
-
-//       await _loadSettings();
-//     } catch (e) {
-//       if (!mounted) return;
-
-//       setState(() => _loadingDevices = false);
-
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(content: Text('Bluetooth devices load failed: $e')),
-//       );
-//     }
-//   }
-
-//   Future<void> _saveBluetoothPrinter() async {
-//     if (_selectedDevice == null) {
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         const SnackBar(content: Text('Select Bluetooth printer')),
-//       );
-//       return;
+//     if (!isConnected) {
+//       await _bluetoothPrinter.connect(_selectedDevice!);
 //     }
 
 //     final prefs = await SharedPreferences.getInstance();
@@ -98,42 +138,53 @@
 //     if (!mounted) return;
 
 //     ScaffoldMessenger.of(context).showSnackBar(
-//       const SnackBar(content: Text('Bluetooth printer saved')),
+//       SnackBar(
+//         content: Text(
+//           'Connected: ${_selectedDevice!.name ?? 'Printer'}',
+//         ),
+//       ),
 //     );
-
-//     Navigator.pop(context);
-//   }
-
-//   Future<void> _saveWifiPrinter() async {
-//     final ip = _ipController.text.trim();
-
-//     if (ip.isEmpty) {
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         const SnackBar(content: Text('Enter WiFi printer IP address')),
-//       );
-//       return;
-//     }
-
-//     final prefs = await SharedPreferences.getInstance();
-//     await prefs.setString('wifi_printer_ip', ip);
-
-//     if (!mounted) return;
-
+//   } catch (e) {
 //     ScaffoldMessenger.of(context).showSnackBar(
-//       const SnackBar(content: Text('WiFi printer IP saved')),
+//       SnackBar(content: Text('Connection failed: $e')),
 //     );
-
-//     Navigator.pop(context);
+//   } finally {
+//     if (mounted) {
+//       setState(() => _isConnecting = false);
+//     }
 //   }
+// }
 
-//   @override
-//   void dispose() {
-//     _ipController.dispose();
-//     super.dispose();
-//   }
+  Future<void> _saveWifiPrinter() async {
+    final ip = _ipController.text.trim();
 
-//   @override
-//   Widget build(BuildContext context) {
+    if (ip.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter WiFi printer IP address')),
+      );
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('wifi_printer_ip', ip);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('WiFi printer IP saved')),
+    );
+
+    Navigator.pop(context);
+  }
+
+  @override
+  void dispose() {
+    _ipController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
 //     if (Platform.isAndroid) {
 //       return Scaffold(
 //         appBar: AppBar(
@@ -180,15 +231,27 @@
 
 //               const SizedBox(height: 18),
 
-//               SizedBox(
-//                 width: double.infinity,
-//                 height: 50,
-//                 child: ElevatedButton.icon(
-//                   onPressed: _saveBluetoothPrinter,
-//                   icon: const Icon(Icons.save),
-//                   label: const Text('Save Bluetooth Printer'),
-//                 ),
-//               ),
+//              SizedBox(
+//   width: double.infinity,
+//   height: 50,
+//   child: ElevatedButton.icon(
+//     onPressed: _isConnecting ? null : _connectBluetoothPrinter,
+//     icon: _isConnecting
+//         ? const SizedBox(
+//             width: 18,
+//             height: 18,
+//             child: CircularProgressIndicator(
+//               strokeWidth: 2,
+//               color: Colors.white,
+//             ),
+//           )
+//         : const Icon(Icons.bluetooth_connected),
+//     label: Text(
+//       _isConnecting ? 'Connecting...' : 'Connect Printer',
+//     ),
+//   ),
+// ),
+              
 
 //               const SizedBox(height: 12),
 
@@ -207,94 +270,6 @@
 //       );
 //     }
 
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: const Text('WiFi Printer Settings'),
-//       ),
-//       body: Padding(
-//         padding: const EdgeInsets.all(18),
-//         child: Column(
-//           children: [
-//             TextField(
-//               controller: _ipController,
-//               keyboardType: TextInputType.number,
-//               decoration: const InputDecoration(
-//                 labelText: 'WiFi Printer IP Address',
-//                 hintText: 'Example: 192.168.1.120',
-//                 border: OutlineInputBorder(),
-//               ),
-//             ),
-//             const SizedBox(height: 18),
-//             SizedBox(
-//               width: double.infinity,
-//               height: 50,
-//               child: ElevatedButton.icon(
-//                 onPressed: _saveWifiPrinter,
-//                 icon: const Icon(Icons.save),
-//                 label: const Text('Save WiFi Printer IP'),
-//               ),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }
-
-import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-class PrinterSettingsScreen extends StatefulWidget {
-  const PrinterSettingsScreen({super.key});
-
-  @override
-  State<PrinterSettingsScreen> createState() => _PrinterSettingsScreenState();
-}
-
-class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
-  final TextEditingController _ipController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSavedIp();
-  }
-
-  Future<void> _loadSavedIp() async {
-    final prefs = await SharedPreferences.getInstance();
-    _ipController.text = prefs.getString('wifi_printer_ip') ?? '';
-  }
-
-  Future<void> _saveIp() async {
-    final ip = _ipController.text.trim();
-
-    if (ip.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter WiFi printer IP address')),
-      );
-      return;
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('wifi_printer_ip', ip);
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('WiFi printer IP saved')),
-    );
-
-    Navigator.pop(context);
-  }
-
-  @override
-  void dispose() {
-    _ipController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('WiFi Printer Settings'),
@@ -317,7 +292,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
               width: double.infinity,
               height: 50,
               child: ElevatedButton.icon(
-                onPressed: _saveIp,
+                onPressed: _saveWifiPrinter,
                 icon: const Icon(Icons.save),
                 label: const Text('Save WiFi Printer IP'),
               ),
@@ -328,3 +303,91 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
     );
   }
 }
+
+// import 'package:flutter/material.dart';
+// import 'package:shared_preferences/shared_preferences.dart';
+
+// class PrinterSettingsScreen extends StatefulWidget {
+//   const PrinterSettingsScreen({super.key});
+
+//   @override
+//   State<PrinterSettingsScreen> createState() => _PrinterSettingsScreenState();
+// }
+
+// class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
+//   final TextEditingController _ipController = TextEditingController();
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _loadSavedIp();
+//   }
+
+//   Future<void> _loadSavedIp() async {
+//     final prefs = await SharedPreferences.getInstance();
+//     _ipController.text = prefs.getString('wifi_printer_ip') ?? '';
+//   }
+
+//   Future<void> _saveIp() async {
+//     final ip = _ipController.text.trim();
+
+//     if (ip.isEmpty) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text('Enter WiFi printer IP address')),
+//       );
+//       return;
+//     }
+
+//     final prefs = await SharedPreferences.getInstance();
+//     await prefs.setString('wifi_printer_ip', ip);
+
+//     if (!mounted) return;
+
+//     ScaffoldMessenger.of(context).showSnackBar(
+//       const SnackBar(content: Text('WiFi printer IP saved')),
+//     );
+
+//     Navigator.pop(context);
+//   }
+
+//   @override
+//   void dispose() {
+//     _ipController.dispose();
+//     super.dispose();
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: const Text('WiFi Printer Settings'),
+//       ),
+//       body: Padding(
+//         padding: const EdgeInsets.all(18),
+//         child: Column(
+//           children: [
+//             TextField(
+//               controller: _ipController,
+//               keyboardType: TextInputType.number,
+//               decoration: const InputDecoration(
+//                 labelText: 'WiFi Printer IP Address',
+//                 hintText: 'Example: 192.168.1.120',
+//                 border: OutlineInputBorder(),
+//               ),
+//             ),
+//             const SizedBox(height: 18),
+//             SizedBox(
+//               width: double.infinity,
+//               height: 50,
+//               child: ElevatedButton.icon(
+//                 onPressed: _saveIp,
+//                 icon: const Icon(Icons.save),
+//                 label: const Text('Save WiFi Printer IP'),
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }

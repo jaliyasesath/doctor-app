@@ -16,8 +16,8 @@ static const String _cachedEndDateKey = 'cached_end_date';
 static const String _cachedDaysKey = 'cached_days_remaining';
 static const String _lastOnlineCheckKey = 'last_online_check';
 
-  //static const Duration trialDuration = Duration(days: 7);
-  static const Duration trialDuration = Duration(minutes: 1);
+  static const Duration trialDuration = Duration(days: 30);
+  //static const Duration trialDuration = Duration(minutes: 1);
   //static const Duration trialDuration = Duration(seconds: 30);
 
   static const List<String> validLifetimeKeys = [

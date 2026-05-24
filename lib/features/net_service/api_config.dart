@@ -14,11 +14,13 @@ class ApiConfig {
   // CLOUD API (PERMANENT FUTURE SERVER)
   // Replace later with:
   // https://api.yourclinic.com/api
+  
   // =========================================
 
-  static const String cloudBaseUrl =
-      'http://192.168.8.91:5219/api';
-       //'http://172.20.10.4:5219/api';
+  
+
+         static const String cloudBaseUrl =
+    'http://84.247.174.82:5219/api';
 
   // =========================================
   // LOCAL WIFI API (PC/LAPTOP API)
@@ -26,8 +28,10 @@ class ApiConfig {
   // =========================================
 
   static const String localWifiBaseUrl =
-      'http://192.168.8.91:5219/api';
-      // 'http://172.20.10.4:5219/api';
+      //'http://192.168.8.91:5219/api';
+       'http://172.20.10.4:5219/api';
+
+      
 
 
   // =========================================

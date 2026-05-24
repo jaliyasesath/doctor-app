@@ -95,7 +95,9 @@ void initState() {
   }
 
   Future<void> _checkLicenseOnDashboard() async {
+  if (!_licenseValid) {
   setState(() => _isCheckingLicense = true);
+}
   final trialExpired = await LicenseService.isTrialExpired();
 
 if (trialExpired) {

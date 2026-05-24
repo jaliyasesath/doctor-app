@@ -408,11 +408,9 @@ _loadCustomClinicalChips();
   }
 
   String _patientAllergyText() {
-    final allergyFromChips = selectedAllergies.join(', ');
-    final notes = _patientNotesController.text.trim();
-
-    return '$allergyFromChips $notes'.toLowerCase();
-  }
+  final allergyFromChips = selectedAllergies.join(', ');
+  return allergyFromChips.toLowerCase();
+}
 
   Future<bool> _checkAllergyBeforeAdd(Map<String, dynamic> medicine) async {
     final drugGroup =
