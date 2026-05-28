@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+//import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
@@ -33,7 +33,7 @@ class PrintPreviewScreen extends StatefulWidget {
 class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
   final WifiThermalPrinterService _wifiPrinter =
       WifiThermalPrinterService();
-  final BlueThermalPrinter printer = BlueThermalPrinter.instance;
+  //final BlueThermalPrinter printer = BlueThermalPrinter.instance;
 
   bool _isLoadingRx = true;
   bool _isLoadingDoctor = true;
@@ -75,7 +75,7 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
     }
     await _checkAlreadyBilled();
 
-    await _autoConnectPrinter();
+    //await _autoConnectPrinter();
   }
 
   Future<void> _loadDoctorHeader() async {
@@ -134,31 +134,31 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
 }
 
 
-  Future<void> _autoConnectPrinter() async {
-    if (!Platform.isAndroid) return;
+  // Future<void> _autoConnectPrinter() async {
+  //   if (!Platform.isAndroid) return;
 
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedAddress = prefs.getString('bluetooth_printer_address');
+  //   try {
+  //     final prefs = await SharedPreferences.getInstance();
+  //     final savedAddress = prefs.getString('bluetooth_printer_address');
 
-      if (savedAddress == null || savedAddress.isEmpty) return;
+  //     if (savedAddress == null || savedAddress.isEmpty) return;
 
-      final devices = await printer.getBondedDevices();
+  //     final devices = await printer.getBondedDevices();
 
-      BluetoothDevice? selected;
+  //     BluetoothDevice? selected;
 
-      for (final d in devices) {
-        if (d.address == savedAddress) {
-          selected = d;
-          break;
-        }
-      }
+  //     for (final d in devices) {
+  //       if (d.address == savedAddress) {
+  //         selected = d;
+  //         break;
+  //       }
+  //     }
 
-      if (selected != null) {
-        await printer.connect(selected);
-      }
-    } catch (_) {}
-  }
+  //     if (selected != null) {
+  //       await printer.connect(selected);
+  //     }
+  //   } catch (_) {}
+  // }
 
   List<Map<String, String>> _getPdfItems() {
     return PrescriptionStore.items.map((item) {
@@ -278,6 +278,14 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
     }
   }
 
+  // Future<void> _printNow() async {
+  // if (_isLoadingRx || _isLoadingDoctor || rxNo.isEmpty || qrValue.isEmpty) {
+  //   ScaffoldMessenger.of(context).showSnackBar(
+  //     const SnackBar(content: Text('Please wait, document is loading')),
+  //   );
+  //   return;
+  // }
+
   Future<void> _printNow() async {
   if (_isLoadingRx || _isLoadingDoctor || rxNo.isEmpty || qrValue.isEmpty) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -286,16 +294,18 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
     return;
   }
 
-  if (Platform.isAndroid) {
-    await _printBluetoothAndroid();
-  } else {
+  if (Platform.isIOS) {
+    await _printWifiIos();
+  } else if (Platform.isAndroid) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Printing is available on Android Bluetooth only'),
+        content: Text('Android Bluetooth print disabled in iOS build mode'),
       ),
     );
   }
 }
+
+ 
 
   // Future<void> _printNow() async {
   //   if (_isLoadingRx || _isLoadingDoctor || rxNo.isEmpty || qrValue.isEmpty) {
@@ -316,76 +326,76 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
   //   }
   // }
 
-//   Future<void> _printWifiIos() async {
-//     final prefs = await SharedPreferences.getInstance();
-//     final printerIp = prefs.getString('wifi_printer_ip') ?? '';
+  Future<void> _printWifiIos() async {
+    final prefs = await SharedPreferences.getInstance();
+    final printerIp = prefs.getString('wifi_printer_ip') ?? '';
 
-//     if (printerIp.isEmpty) {
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         const SnackBar(content: Text('Please set WiFi printer IP address first')),
-//       );
-//       return;
-//     }
+    if (printerIp.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please set WiFi printer IP address first')),
+      );
+      return;
+    }
 
-//     final currentDate =
-//         widget.passedDate ?? DateTime.now().toString().substring(0, 10);
+    final currentDate =
+        widget.passedDate ?? DateTime.now().toString().substring(0, 10);
 
-//     final text = '''
-// ${medicalCenterName.toUpperCase()}
-// Dr. $doctorName
-// $specialization
-// $clinicAddress
+    final text = '''
+${medicalCenterName.toUpperCase()}
+Dr. $doctorName
+$specialization
+$clinicAddress
 
-// -----------------------------
-// Date: $currentDate
-// Rx: $rxNo
-// -----------------------------
+-----------------------------
+Date: $currentDate
+Rx: $rxNo
+-----------------------------
 
-// PATIENT DETAILS
-// Name: ${PrescriptionStore.patientName}
-// Age: ${PrescriptionStore.patientAge}
-// Gender: ${PrescriptionStore.patientGender}
+PATIENT DETAILS
+Name: ${PrescriptionStore.patientName}
+Age: ${PrescriptionStore.patientAge}
+Gender: ${PrescriptionStore.patientGender}
 
-// -----------------------------
-// PRESCRIPTION
-// -----------------------------
-// ${PrescriptionStore.items.asMap().entries.map((entry) {
-//       final index = entry.key + 1;
-//       final item = entry.value;
-//       return '$index. ${item.medicineName}\n${item.dosage} | ${item.frequency} | ${item.duration}\n${item.instructions}';
-//     }).join('\n\n')}
+-----------------------------
+PRESCRIPTION
+-----------------------------
+${PrescriptionStore.items.asMap().entries.map((entry) {
+      final index = entry.key + 1;
+      final item = entry.value;
+      return '$index. ${item.medicineName}\n${item.dosage} | ${item.frequency} | ${item.duration}\n${item.instructions}';
+    }).join('\n\n')}
 
-// -----------------------------
-// Dr. $doctorName
-// $qualifications
-// $profession
-// SLMC Reg. No: $slmcRegNo
-// $affiliation
-// Tel: $contactNumber
-// -----------------------------
-// QR: $qrValue
+-----------------------------
+Dr. $doctorName
+$qualifications
+$profession
+SLMC Reg. No: $slmcRegNo
+$affiliation
+Tel: $contactNumber
+-----------------------------
+QR: $qrValue
 
-// GET WELL SOON
-// -----------------------------
-// ''';
+GET WELL SOON
+-----------------------------
+''';
 
-//     try {
-//       await _wifiPrinter.printText(
-//         printerIp: printerIp,
-//         text: text,
-//       );
+    try {
+      await _wifiPrinter.printText(
+        printerIp: printerIp,
+        text: text,
+      );
 
-//       if (!mounted) return;
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(content: Text('WiFi print sent ($rxNo)')),
-//       );
-//     } catch (e) {
-//       if (!mounted) return;
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(content: Text('WiFi print failed: $e')),
-//       );
-//     }
-//   }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('WiFi print sent ($rxNo)')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('WiFi print failed: $e')),
+      );
+    }
+  }
 
 // Future<void> _printBluetoothAndroid() async {
 //   ScaffoldMessenger.of(context).showSnackBar(
@@ -394,126 +404,7 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
 //     ),
 //   );
 // }
-  Future<void> _printBluetoothAndroid() async {
-    if (_isBillMode) {
-  await _printBluetoothBill();
-  return;
-}
-    final items = PrescriptionStore.items;
-    final currentDate =
-        widget.passedDate ?? DateTime.now().toString().substring(0, 10);
-
-    try {
-      final isConnected = await printer.isConnected ?? false;
-
-      if (!isConnected) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please connect printer first')),
-        );
-        return;
-      }
-
-      printer.printCustom(medicalCenterName.toUpperCase(), 2, 1);
-      printer.printCustom('Dr. $doctorName', 1, 1);
-
-      if (specialization.isNotEmpty) {
-        printer.printCustom(specialization, 0, 1);
-      }
-
-      if (clinicAddress.isNotEmpty) {
-        printer.printCustom(clinicAddress, 0, 1);
-      }
-
-      printer.printNewLine();
-      printer.printCustom('--------------------------------', 0, 1);
-
-      printer.printCustom('Date: $currentDate', 0, 0);
-      printer.printCustom('Rx: $rxNo', 0, 2);
-      printer.printCustom('--------------------------------', 0, 1);
-
-      printer.printCustom('PATIENT DETAILS', 1, 0);
-
-      if (PrescriptionStore.patientName.isNotEmpty) {
-        printer.printCustom('Name: ${PrescriptionStore.patientName}', 0, 0);
-      }
-
-      if (PrescriptionStore.patientAge.isNotEmpty) {
-        printer.printCustom('Age: ${PrescriptionStore.patientAge}', 0, 0);
-      }
-
-      if (PrescriptionStore.patientGender.isNotEmpty) {
-        printer.printCustom('Gender: ${PrescriptionStore.patientGender}', 0, 0);
-      }
-
-      printer.printCustom('--------------------------------', 0, 1);
-      printer.printCustom('PRESCRIPTION', 1, 1);
-      printer.printCustom('--------------------------------', 0, 1);
-
-      int index = 1;
-
-      for (final item in items) {
-        printer.printCustom('$index. ${item.medicineName}', 1, 0);
-
-        printer.printCustom(
-          '${item.dosage} | ${item.frequency} | ${item.duration}',
-          0,
-          0,
-        );
-
-        if (item.instructions.isNotEmpty) {
-          printer.printCustom(item.instructions, 0, 0);
-        }
-
-        printer.printNewLine();
-        index++;
-      }
-
-      printer.printCustom('--------------------------------', 0, 1);
-      printer.printCustom('Dr. $doctorName', 1, 1);
-
-      if (qualifications.isNotEmpty) {
-        printer.printCustom(qualifications, 0, 1);
-      }
-
-      if (profession.isNotEmpty) {
-        printer.printCustom(profession, 0, 1);
-      }
-
-      if (slmcRegNo.isNotEmpty) {
-        printer.printCustom('SLMC Reg. No: $slmcRegNo', 0, 1);
-      }
-
-      if (affiliation.isNotEmpty) {
-        printer.printCustom(affiliation, 0, 1);
-      }
-
-      if (contactNumber.isNotEmpty) {
-        printer.printCustom('Tel: $contactNumber', 0, 1);
-      }
-
-      printer.printCustom('--------------------------------', 0, 1);
-      printer.printCustom('Prescription QR', 1, 1);
-      await printer.printQRcode(qrValue, 220, 220, 1);
-      printer.printCustom(qrValue, 0, 1);
-      printer.printCustom('--------------------------------', 0, 1);
-      printer.printCustom('GET WELL SOON', 1, 1);
-      printer.printCustom('--------------------------------', 0, 1);
-      printer.printNewLine();
-      printer.printNewLine();
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Print sent with QR ($rxNo)')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Print failed: $e')),
-      );
-    }
-  }
+ 
 
   Future<void> _saveBillIfNeeded() async {
     if (!widget.allowBillSave) {
@@ -580,104 +471,7 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
 
 
 
-  Future<void> _printBluetoothBill() async {
-  final items = PrescriptionStore.items
-      .where((e) => !e.prescriptionOnly)
-      .toList();
-
-  final currentDate =
-      widget.passedDate ?? DateTime.now().toString().substring(0, 10);
-
-  final consultationFee =
-    PrescriptionStore.consultationFee;
-
-  final medicineTotal = items.fold<double>(
-    0,
-    (sum, item) => sum + item.lineTotal,
-  );
-
-  final grandTotal = consultationFee + medicineTotal;
-
- await _saveBillIfNeeded();
-
-  try {
-    final isConnected = await printer.isConnected ?? false;
-
-    if (!isConnected) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please connect printer first')),
-      );
-      return;
-    }
-
-    printer.printCustom(medicalCenterName.toUpperCase(), 2, 1);
-    printer.printCustom('BILL RECEIPT', 1, 1);
-    printer.printCustom('--------------------------------', 0, 1);
-
-    printer.printCustom('Date: $currentDate', 0, 0);
-    printer.printCustom('Rx: $rxNo', 0, 0);
-
-    if (PrescriptionStore.patientName.isNotEmpty) {
-      printer.printCustom(
-        'Patient: ${PrescriptionStore.patientName}',
-        0,
-        0,
-      );
-    }
-
-    printer.printCustom('--------------------------------', 0, 1);
-    printer.printCustom('ITEMS', 1, 1);
-    printer.printCustom('--------------------------------', 0, 1);
-
-    int index = 1;
-
-    for (final item in items) {
-      printer.printCustom('$index. ${item.medicineName}', 0, 0);
-      printer.printCustom(
-        'Qty: ${item.quantity}  Rs. ${item.lineTotal.toStringAsFixed(2)}',
-        0,
-        2,
-      );
-      index++;
-    }
-
-    printer.printCustom('--------------------------------', 0, 1);
-    printer.printCustom(
-      'Channeling Fee: Rs. ${consultationFee.toStringAsFixed(2)}',
-      0,
-      2,
-    );
-    printer.printCustom(
-      'Medicine Charges: Rs. ${medicineTotal.toStringAsFixed(2)}',
-      0,
-      2,
-    );
-    printer.printCustom('--------------------------------', 0, 1);
-    printer.printCustom(
-      'GRAND TOTAL: Rs. ${grandTotal.toStringAsFixed(2)}',
-      1,
-      2,
-    );
-    printer.printCustom('--------------------------------', 0, 1);
-
-    printer.printCustom('Thank you', 1, 1);
-    printer.printCustom('--------------------------------', 0, 1);
-    printer.printNewLine();
-    printer.printNewLine();
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Bill printed ($rxNo)')),
-    );
-  } catch (e) {
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Bill print failed: $e')),
-    );
-  }
-}
+ 
 
   bool _hasValidSignature() {
     return signaturePath.isNotEmpty && File(signaturePath).existsSync();
