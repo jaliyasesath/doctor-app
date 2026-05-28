@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
-
+import 'dart:async';
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 import '../data/prescription_store.dart';
 import '../models/prescription_item.dart';
 import 'print_preview_screen.dart';
+import '../../reception/screens/reception_prescription_edit_screen.dart';
 
 class PrescriptionHistoryScreen extends StatefulWidget {
-  const PrescriptionHistoryScreen({super.key});
+
+  final bool receptionMode;
+
+  const PrescriptionHistoryScreen({
+    super.key,
+    this.receptionMode = false,
+  });
 
   @override
   State<PrescriptionHistoryScreen> createState() =>
@@ -25,6 +32,7 @@ bool _hasMore = true;
 int? _doctorId;
 
 final ScrollController _scrollController = ScrollController();
+Timer? _refreshTimer;
 
 final int _limit = 30;
 int _offset = 0;
@@ -34,6 +42,12 @@ void initState() {
   super.initState();
 
   _initAndLoad();
+  _refreshTimer = Timer.periodic(
+  const Duration(seconds: 5),
+  (_) {
+    _loadPrescriptions();
+  },
+);
 
   _scrollController.addListener(() {
     if (_scrollController.position.pixels >=
@@ -63,25 +77,26 @@ void initState() {
     _doctorId = doctorId;
 
     await DatabaseHelper.instance.assignOldLocalDataToDoctor(doctorId);
-    await _loadPrescriptions();
+    await _loadPrescriptions(showLoader: true);
   }
 
- Future<void> _loadPrescriptions() async {
+ Future<void> _loadPrescriptions({bool showLoader = false}) async {
   if (_doctorId == null) return;
 
-  setState(() {
-    _isLoading = true;
-    _offset = 0;
-    _hasMore = true;
-  });
+  if (showLoader && mounted) {
+    setState(() {
+      _isLoading = true;
+    });
+  }
 
   try {
-    final data =
-        await DatabaseHelper.instance.getPrescriptionsByDoctorPaged(
-      _doctorId!,
-      limit: _limit,
-      offset: 0,
-    );
+    final data = widget.receptionMode
+    ? await DatabaseHelper.instance.getPrescriptions()
+    : await DatabaseHelper.instance.getPrescriptionsByDoctorPaged(
+        _doctorId!,
+        limit: _limit,
+        offset: 0,
+      );
 
     if (!mounted) return;
 
@@ -236,13 +251,20 @@ Future<void> _loadMorePrescriptions() async {
     );
   }
 
-  void _editNotReady() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Edit feature will be connected next'),
+  Future<void> _openReceptionEdit(int prescriptionId) async {
+  final updated = await Navigator.push<bool>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ReceptionPrescriptionEditScreen(
+        prescriptionId: prescriptionId,
       ),
-    );
+    ),
+  );
+
+  if (updated == true) {
+    await _loadPrescriptions();
   }
+}
 
   Widget _buildCard(Map<String, dynamic> item) {
     final patientName = (item['patient_name'] ?? '').toString();
@@ -303,21 +325,30 @@ Future<void> _loadMorePrescriptions() async {
                   child: OutlinedButton.icon(
                     icon: const Icon(Icons.edit),
                     label: const Text('Edit'),
-                    onPressed: _editNotReady,
+                    onPressed: widget.receptionMode
+    ? () => _openReceptionEdit(id)
+    : () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Edit feature will be connected next'),
+          ),
+        );
+      },
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.delete),
-                    label: const Text('Delete'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: () => _confirmDelete(id),
-                  ),
-                ),
+                if (!widget.receptionMode)
+  Expanded(
+    child: ElevatedButton.icon(
+      icon: const Icon(Icons.delete),
+      label: const Text('Delete'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.red,
+        foregroundColor: Colors.white,
+      ),
+      onPressed: () => _confirmDelete(id),
+    ),
+  ),
               ],
             ),
           ],
@@ -332,6 +363,7 @@ Future<void> _loadMorePrescriptions() async {
 
   @override
 void dispose() {
+  _refreshTimer?.cancel();
   _scrollController.dispose();
   super.dispose();
 }

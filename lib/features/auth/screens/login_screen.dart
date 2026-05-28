@@ -13,6 +13,7 @@ import '../../../data/local/database_helper.dart';
 import '../../net_service/connection_mode_service.dart';
 import '../../notifications/services/local_notification_service.dart';
 import '../../followup/screens/follow_up_screen.dart';
+import '../../sync/services/sync_service.dart';
 
 
 class LoginScreen extends StatefulWidget {
@@ -264,6 +265,9 @@ if (doctorId != null) {
     },
   );
 }
+
+await SyncService().resetSyncTimestamps();
+await SyncService().syncAll();
 
       if (!mounted) return;
 

@@ -64,6 +64,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
   late final TextEditingController _spo2Controller;
 
   late final TextEditingController _followUpNoteController;
+  late final TextEditingController _consultationFeeController;
 
 DateTime? _followUpDate;
 
@@ -74,6 +75,7 @@ bool _enableSmsReminder = false;
   String _selectedGender = 'Male';
   String? _currentRxNo;
   int? _currentPatientId;
+  bool _prescriptionSaved = false;
   final ApiPatientService _patientApi = ApiPatientService();
 
   String? _selectedComplaintChip;
@@ -136,6 +138,10 @@ final List<String> _diagnosisOptions = [
     super.initState();
 
     _followUpNoteController = TextEditingController();
+
+    _consultationFeeController = TextEditingController(
+  text: PrescriptionStore.consultationFee.toStringAsFixed(0),
+);
 
     _patientNameController = TextEditingController(
   text: widget.patientName ?? PrescriptionStore.patientName,
@@ -286,6 +292,7 @@ _loadCustomClinicalChips();
   @override
   void dispose() {
     _followUpNoteController.dispose();
+    _consultationFeeController.dispose();
     _patientNameController.dispose();
     _patientAgeController.dispose();
     _patientPhoneController.dispose();
@@ -522,6 +529,8 @@ String _buildDurationValue(
 
   final durationController =
     TextEditingController(text: '5');
+    final quantityController =
+    TextEditingController(text: '1');
 
 String selectedDurationUnit = 'Days';
 
@@ -533,6 +542,7 @@ String selectedDurationUnit = 'Days';
   );
 
   String selectedFrequency = 'BD';
+  bool prescriptionOnly = false;
 
   final added = await showDialog<bool>(
     context: context,
@@ -827,7 +837,17 @@ String selectedDurationUnit = 'Days';
 ),
 
                     const SizedBox(height: 12),
+TextField(
+  controller: quantityController,
+  keyboardType: TextInputType.number,
+  decoration: const InputDecoration(
+    labelText: 'Quantity',
+    hintText: '1',
+    border: OutlineInputBorder(),
+  ),
+),
 
+const SizedBox(height: 12),
                     TextField(
                       controller:
                           instructionsController,
@@ -840,6 +860,21 @@ String selectedDurationUnit = 'Days';
                         border: OutlineInputBorder(),
                       ),
                     ),
+                    const SizedBox(height: 8),
+
+CheckboxListTile(
+  value: prescriptionOnly,
+  onChanged: (value) {
+    setDialogState(() {
+      prescriptionOnly = value ?? false;
+    });
+  },
+  title: const Text(
+    'Prescription only (Do not add to bill)',
+  ),
+  controlAffinity: ListTileControlAffinity.leading,
+  contentPadding: EdgeInsets.zero,
+),
                   ],
                 ),
               ),
@@ -867,6 +902,7 @@ String selectedDurationUnit = 'Days';
     dosageController.dispose();
     durationController.dispose();
     instructionsController.dispose();
+    quantityController.dispose();
     return;
   }
 
@@ -878,6 +914,7 @@ String selectedDurationUnit = 'Days';
     dosageController.dispose();
     durationController.dispose();
     instructionsController.dispose();
+    quantityController.dispose();
     return;
   }
 
@@ -896,6 +933,30 @@ String selectedDurationUnit = 'Days';
 ),
         instructions:
             instructionsController.text.trim(),
+            prescriptionOnly: prescriptionOnly,
+unitPrice: prescriptionOnly
+    ? 0
+    : double.tryParse(
+          selected!['selling_price']?.toString() ?? '0',
+        ) ??
+        0,
+quantity: prescriptionOnly
+    ? 0
+    : double.tryParse(
+          quantityController.text.trim(),
+        ) ??
+        1,
+
+lineTotal: prescriptionOnly
+    ? 0
+    : (double.tryParse(
+              selected!['selling_price']?.toString() ?? '0',
+            ) ??
+            0) *
+        (double.tryParse(
+              quantityController.text.trim(),
+            ) ??
+            1),
       ),
     );
   });
@@ -904,6 +965,7 @@ String selectedDurationUnit = 'Days';
   dosageController.dispose();
   durationController.dispose();
   instructionsController.dispose();
+  quantityController.dispose();
 }
 
   Future<void> _ensureRxNumber() async {
@@ -933,6 +995,10 @@ String selectedDurationUnit = 'Days';
       }
 
       final items = PrescriptionStore.items;
+
+
+
+      
 
       if (_patientNameController.text.trim().isEmpty ||
           _patientAgeController.text.trim().isEmpty ||
@@ -1068,6 +1134,10 @@ final itemRows = items.map((item) {
     'frequency': item.frequency,
     'duration': item.duration,
     'instructions': item.instructions,
+    'prescription_only': item.prescriptionOnly ? 1 : 0,
+    'unit_price': item.unitPrice,
+    'quantity': item.quantity,
+    'line_total': item.lineTotal,
   };
 }).toList();
 
@@ -1084,10 +1154,30 @@ if (_followUpDate != null && _enableAppReminder) {
   );
 }
 
-      final online = await NetworkService.isOnline();
+  if (!mounted) return;
 
-      if (online) {
-  await SyncService().syncAll();
+setState(() {
+  _prescriptionSaved = true;
+});
+
+final message = _isEditMode
+    ? 'Prescription updated successfully ✅'
+    : 'Prescription saved successfully ✅';
+
+ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+    content: Text(message),
+    backgroundColor: Colors.green,
+    duration: const Duration(seconds: 2),
+  ),
+);
+
+final online = await NetworkService.isOnline();
+
+if (online) {
+  try {
+    await SyncService().syncAll();
+  } catch (_) {}
 }
 
 if (widget.existingPatientId != null) {
@@ -1098,23 +1188,13 @@ if (widget.existingPatientId != null) {
   } catch (_) {}
 }
 
-      if (!mounted) return;
+if (mounted) {
+  setState(() {});
+}
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            online
-                ? (_isEditMode
-                    ? 'Prescription updated and synced'
-                    : 'Prescription saved and synced')
-                : (_isEditMode
-                    ? 'Prescription updated locally (pending sync)'
-                    : 'Prescription saved locally (pending sync)'),
-          ),
-        ),
-      );
 
-      _resetFormAfterSave();
+
+//_resetFormAfterSave();
     } catch (e) {
       if (!mounted) return;
 
@@ -1158,7 +1238,7 @@ _enableSmsReminder = false;
       selectedDiseases = [];
 
       selectedMedicine = null;
-
+      _prescriptionSaved = false;
       _currentRxNo = null;
       _currentPatientId = null;
     });
@@ -1263,6 +1343,7 @@ _enableSmsReminder = false;
           passedDate: _isEditMode
               ? widget.existingDate
               : DateTime.now().toString().substring(0, 10),
+              allowBillSave: true,
         ),
       ),
     );
@@ -1393,6 +1474,7 @@ if (item.duration.contains('/52')) {
     ),
   ],
 ),
+
                     const SizedBox(height: 12),
                     TextField(
                       controller: instructionsController,
@@ -1422,16 +1504,20 @@ if (item.duration.contains('/52')) {
 
     if (result == true) {
       setState(() {
-        PrescriptionStore.items[index] = PrescriptionItem(
-          medicineName: item.medicineName,
-          dosage: dosageController.text.trim(),
-          frequency: selectedFrequency,
-          duration: _buildDurationValue(
-  durationController.text,
-  selectedDurationUnit,
-),
-          instructions: instructionsController.text.trim(),
-        );
+       PrescriptionStore.items[index] = PrescriptionItem(
+  medicineName: item.medicineName,
+  dosage: dosageController.text.trim(),
+  frequency: selectedFrequency,
+  duration: _buildDurationValue(
+    durationController.text,
+    selectedDurationUnit,
+  ),
+  instructions: instructionsController.text.trim(),
+  prescriptionOnly: item.prescriptionOnly,
+  unitPrice: item.unitPrice,
+  quantity: item.quantity,
+  lineTotal: item.lineTotal,
+);
       });
     }
 
@@ -2184,9 +2270,57 @@ Future<void> _deleteClinicalOption({
   );
 }
 
+Widget _buildBillingSection() {
+  return ExpansionTile(
+    initiallyExpanded: false,
+    tilePadding: EdgeInsets.zero,
+    title: const Row(
+      children: [
+        Icon(Icons.payments_outlined, color: Colors.green),
+        SizedBox(width: 8),
+        Text(
+          'Billing',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ],
+    ),
+    subtitle: Text(
+      'Channeling Fee: Rs. ${PrescriptionStore.consultationFee.toStringAsFixed(2)}',
+    ),
+    children: [
+      const SizedBox(height: 12),
+      TextField(
+        controller: _consultationFeeController,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(
+          labelText: 'Channeling Fee',
+          hintText: '1500',
+          prefixText: 'Rs. ',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        onChanged: (value) {
+          final fee = double.tryParse(value.trim()) ?? 0;
+          PrescriptionStore.setConsultationFee(fee);
+          setState(() {});
+        },
+      ),
+    ],
+  );
+}
+
   @override
-  Widget build(BuildContext context) {
-    final items = PrescriptionStore.items;
+Widget build(BuildContext context) {
+  final items = PrescriptionStore.items;
+
+  final medicineTotal = items
+      .where((e) => !e.prescriptionOnly)
+      .fold<double>(0, (sum, e) => sum + e.lineTotal);
+
+  final channelingFee = PrescriptionStore.consultationFee;
+
+  final grandTotal = medicineTotal + channelingFee;
 
     return Scaffold(
   resizeToAvoidBottomInset: true,
@@ -2256,8 +2390,12 @@ const SizedBox(height: 14),
 _buildVisitDetailsSection(),
                       const SizedBox(height: 14),
 _buildFollowUpSection(),
-                      const SizedBox(height: 14),
-                      _buildSmartClinicalField(
+const SizedBox(height: 14),
+
+_buildBillingSection(),
+const SizedBox(height: 14),
+
+_buildSmartClinicalField(
                         title: 'Complaint',
                         hintText: 'Type or select complaint',
                         controller: _complaintController,
@@ -2312,6 +2450,40 @@ _buildFollowUpSection(),
                     ],
                   ),
                 ),
+                Container(
+  width: double.infinity,
+  padding: const EdgeInsets.all(14),
+  margin: const EdgeInsets.only(bottom: 12),
+  decoration: BoxDecoration(
+    color: Colors.green.withOpacity(0.08),
+    borderRadius: BorderRadius.circular(14),
+    border: Border.all(color: Colors.green.withOpacity(0.25)),
+  ),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'Bill Summary',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 15,
+        ),
+      ),
+      const SizedBox(height: 8),
+      Text('Medicine Total: Rs. ${medicineTotal.toStringAsFixed(2)}'),
+      Text('Channeling Fee: Rs. ${channelingFee.toStringAsFixed(2)}'),
+      const Divider(),
+      Text(
+        'Grand Total: Rs. ${grandTotal.toStringAsFixed(2)}',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Colors.green,
+        ),
+      ),
+    ],
+  ),
+),
+                
                 const SizedBox(height: 12),
                 if (items.isEmpty)
                   const Center(
@@ -2345,31 +2517,74 @@ _buildFollowUpSection(),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.medicineName,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${item.dosage} • ${item.frequency} • ${item.duration}',
-                                  style: const TextStyle(color: Colors.black54),
-                                ),
-                                if (item.instructions.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    item.instructions,
-                                    style: const TextStyle(
-                                      color: Colors.blueGrey,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+
+    Text(
+      item.medicineName,
+      style: const TextStyle(
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+
+    if (item.prescriptionOnly) ...[
+      const SizedBox(height: 4),
+
+      Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 8,
+          vertical: 4,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Text(
+          'Prescription Only',
+          style: TextStyle(
+            color: Colors.orange,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    ],
+
+    const SizedBox(height: 4),
+
+    Text(
+      '${item.dosage} • ${item.frequency} • ${item.duration}',
+      style: const TextStyle(
+        color: Colors.black54,
+      ),
+    ),
+    if (!item.prescriptionOnly) ...[
+  const SizedBox(height: 4),
+  Text(
+    'Qty: ${item.quantity.toStringAsFixed(0)} • '
+    'Unit: Rs. ${item.unitPrice.toStringAsFixed(2)} • '
+    'Total: Rs. ${item.lineTotal.toStringAsFixed(2)}',
+    style: const TextStyle(
+      color: Colors.green,
+      fontSize: 13,
+      fontWeight: FontWeight.w600,
+    ),
+  ),
+],
+
+    if (item.instructions.isNotEmpty) ...[
+      const SizedBox(height: 4),
+
+      Text(
+        item.instructions,
+        style: const TextStyle(
+          color: Colors.blueGrey,
+          fontSize: 13,
+        ),
+      ),
+    ],
+  ],
+)
                           ),
                           IconButton(
                             icon: const Icon(Icons.edit, color: Colors.orange),
@@ -2420,7 +2635,10 @@ _buildFollowUpSection(),
                 child: ElevatedButton.icon(
                   icon: const Icon(Icons.print),
                   label: const Text('Print Preview'),
-                  onPressed: _openPrintPreview,
+                 onPressed:
+    _prescriptionSaved
+        ? _openPrintPreview
+        : null,
                 ),
               ),
             ),

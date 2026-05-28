@@ -24,6 +24,10 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
   late final TextEditingController _addressController;
   late final TextEditingController _notesController;
 
+  late final TextEditingController _allergiesController;
+late final TextEditingController _chronicController;
+late final TextEditingController _alertsController;
+
   late String _selectedGender;
   bool _isSaving = false;
 
@@ -61,6 +65,24 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
       text: (widget.patient['notes'] ?? '').toString(),
     );
 
+    _allergiesController = TextEditingController(
+  text: (widget.patient['allergies'] ?? '').toString(),
+);
+
+_chronicController = TextEditingController(
+  text: (widget.patient['chronic_diseases'] ??
+          widget.patient['chronicDiseases'] ??
+          '')
+      .toString(),
+);
+
+_alertsController = TextEditingController(
+  text: (widget.patient['important_alerts'] ??
+          widget.patient['importantAlerts'] ??
+          '')
+      .toString(),
+);
+
     _selectedGender = (widget.patient['patientGender'] ??
             widget.patient['gender'] ??
             widget.patient['patient_gender'] ??
@@ -79,6 +101,9 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
     _phoneController.dispose();
     _addressController.dispose();
     _notesController.dispose();
+    _allergiesController.dispose();
+_chronicController.dispose();
+_alertsController.dispose();
     super.dispose();
   }
 
@@ -97,6 +122,9 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
         'phone_number': _phoneController.text.trim(),
         'address': _addressController.text.trim(),
         'notes': _notesController.text.trim(),
+        'allergies': _allergiesController.text.trim(),
+'chronic_diseases': _chronicController.text.trim(),
+'important_alerts': _alertsController.text.trim(),
       });
 
       final online = await NetworkService.isOnline();
@@ -208,14 +236,37 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
               ),
               const SizedBox(height: 12),
               TextFormField(
-                controller: _notesController,
-                maxLines: 3,
-                decoration: _decoration('Notes'),
-              ),
+  controller: _notesController,
+  maxLines: 3,
+  decoration: _decoration('Notes'),
+),
+
+const SizedBox(height: 12),
+
+TextFormField(
+  controller: _allergiesController,
+  decoration: _decoration('Allergies'),
+),
+
+const SizedBox(height: 12),
+
+TextFormField(
+  controller: _chronicController,
+  decoration: _decoration('Chronic Diseases'),
+),
+
+const SizedBox(height: 12),
+
+TextFormField(
+  controller: _alertsController,
+  maxLines: 2,
+  decoration: _decoration('Important Alerts'),
+),
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
                 height: 50,
+
                 child: ElevatedButton(
                   onPressed: _isSaving ? null : _savePatient,
                   child: _isSaving

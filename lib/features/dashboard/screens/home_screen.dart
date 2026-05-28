@@ -12,7 +12,7 @@ import '../../prescription/screens/patient_history_screen.dart';
 import '../../prescription/screens/prescription_history_screen.dart';
 import '../../prescription/screens/prescription_list_screen.dart';
 import '../../prescription/screens/qr_scan_screen.dart';
-import '../../printer/screens/printer_screen.dart';
+
 import '../../sync/services/network_service.dart';
 import '../../sync/services/sync_service.dart';
 import '../../medicines/screens/medicine_screen.dart';
@@ -25,6 +25,7 @@ import 'dart:async';
 import '../../license/screens/admin_subscription_screen.dart';
 
 import '../../followup/screens/follow_up_screen.dart';
+import '../../billing/screens/billing_report_screen.dart';
 import '../../license/screens/license_gate_screen.dart';
 import '../../license/data/license_service.dart';
 
@@ -337,9 +338,7 @@ if (trialExpired) {
       case 'Scan Prescription':
         screen = const QRScanScreen();
         break;
-      case 'Thermal Print Setup':
-        screen = const PrinterScreen();
-        break;
+      
         
   //       case 'Admin Subscriptions':
   // screen = const AdminSubscriptionScreen();
@@ -348,6 +347,9 @@ if (trialExpired) {
 
 case 'Follow-Ups':
   screen = const FollowUpScreen();
+  break;
+  case 'Income Report':
+  screen = const BillingReportScreen();
   break;
     }
 
@@ -634,6 +636,11 @@ Widget _summaryCard(
   final items = [
     _buildCard('OPD Fast Mode', Icons.flash_on, Colors.red),
     _buildCard('Analytics', Icons.bar_chart, Colors.deepPurple),
+    _buildCard(
+  'Income Report',
+  Icons.account_balance_wallet,
+  Colors.green,
+),
 //     _buildCard(
 //   'Admin Subscriptions',
 //   Icons.workspace_premium,
@@ -647,7 +654,7 @@ Widget _summaryCard(
     _buildCard('Patient History', Icons.search, Colors.teal),
     _buildCard('Patient Master', Icons.people_alt, Colors.brown),
     _buildCard('Scan Prescription', Icons.qr_code_scanner, Colors.indigo),
-    _buildCard('Thermal Print Setup', Icons.print, Colors.purple),
+   
     _buildCard('Hotspot QR', Icons.qr_code_2, Colors.blueGrey),
   ];
 

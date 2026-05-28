@@ -1,6 +1,6 @@
 import 'dart:io';
 
-//import 'package:blue_thermal_printer/blue_thermal_printer.dart';
+import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
@@ -12,16 +12,19 @@ import '../data/prescription_store.dart';
 import '../services/wifi_thermal_printer_service.dart';
 import '../utils/prescription_pdf_helper.dart';
 import 'printer_settings_screen.dart';
+import '../../../data/local/database_helper.dart';
 
 class PrintPreviewScreen extends StatefulWidget {
   final String? passedRxNo;
   final String? passedDate;
+  final bool allowBillSave;
 
   const PrintPreviewScreen({
-    super.key,
-    this.passedRxNo,
-    this.passedDate,
-  });
+  super.key,
+  this.passedRxNo,
+  this.passedDate,
+  this.allowBillSave = false,
+});
 
   @override
   State<PrintPreviewScreen> createState() => _PrintPreviewScreenState();
@@ -30,12 +33,14 @@ class PrintPreviewScreen extends StatefulWidget {
 class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
   final WifiThermalPrinterService _wifiPrinter =
       WifiThermalPrinterService();
-  //final BlueThermalPrinter printer = BlueThermalPrinter.instance;
+  final BlueThermalPrinter printer = BlueThermalPrinter.instance;
 
   bool _isLoadingRx = true;
   bool _isLoadingDoctor = true;
   bool _isSharingPdf = false;
   bool _isSharingWhatsApp = false;
+  bool _isBillMode = false;
+  bool _alreadyBilled = false;
 
   String rxNo = '';
   String qrValue = '';
@@ -68,8 +73,9 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
     } else {
       await _loadPersistentRx();
     }
+    await _checkAlreadyBilled();
 
-    //await _autoConnectPrinter();
+    await _autoConnectPrinter();
   }
 
   Future<void> _loadDoctorHeader() async {
@@ -109,33 +115,50 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
       _isLoadingRx = false;
     });
   }
+  Future<void> _checkAlreadyBilled() async {
+  final prescription =
+      await DatabaseHelper.instance.getPrescriptionByNo(rxNo);
+
+  final prescriptionId = prescription?['id'] as int?;
+
+  if (prescriptionId == null) return;
+
+  final bill =
+      await DatabaseHelper.instance.getBillByPrescription(prescriptionId);
+
+  if (!mounted) return;
+
+  setState(() {
+    _alreadyBilled = bill != null;
+  });
+}
 
 
-  // Future<void> _autoConnectPrinter() async {
-  //   if (!Platform.isAndroid) return;
+  Future<void> _autoConnectPrinter() async {
+    if (!Platform.isAndroid) return;
 
-  //   try {
-  //     final prefs = await SharedPreferences.getInstance();
-  //     final savedAddress = prefs.getString('bluetooth_printer_address');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedAddress = prefs.getString('bluetooth_printer_address');
 
-  //     if (savedAddress == null || savedAddress.isEmpty) return;
+      if (savedAddress == null || savedAddress.isEmpty) return;
 
-  //     final devices = await printer.getBondedDevices();
+      final devices = await printer.getBondedDevices();
 
-  //     BluetoothDevice? selected;
+      BluetoothDevice? selected;
 
-  //     for (final d in devices) {
-  //       if (d.address == savedAddress) {
-  //         selected = d;
-  //         break;
-  //       }
-  //     }
+      for (final d in devices) {
+        if (d.address == savedAddress) {
+          selected = d;
+          break;
+        }
+      }
 
-  //     if (selected != null) {
-  //       await printer.connect(selected);
-  //     }
-  //   } catch (_) {}
-  // }
+      if (selected != null) {
+        await printer.connect(selected);
+      }
+    } catch (_) {}
+  }
 
   List<Map<String, String>> _getPdfItems() {
     return PrescriptionStore.items.map((item) {
@@ -263,7 +286,15 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
     return;
   }
 
-  await _printWifiIos();
+  if (Platform.isAndroid) {
+    await _printBluetoothAndroid();
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Printing is available on Android Bluetooth only'),
+      ),
+    );
+  }
 }
 
   // Future<void> _printNow() async {
@@ -285,76 +316,76 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
   //   }
   // }
 
-  Future<void> _printWifiIos() async {
-    final prefs = await SharedPreferences.getInstance();
-    final printerIp = prefs.getString('wifi_printer_ip') ?? '';
+//   Future<void> _printWifiIos() async {
+//     final prefs = await SharedPreferences.getInstance();
+//     final printerIp = prefs.getString('wifi_printer_ip') ?? '';
 
-    if (printerIp.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please set WiFi printer IP address first')),
-      );
-      return;
-    }
+//     if (printerIp.isEmpty) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text('Please set WiFi printer IP address first')),
+//       );
+//       return;
+//     }
 
-    final currentDate =
-        widget.passedDate ?? DateTime.now().toString().substring(0, 10);
+//     final currentDate =
+//         widget.passedDate ?? DateTime.now().toString().substring(0, 10);
 
-    final text = '''
-${medicalCenterName.toUpperCase()}
-Dr. $doctorName
-$specialization
-$clinicAddress
+//     final text = '''
+// ${medicalCenterName.toUpperCase()}
+// Dr. $doctorName
+// $specialization
+// $clinicAddress
 
------------------------------
-Date: $currentDate
-Rx: $rxNo
------------------------------
+// -----------------------------
+// Date: $currentDate
+// Rx: $rxNo
+// -----------------------------
 
-PATIENT DETAILS
-Name: ${PrescriptionStore.patientName}
-Age: ${PrescriptionStore.patientAge}
-Gender: ${PrescriptionStore.patientGender}
+// PATIENT DETAILS
+// Name: ${PrescriptionStore.patientName}
+// Age: ${PrescriptionStore.patientAge}
+// Gender: ${PrescriptionStore.patientGender}
 
------------------------------
-PRESCRIPTION
------------------------------
-${PrescriptionStore.items.asMap().entries.map((entry) {
-      final index = entry.key + 1;
-      final item = entry.value;
-      return '$index. ${item.medicineName}\n${item.dosage} | ${item.frequency} | ${item.duration}\n${item.instructions}';
-    }).join('\n\n')}
+// -----------------------------
+// PRESCRIPTION
+// -----------------------------
+// ${PrescriptionStore.items.asMap().entries.map((entry) {
+//       final index = entry.key + 1;
+//       final item = entry.value;
+//       return '$index. ${item.medicineName}\n${item.dosage} | ${item.frequency} | ${item.duration}\n${item.instructions}';
+//     }).join('\n\n')}
 
------------------------------
-Dr. $doctorName
-$qualifications
-$profession
-SLMC Reg. No: $slmcRegNo
-$affiliation
-Tel: $contactNumber
------------------------------
-QR: $qrValue
+// -----------------------------
+// Dr. $doctorName
+// $qualifications
+// $profession
+// SLMC Reg. No: $slmcRegNo
+// $affiliation
+// Tel: $contactNumber
+// -----------------------------
+// QR: $qrValue
 
-GET WELL SOON
------------------------------
-''';
+// GET WELL SOON
+// -----------------------------
+// ''';
 
-    try {
-      await _wifiPrinter.printText(
-        printerIp: printerIp,
-        text: text,
-      );
+//     try {
+//       await _wifiPrinter.printText(
+//         printerIp: printerIp,
+//         text: text,
+//       );
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('WiFi print sent ($rxNo)')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('WiFi print failed: $e')),
-      );
-    }
-  }
+//       if (!mounted) return;
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text('WiFi print sent ($rxNo)')),
+//       );
+//     } catch (e) {
+//       if (!mounted) return;
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text('WiFi print failed: $e')),
+//       );
+//     }
+//   }
 
 // Future<void> _printBluetoothAndroid() async {
 //   ScaffoldMessenger.of(context).showSnackBar(
@@ -363,122 +394,290 @@ GET WELL SOON
 //     ),
 //   );
 // }
-  // Future<void> _printBluetoothAndroid() async {
-  //   final items = PrescriptionStore.items;
-  //   final currentDate =
-  //       widget.passedDate ?? DateTime.now().toString().substring(0, 10);
+  Future<void> _printBluetoothAndroid() async {
+    if (_isBillMode) {
+  await _printBluetoothBill();
+  return;
+}
+    final items = PrescriptionStore.items;
+    final currentDate =
+        widget.passedDate ?? DateTime.now().toString().substring(0, 10);
 
-  //   try {
-  //     final isConnected = await printer.isConnected ?? false;
+    try {
+      final isConnected = await printer.isConnected ?? false;
 
-  //     if (!isConnected) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(content: Text('Please connect printer first')),
-  //       );
-  //       return;
-  //     }
+      if (!isConnected) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please connect printer first')),
+        );
+        return;
+      }
 
-  //     printer.printCustom(medicalCenterName.toUpperCase(), 2, 1);
-  //     printer.printCustom('Dr. $doctorName', 1, 1);
+      printer.printCustom(medicalCenterName.toUpperCase(), 2, 1);
+      printer.printCustom('Dr. $doctorName', 1, 1);
 
-  //     if (specialization.isNotEmpty) {
-  //       printer.printCustom(specialization, 0, 1);
-  //     }
+      if (specialization.isNotEmpty) {
+        printer.printCustom(specialization, 0, 1);
+      }
 
-  //     if (clinicAddress.isNotEmpty) {
-  //       printer.printCustom(clinicAddress, 0, 1);
-  //     }
+      if (clinicAddress.isNotEmpty) {
+        printer.printCustom(clinicAddress, 0, 1);
+      }
 
-  //     printer.printNewLine();
-  //     printer.printCustom('--------------------------------', 0, 1);
+      printer.printNewLine();
+      printer.printCustom('--------------------------------', 0, 1);
 
-  //     printer.printCustom('Date: $currentDate', 0, 0);
-  //     printer.printCustom('Rx: $rxNo', 0, 2);
-  //     printer.printCustom('--------------------------------', 0, 1);
+      printer.printCustom('Date: $currentDate', 0, 0);
+      printer.printCustom('Rx: $rxNo', 0, 2);
+      printer.printCustom('--------------------------------', 0, 1);
 
-  //     printer.printCustom('PATIENT DETAILS', 1, 0);
+      printer.printCustom('PATIENT DETAILS', 1, 0);
 
-  //     if (PrescriptionStore.patientName.isNotEmpty) {
-  //       printer.printCustom('Name: ${PrescriptionStore.patientName}', 0, 0);
-  //     }
+      if (PrescriptionStore.patientName.isNotEmpty) {
+        printer.printCustom('Name: ${PrescriptionStore.patientName}', 0, 0);
+      }
 
-  //     if (PrescriptionStore.patientAge.isNotEmpty) {
-  //       printer.printCustom('Age: ${PrescriptionStore.patientAge}', 0, 0);
-  //     }
+      if (PrescriptionStore.patientAge.isNotEmpty) {
+        printer.printCustom('Age: ${PrescriptionStore.patientAge}', 0, 0);
+      }
 
-  //     if (PrescriptionStore.patientGender.isNotEmpty) {
-  //       printer.printCustom('Gender: ${PrescriptionStore.patientGender}', 0, 0);
-  //     }
+      if (PrescriptionStore.patientGender.isNotEmpty) {
+        printer.printCustom('Gender: ${PrescriptionStore.patientGender}', 0, 0);
+      }
 
-  //     printer.printCustom('--------------------------------', 0, 1);
-  //     printer.printCustom('PRESCRIPTION', 1, 1);
-  //     printer.printCustom('--------------------------------', 0, 1);
+      printer.printCustom('--------------------------------', 0, 1);
+      printer.printCustom('PRESCRIPTION', 1, 1);
+      printer.printCustom('--------------------------------', 0, 1);
 
-  //     int index = 1;
+      int index = 1;
 
-  //     for (final item in items) {
-  //       printer.printCustom('$index. ${item.medicineName}', 1, 0);
+      for (final item in items) {
+        printer.printCustom('$index. ${item.medicineName}', 1, 0);
 
-  //       printer.printCustom(
-  //         '${item.dosage} | ${item.frequency} | ${item.duration}',
-  //         0,
-  //         0,
-  //       );
+        printer.printCustom(
+          '${item.dosage} | ${item.frequency} | ${item.duration}',
+          0,
+          0,
+        );
 
-  //       if (item.instructions.isNotEmpty) {
-  //         printer.printCustom(item.instructions, 0, 0);
-  //       }
+        if (item.instructions.isNotEmpty) {
+          printer.printCustom(item.instructions, 0, 0);
+        }
 
-  //       printer.printNewLine();
-  //       index++;
-  //     }
+        printer.printNewLine();
+        index++;
+      }
 
-  //     printer.printCustom('--------------------------------', 0, 1);
-  //     printer.printCustom('Dr. $doctorName', 1, 1);
+      printer.printCustom('--------------------------------', 0, 1);
+      printer.printCustom('Dr. $doctorName', 1, 1);
 
-  //     if (qualifications.isNotEmpty) {
-  //       printer.printCustom(qualifications, 0, 1);
-  //     }
+      if (qualifications.isNotEmpty) {
+        printer.printCustom(qualifications, 0, 1);
+      }
 
-  //     if (profession.isNotEmpty) {
-  //       printer.printCustom(profession, 0, 1);
-  //     }
+      if (profession.isNotEmpty) {
+        printer.printCustom(profession, 0, 1);
+      }
 
-  //     if (slmcRegNo.isNotEmpty) {
-  //       printer.printCustom('SLMC Reg. No: $slmcRegNo', 0, 1);
-  //     }
+      if (slmcRegNo.isNotEmpty) {
+        printer.printCustom('SLMC Reg. No: $slmcRegNo', 0, 1);
+      }
 
-  //     if (affiliation.isNotEmpty) {
-  //       printer.printCustom(affiliation, 0, 1);
-  //     }
+      if (affiliation.isNotEmpty) {
+        printer.printCustom(affiliation, 0, 1);
+      }
 
-  //     if (contactNumber.isNotEmpty) {
-  //       printer.printCustom('Tel: $contactNumber', 0, 1);
-  //     }
+      if (contactNumber.isNotEmpty) {
+        printer.printCustom('Tel: $contactNumber', 0, 1);
+      }
 
-  //     printer.printCustom('--------------------------------', 0, 1);
-  //     printer.printCustom('Prescription QR', 1, 1);
-  //     await printer.printQRcode(qrValue, 220, 220, 1);
-  //     printer.printCustom(qrValue, 0, 1);
-  //     printer.printCustom('--------------------------------', 0, 1);
-  //     printer.printCustom('GET WELL SOON', 1, 1);
-  //     printer.printCustom('--------------------------------', 0, 1);
-  //     printer.printNewLine();
-  //     printer.printNewLine();
+      printer.printCustom('--------------------------------', 0, 1);
+      printer.printCustom('Prescription QR', 1, 1);
+      await printer.printQRcode(qrValue, 220, 220, 1);
+      printer.printCustom(qrValue, 0, 1);
+      printer.printCustom('--------------------------------', 0, 1);
+      printer.printCustom('GET WELL SOON', 1, 1);
+      printer.printCustom('--------------------------------', 0, 1);
+      printer.printNewLine();
+      printer.printNewLine();
 
-  //     if (!mounted) return;
+      if (!mounted) return;
 
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(content: Text('Print sent with QR ($rxNo)')),
-  //     );
-  //   } catch (e) {
-  //     if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Print sent with QR ($rxNo)')),
+      );
+    } catch (e) {
+      if (!mounted) return;
 
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(content: Text('Print failed: $e')),
-  //     );
-  //   }
-  // }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Print failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _saveBillIfNeeded() async {
+    if (!widget.allowBillSave) {
+  return;
+}
+  final billItems = PrescriptionStore.items
+      .where((e) => !e.prescriptionOnly)
+      .toList();
+
+  final consultationFee = PrescriptionStore.consultationFee;
+
+  final medicineTotal = billItems.fold<double>(
+    0,
+    (sum, item) => sum + item.lineTotal,
+  );
+
+  final grandTotal = consultationFee + medicineTotal;
+
+  final existingPrescription =
+      await DatabaseHelper.instance.getPrescriptionByNo(rxNo);
+
+  final existingPrescriptionId =
+      existingPrescription?['id'] as int?;
+
+  bool shouldSaveBill = true;
+
+  if (existingPrescriptionId != null) {
+    final existingBill =
+        await DatabaseHelper.instance.getBillByPrescription(
+      existingPrescriptionId,
+    );
+
+    if (existingBill != null) {
+      shouldSaveBill = false;
+    }
+  }
+
+  final currentDoctorId = await DoctorSession.getDoctorId();
+
+  if (shouldSaveBill) {
+    await DatabaseHelper.instance.insertPrescriptionBill({
+      'doctor_id': existingPrescription?['doctor_id'] ?? currentDoctorId,
+      'patient_id': existingPrescription?['patient_id'],
+      'prescription_id': existingPrescriptionId,
+      'prescription_no': rxNo,
+
+      'consultation_fee': consultationFee,
+      'medicine_charges': medicineTotal,
+      'other_charges': 0,
+      'discount_amount': 0,
+
+      'total_amount': grandTotal,
+      'paid_amount': grandTotal,
+      'balance_amount': 0,
+
+      'payment_method': 'Cash',
+      'payment_status': 'Paid',
+
+      'notes': 'Bill generated from preview',
+    });
+  }
+  
+}
+
+
+
+  Future<void> _printBluetoothBill() async {
+  final items = PrescriptionStore.items
+      .where((e) => !e.prescriptionOnly)
+      .toList();
+
+  final currentDate =
+      widget.passedDate ?? DateTime.now().toString().substring(0, 10);
+
+  final consultationFee =
+    PrescriptionStore.consultationFee;
+
+  final medicineTotal = items.fold<double>(
+    0,
+    (sum, item) => sum + item.lineTotal,
+  );
+
+  final grandTotal = consultationFee + medicineTotal;
+
+ await _saveBillIfNeeded();
+
+  try {
+    final isConnected = await printer.isConnected ?? false;
+
+    if (!isConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please connect printer first')),
+      );
+      return;
+    }
+
+    printer.printCustom(medicalCenterName.toUpperCase(), 2, 1);
+    printer.printCustom('BILL RECEIPT', 1, 1);
+    printer.printCustom('--------------------------------', 0, 1);
+
+    printer.printCustom('Date: $currentDate', 0, 0);
+    printer.printCustom('Rx: $rxNo', 0, 0);
+
+    if (PrescriptionStore.patientName.isNotEmpty) {
+      printer.printCustom(
+        'Patient: ${PrescriptionStore.patientName}',
+        0,
+        0,
+      );
+    }
+
+    printer.printCustom('--------------------------------', 0, 1);
+    printer.printCustom('ITEMS', 1, 1);
+    printer.printCustom('--------------------------------', 0, 1);
+
+    int index = 1;
+
+    for (final item in items) {
+      printer.printCustom('$index. ${item.medicineName}', 0, 0);
+      printer.printCustom(
+        'Qty: ${item.quantity}  Rs. ${item.lineTotal.toStringAsFixed(2)}',
+        0,
+        2,
+      );
+      index++;
+    }
+
+    printer.printCustom('--------------------------------', 0, 1);
+    printer.printCustom(
+      'Channeling Fee: Rs. ${consultationFee.toStringAsFixed(2)}',
+      0,
+      2,
+    );
+    printer.printCustom(
+      'Medicine Charges: Rs. ${medicineTotal.toStringAsFixed(2)}',
+      0,
+      2,
+    );
+    printer.printCustom('--------------------------------', 0, 1);
+    printer.printCustom(
+      'GRAND TOTAL: Rs. ${grandTotal.toStringAsFixed(2)}',
+      1,
+      2,
+    );
+    printer.printCustom('--------------------------------', 0, 1);
+
+    printer.printCustom('Thank you', 1, 1);
+    printer.printCustom('--------------------------------', 0, 1);
+    printer.printNewLine();
+    printer.printNewLine();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Bill printed ($rxNo)')),
+    );
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Bill print failed: $e')),
+    );
+  }
+}
 
   bool _hasValidSignature() {
     return signaturePath.isNotEmpty && File(signaturePath).existsSync();
@@ -612,13 +811,41 @@ GET WELL SOON
                     Text('Age: ${PrescriptionStore.patientAge}'),
                     Text('Gender: ${PrescriptionStore.patientGender}'),
                     const Divider(height: 30),
-                    const Text(
-                      'Prescription',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    Row(
+  children: [
+    Text(
+      _isBillMode
+          ? 'Bill Receipt'
+          : 'Prescription',
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+
+    if (_isBillMode && _alreadyBilled) ...[
+      const SizedBox(width: 10),
+      Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 4,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Text(
+          'Already Billed ✅',
+          style: TextStyle(
+            color: Colors.orange,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    ],
+  ],
+),
                     const SizedBox(height: 10),
                     if (items.isEmpty)
                       const Text('No medicines added')
@@ -628,25 +855,128 @@ GET WELL SOON
                         final item = entry.value;
 
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+  padding: const EdgeInsets.only(bottom: 12),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+
+      Text(
+        '$index. ${item.medicineName}',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+
+      Text(
+        '${item.dosage} • ${item.frequency} • ${item.duration}',
+      ),
+
+      if (item.instructions.isNotEmpty &&
+          !_isBillMode)
+        Text(
+          'Instructions: ${item.instructions}',
+        ),
+
+      if (_isBillMode &&
+          !item.prescriptionOnly) ...[
+
+        const SizedBox(height: 4),
+
+        Row(
+          mainAxisAlignment:
+              MainAxisAlignment.spaceBetween,
+          children: [
+
+            Text(
+              'Qty: ${item.quantity}',
+            ),
+
+            Text(
+              'Rs. ${item.lineTotal.toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ],
+    ],
+  ),
+);
+                                           }),
+
+                    if (_isBillMode) ...[
+                      const Divider(height: 30),
+
+                      Builder(
+                        builder: (_) {
+                          final medicineTotal = items
+                              .where((e) => !e.prescriptionOnly)
+                              .fold<double>(
+                                0,
+                                (sum, item) => sum + item.lineTotal,
+                              );
+
+                          final consultationFee =
+    PrescriptionStore.consultationFee;
+
+                          final grandTotal =
+                              consultationFee + medicineTotal;
+
+                          return Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                '$index. ${item.medicineName}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Channeling Fee'),
+                                  Text(
+                                    'Rs. ${consultationFee.toStringAsFixed(2)}',
+                                  ),
+                                ],
                               ),
-                              Text(
-                                '${item.dosage} • ${item.frequency} • ${item.duration}',
+
+                              const SizedBox(height: 8),
+
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text('Medicine Charges'),
+                                  Text(
+                                    'Rs. ${medicineTotal.toStringAsFixed(2)}',
+                                  ),
+                                ],
                               ),
-                              if (item.instructions.isNotEmpty)
-                                Text('Instructions: ${item.instructions}'),
+
+                              const Divider(),
+
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Grand Total',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Rs. ${grandTotal.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ],
-                          ),
-                        );
-                      }),
+                          );
+                        },
+                      ),
+                    ],
+
                     const Divider(height: 30),
                     _doctorStampPreview(),
                     const SizedBox(height: 16),
@@ -670,6 +1000,51 @@ GET WELL SOON
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
+            Expanded(
+  child: SizedBox(
+    height: 50,
+    child: OutlinedButton.icon(
+      icon: Icon(
+        _isBillMode
+            ? Icons.receipt_long
+            : Icons.payments,
+      ),
+      label: Text(
+        _isBillMode
+            ? 'Prescription'
+            : 'Bill',
+      ),
+      onPressed: () async {
+  setState(() {
+    _isBillMode = !_isBillMode;
+  });
+
+  if (_isBillMode) {
+    final wasAlreadyBilled = _alreadyBilled;
+
+    await _saveBillIfNeeded();
+    await _checkAlreadyBilled();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          wasAlreadyBilled
+              ? 'Bill already saved ✅ Income report not updated again'
+              : 'Bill saved successfully ✅',
+        ),
+        backgroundColor:
+            wasAlreadyBilled ? Colors.orange : Colors.green,
+      ),
+    );
+  }
+},
+    ),
+  ),
+),
+
+const SizedBox(width: 8),
             Expanded(
               child: SizedBox(
                 height: 50,

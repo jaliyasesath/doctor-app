@@ -38,7 +38,7 @@ class _ReceptionQueueScreenState
 
     _selectedTab = widget.initialTab;
 
-    _loadData();
+    _loadData(showLoader: true);
 
     _autoRefreshTimer = Timer.periodic(
       const Duration(seconds: 5),
@@ -56,11 +56,13 @@ class _ReceptionQueueScreenState
     super.dispose();
   }
 
-  Future<void> _loadData() async {
-    setState(() {
-      _loading = true;
-      _error = '';
-    });
+  Future<void> _loadData({bool showLoader = false}) async {
+    if (showLoader && mounted) {
+  setState(() {
+    _loading = true;
+    _error = '';
+  });
+}
 
     try {
       final online = await NetworkService.isOnline();

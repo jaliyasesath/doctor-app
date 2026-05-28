@@ -213,7 +213,10 @@ class ApiPatientService {
     required String gender,
     required String phone,
     required String address,
-    required String notes,
+   required String notes,
+required String allergies,
+required String chronicDiseases,
+required String importantAlerts,
   }) async {
     try {
       final token = await _getToken();
@@ -223,13 +226,17 @@ class ApiPatientService {
             _uri('/Patients'),
             headers: _headers(token ?? ''),
             body: jsonEncode({
-              'patientName': name,
-              'age': int.tryParse(age) ?? 0,
-              'gender': gender,
-              'phoneNumber': phone,
-              'address': address,
-              'notes': notes,
-            }),
+  'patientName': name,
+  'age': int.tryParse(age) ?? 0,
+  'gender': gender,
+  'phoneNumber': phone,
+  'address': address,
+  'notes': notes,
+
+  'allergies': allergies,
+  'chronicDiseases': chronicDiseases,
+  'importantAlerts': importantAlerts,
+}),
           )
           .timeout(const Duration(seconds: 15));
 
@@ -251,6 +258,9 @@ class ApiPatientService {
         'notes': notes,
         'queue_status': 'Waiting',
         'sync_status': 'pending',
+        'allergies': allergies,
+'chronic_diseases': chronicDiseases,
+'important_alerts': importantAlerts,
       });
 
       return {
@@ -306,6 +316,9 @@ class ApiPatientService {
     required String phone,
     required String address,
     required String notes,
+    required String allergies,
+required String chronicDiseases,
+required String importantAlerts,
   }) async {
     final token = await _getToken();
 
@@ -321,6 +334,9 @@ class ApiPatientService {
             'phoneNumber': phone,
             'address': address,
             'notes': notes,
+            'allergies': allergies,
+'chronicDiseases': chronicDiseases,
+'importantAlerts': importantAlerts,
           }),
         )
         .timeout(const Duration(seconds: 15));

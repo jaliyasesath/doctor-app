@@ -38,6 +38,15 @@ class SyncService {
   final ApiPatientService _patientApi = ApiPatientService();
   final ApiPrescriptionService _prescriptionApi = ApiPrescriptionService();
 
+
+  Future<void> resetSyncTimestamps() async {
+  final prefs = await SharedPreferences.getInstance();
+
+  await prefs.remove('last_patients_sync_at');
+  await prefs.remove('last_prescriptions_sync_at');
+  await prefs.remove('last_medicines_sync_at');
+}
+
   Future<SyncResult> syncAll() async {
     final result = SyncResult();
 
@@ -116,7 +125,7 @@ class SyncService {
   try {
     final prefs = await SharedPreferences.getInstance();
 
-    final lastSyncAt = prefs.getString('last_patients_sync_at');
+    final String? lastSyncAt = null;
 
     int page = 1;
     const pageSize = 100;
@@ -170,8 +179,7 @@ class SyncService {
   try {
     final prefs = await SharedPreferences.getInstance();
 
-    final lastSyncAt =
-        prefs.getString('last_prescriptions_sync_at');
+    final String? lastSyncAt = null;
 
     int page = 1;
     const pageSize = 100;
@@ -252,7 +260,7 @@ class SyncService {
 
   try {
     final prefs = await SharedPreferences.getInstance();
-    final lastSyncAt = prefs.getString('last_medicines_sync_at');
+    final String? lastSyncAt = null;
 
     int page = 1;
     const pageSize = 100;
@@ -384,14 +392,20 @@ class SyncService {
 
       try {
         final apiResult = await _patientApi.upsertPatient(
-          serverId: patient['server_id'] as int?,
-          name: patient['patient_name']?.toString() ?? '',
-          age: patient['patient_age']?.toString() ?? '',
-          gender: patient['patient_gender']?.toString() ?? '',
-          phone: patient['phone_number']?.toString() ?? '',
-          address: patient['address']?.toString() ?? '',
-          notes: patient['notes']?.toString() ?? '',
-        );
+  serverId: patient['server_id'] as int?,
+  name: patient['patient_name']?.toString() ?? '',
+  age: patient['patient_age']?.toString() ?? '',
+  gender: patient['patient_gender']?.toString() ?? '',
+  phone: patient['phone_number']?.toString() ?? '',
+  address: patient['address']?.toString() ?? '',
+  notes: patient['notes']?.toString() ?? '',
+
+  allergies: patient['allergies']?.toString() ?? '',
+  chronicDiseases:
+      patient['chronic_diseases']?.toString() ?? '',
+  importantAlerts:
+      patient['important_alerts']?.toString() ?? '',
+);
 
         if (apiResult['success'] == true && apiResult['serverId'] != null) {
           await _db.markPatientSynced(localId, apiResult['serverId'] as int);

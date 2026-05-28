@@ -429,6 +429,11 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
   final TextEditingController _drugGroupController = TextEditingController();
   final TextEditingController _doseFormController = TextEditingController();
   final TextEditingController _strengthController = TextEditingController();
+  final TextEditingController _sellingPriceController =
+    TextEditingController();
+
+final TextEditingController _costPriceController =
+    TextEditingController();
 
   bool isFavorite = false;
   bool saving = false;
@@ -457,6 +462,11 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
     _drugGroupController.text = med['drug_group']?.toString() ?? '';
     _doseFormController.text = med['dose_form']?.toString() ?? '';
     _strengthController.text = med['strength']?.toString() ?? '';
+    _sellingPriceController.text =
+    med['selling_price']?.toString() ?? '';
+
+_costPriceController.text =
+    med['cost_price']?.toString() ?? '';
     isFavorite = (med['is_favorite'] ?? 0) == 1;
   }
 
@@ -468,6 +478,8 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
     _drugGroupController.dispose();
     _doseFormController.dispose();
     _strengthController.dispose();
+    _sellingPriceController.dispose();
+_costPriceController.dispose();
     super.dispose();
   }
 
@@ -479,14 +491,16 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
   }
 
   Widget _field({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    bool requiredField = false,
-    String? hint,
-  }) {
-    return TextFormField(
-      controller: controller,
+  required TextEditingController controller,
+  required String label,
+  required IconData icon,
+  bool requiredField = false,
+  String? hint,
+  TextInputType keyboardType = TextInputType.text,
+}) {
+  return TextFormField(
+    controller: controller,
+    keyboardType: keyboardType,
       validator: requiredField ? (v) => _required(v, label) : null,
       decoration: InputDecoration(
         labelText: requiredField ? '$label *' : label,
@@ -519,7 +533,11 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
       'drug_group': _drugGroupController.text.trim(),
       'dose_form': _doseFormController.text.trim(),
       'strength': _strengthController.text.trim(),
-      'is_favorite': isFavorite ? 1 : 0,
+'selling_price':
+    double.tryParse(_sellingPriceController.text.trim()) ?? 0,
+'cost_price':
+    double.tryParse(_costPriceController.text.trim()) ?? 0,
+'is_favorite': isFavorite ? 1 : 0,
     };
 
     try {
@@ -615,6 +633,23 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
                     icon: Icons.speed_outlined,
                     hint: '500mg / 250mg / 5ml',
                   ),
+                  const SizedBox(height: 14),
+_field(
+  controller: _sellingPriceController,
+  label: 'Selling Price',
+  icon: Icons.sell_outlined,
+  hint: 'Example: 25.00',
+  keyboardType: TextInputType.number,
+),
+
+const SizedBox(height: 14),
+_field(
+  controller: _costPriceController,
+  label: 'Cost Price',
+  icon: Icons.price_change_outlined,
+  hint: 'Example: 18.00',
+  keyboardType: TextInputType.number,
+),
                   const SizedBox(height: 14),
                   SwitchListTile(
                     value: isFavorite,

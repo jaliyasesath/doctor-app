@@ -15,12 +15,22 @@ class PrescriptionStore {
   static String diagnosis = '';
   static String visitNotes = '';
 
+  static double consultationFee = 1500.0;
+
   static void add(PrescriptionItem item) {
     items.add(item);
   }
 
   static void setItems(List<PrescriptionItem> newItems) {
     items = List<PrescriptionItem>.from(newItems);
+  }
+
+  static void setConsultationFee(double fee) {
+    consultationFee = fee;
+  }
+
+  static void clearConsultationFee() {
+    consultationFee = 1500.0;
   }
 
   static void clear() {
@@ -34,6 +44,7 @@ class PrescriptionStore {
     complaint = '';
     diagnosis = '';
     visitNotes = '';
+    consultationFee = 1500.0;
   }
 
   static void setPatientDetails({

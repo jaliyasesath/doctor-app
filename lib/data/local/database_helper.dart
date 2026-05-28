@@ -23,13 +23,15 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-     version: 26,
+     version: 29,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _createDB(Database db, int version) async {
+
+    
     await db.execute('''
       CREATE TABLE doctors (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -119,7 +121,43 @@ reminder_sent INTEGER DEFAULT 0
     frequency TEXT,
     duration TEXT,
     instructions TEXT,
-    created_at TEXT
+    created_at TEXT,
+    prescription_only INTEGER DEFAULT 0,
+unit_price REAL DEFAULT 0,
+quantity REAL DEFAULT 1,
+line_total REAL DEFAULT 0
+  )
+''');
+
+await db.execute('''
+  CREATE TABLE prescription_bills (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_id INTEGER,
+
+    doctor_id INTEGER,
+    patient_id INTEGER,
+    prescription_id INTEGER,
+
+    prescription_no TEXT,
+
+    consultation_fee REAL DEFAULT 0,
+    medicine_charges REAL DEFAULT 0,
+    other_charges REAL DEFAULT 0,
+    discount_amount REAL DEFAULT 0,
+
+    total_amount REAL DEFAULT 0,
+    paid_amount REAL DEFAULT 0,
+    balance_amount REAL DEFAULT 0,
+
+    payment_method TEXT,
+    payment_status TEXT,
+
+    notes TEXT,
+
+    sync_status TEXT DEFAULT 'pending',
+
+    created_at TEXT,
+    updated_at TEXT
   )
 ''');
 
@@ -145,6 +183,8 @@ reminder_sent INTEGER DEFAULT 0
         drug_group TEXT,
         dose_form TEXT,
         strength TEXT,
+        selling_price REAL DEFAULT 0,
+cost_price REAL DEFAULT 0,
         is_favorite INTEGER DEFAULT 0,
         sync_status TEXT DEFAULT 'pending',
         created_at TEXT,
@@ -440,6 +480,82 @@ if (oldVersion < 25) {
 if (oldVersion < 26) {
   await _createIndexes(db);
 }
+
+if (oldVersion < 27) {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS prescription_bills (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      server_id INTEGER,
+
+      doctor_id INTEGER,
+      patient_id INTEGER,
+      prescription_id INTEGER,
+
+      prescription_no TEXT,
+
+      consultation_fee REAL DEFAULT 0,
+      medicine_charges REAL DEFAULT 0,
+      other_charges REAL DEFAULT 0,
+      discount_amount REAL DEFAULT 0,
+
+      total_amount REAL DEFAULT 0,
+      paid_amount REAL DEFAULT 0,
+      balance_amount REAL DEFAULT 0,
+
+      payment_method TEXT,
+      payment_status TEXT,
+
+      notes TEXT,
+
+      sync_status TEXT DEFAULT 'pending',
+
+      created_at TEXT,
+      updated_at TEXT
+    )
+  ''');
+}
+
+if (oldVersion < 28) {
+  try {
+    await db.execute(
+      'ALTER TABLE prescription_items ADD COLUMN prescription_only INTEGER DEFAULT 0',
+    );
+  } catch (_) {}
+
+  try {
+    await db.execute(
+      'ALTER TABLE prescription_items ADD COLUMN unit_price REAL DEFAULT 0',
+    );
+  } catch (_) {}
+
+  try {
+    await db.execute(
+      'ALTER TABLE prescription_items ADD COLUMN quantity REAL DEFAULT 1',
+    );
+  } catch (_) {}
+
+  try {
+    await db.execute(
+      'ALTER TABLE prescription_items ADD COLUMN line_total REAL DEFAULT 0',
+    );
+  } catch (_) {}
+}
+
+if (oldVersion < 29) {
+  try {
+    await db.execute(
+      'ALTER TABLE medicines ADD COLUMN selling_price REAL DEFAULT 0',
+    );
+  } catch (_) {}
+
+  try {
+    await db.execute(
+      'ALTER TABLE medicines ADD COLUMN cost_price REAL DEFAULT 0',
+    );
+  } catch (_) {}
+}
+
+
   }
 
   // =========================
@@ -747,6 +863,10 @@ data['queue_date'] ??=
       'duration': item['duration'] ?? '',
       'instructions': item['instructions'] ?? '',
       'created_at': DateTime.now().toIso8601String(),
+      'prescription_only': item['prescription_only'] ?? item['prescriptionOnly'] ?? 0,
+'unit_price': item['unit_price'] ?? item['unitPrice'] ?? 0,
+'quantity': item['quantity'] ?? 1,
+'line_total': item['line_total'] ?? item['lineTotal'] ?? 0,
     });
   }
 }
@@ -1463,6 +1583,142 @@ Future<List<Map<String, dynamic>>> searchMedicinesByDoctorPaged(
   );
 }
 
+// =========================
+// PRESCRIPTION BILLS
+// =========================
+
+Future<int> insertPrescriptionBill(
+  Map<String, dynamic> data,
+) async {
+  final db = await database;
+
+  data['sync_status'] ??= 'pending';
+  data['created_at'] ??=
+      DateTime.now().toIso8601String();
+
+  data['updated_at'] =
+      DateTime.now().toIso8601String();
+
+  return db.insert(
+    'prescription_bills',
+    data,
+  );
+}
+
+Future<int> updatePrescriptionBill(
+  int id,
+  Map<String, dynamic> data,
+) async {
+  final db = await database;
+
+  data['sync_status'] = 'pending';
+
+  data['updated_at'] =
+      DateTime.now().toIso8601String();
+
+  return db.update(
+    'prescription_bills',
+    data,
+    where: 'id = ?',
+    whereArgs: [id],
+  );
+}
+
+Future<List<Map<String, dynamic>>>
+    getBillsByDoctor(
+  int doctorId,
+) async {
+  final db = await database;
+
+  return db.query(
+    'prescription_bills',
+    where: 'doctor_id = ?',
+    whereArgs: [doctorId],
+    orderBy: 'id DESC',
+  );
+}
+
+Future<List<Map<String, dynamic>>>
+    getBillsByPatient(
+  int patientId,
+) async {
+  final db = await database;
+
+  return db.query(
+    'prescription_bills',
+    where: 'patient_id = ?',
+    whereArgs: [patientId],
+    orderBy: 'id DESC',
+  );
+}
+
+Future<Map<String, dynamic>?>
+    getBillByPrescription(
+  int prescriptionId,
+) async {
+  final db = await database;
+
+  final result = await db.query(
+    'prescription_bills',
+    where: 'prescription_id = ?',
+    whereArgs: [prescriptionId],
+    limit: 1,
+  );
+
+  return result.isNotEmpty
+      ? result.first
+      : null;
+}
+
+Future<List<Map<String, dynamic>>>
+    getPendingBills() async {
+  final db = await database;
+
+  return db.query(
+    'prescription_bills',
+    where:
+        'sync_status = ? OR sync_status = ?',
+    whereArgs: ['pending', 'failed'],
+    orderBy: 'id ASC',
+  );
+}
+
+Future<void> markBillSynced(
+  int localId,
+  int serverId,
+) async {
+  final db = await database;
+
+  await db.update(
+    'prescription_bills',
+    {
+      'server_id': serverId,
+      'sync_status': 'synced',
+      'updated_at':
+          DateTime.now().toIso8601String(),
+    },
+    where: 'id = ?',
+    whereArgs: [localId],
+  );
+}
+
+Future<void> markBillSyncFailed(
+  int localId,
+) async {
+  final db = await database;
+
+  await db.update(
+    'prescription_bills',
+    {
+      'sync_status': 'failed',
+      'updated_at':
+          DateTime.now().toIso8601String(),
+    },
+    where: 'id = ?',
+    whereArgs: [localId],
+  );
+}
+
   // =========================
   // DASHBOARD
   // =========================
@@ -1620,26 +1876,34 @@ Future<int> getTodayPatientCountByDoctor(int doctorId) async {
 
       final serverId = p['id'] as int;
 
-      final existing = await txn.query(
-        'patients',
-        where: 'server_id = ? AND doctor_id = ?',
-        whereArgs: [serverId, doctorId],
-        limit: 1,
-      );
+      final phone = p['phoneNumber']?.toString() ?? '';
 
-      final data = {
-        'server_id': serverId,
-        'doctor_id': doctorId,
-        'patient_name': (p['patientName'] ?? '').toString(),
-        'patient_age': (p['patientAge'] ?? p['age'] ?? '').toString(),
-        'patient_gender': (p['patientGender'] ?? p['gender'] ?? '').toString(),
-        'phone_number': p['phoneNumber']?.toString(),
-        'address': p['address']?.toString(),
-        'notes': p['notes']?.toString(),
-        'sync_status': 'synced',
-        'updated_at': p['updatedAt']?.toString() ?? DateTime.now().toIso8601String(),
-        'created_at': p['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
-      };
+final existing = await txn.query(
+  'patients',
+  where:
+      '(server_id = ? AND doctor_id = ?) OR (phone_number = ? AND doctor_id = ?)',
+  whereArgs: [serverId, doctorId, phone, doctorId],
+  limit: 1,
+);
+
+     final data = {
+  'server_id': serverId,
+  'doctor_id': doctorId,
+  'patient_name': (p['patientName'] ?? '').toString(),
+  'patient_age': (p['patientAge'] ?? p['age'] ?? '').toString(),
+  'patient_gender': (p['patientGender'] ?? p['gender'] ?? '').toString(),
+  'phone_number': p['phoneNumber']?.toString(),
+  'address': p['address']?.toString(),
+  'notes': p['notes']?.toString(),
+
+  'allergies': p['allergies']?.toString() ?? '',
+  'chronic_diseases': p['chronicDiseases']?.toString() ?? '',
+  'important_alerts': p['importantAlerts']?.toString() ?? '',
+
+  'sync_status': 'synced',
+  'updated_at': p['updatedAt']?.toString() ?? DateTime.now().toIso8601String(),
+  'created_at': p['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
+};
 
       if (existing.isEmpty) {
         await txn.insert('patients', data);
@@ -1672,16 +1936,18 @@ Future<int> getTodayPatientCountByDoctor(int doctorId) async {
   }) async {
     final db = await database;
 
-    final patient = await db.query(
-      'patients',
-      where: 'server_id = ? AND doctor_id = ?',
-      whereArgs: [serverPatientId, doctorId],
-      limit: 1,
-    );
+   final patient = await db.query(
+  'patients',
+  where: 'server_id = ? AND doctor_id = ?',
+  whereArgs: [serverPatientId, doctorId],
+  limit: 1,
+);
 
-    if (patient.isEmpty) return;
+int? localPatientId;
 
-    final localPatientId = patient.first['id'] as int;
+if (patient.isNotEmpty) {
+  localPatientId = patient.first['id'] as int;
+}
 
     final existing = await db.query(
       'prescriptions',
@@ -1693,7 +1959,7 @@ Future<int> getTodayPatientCountByDoctor(int doctorId) async {
     final data = {
       'server_id': serverId,
       'doctor_id': doctorId,
-      'patient_id': localPatientId,
+      'patient_id': localPatientId ?? 0,
       'server_patient_id': serverPatientId,
       'patient_name': patientName,
       'patient_age': patientAge,
@@ -1935,6 +2201,54 @@ Future<void> completeFollowUp(
     },
     where: 'id = ?',
     whereArgs: [prescriptionId],
+  );
+}
+
+Future<Map<String, dynamic>> getTodayIncomeSummaryByDoctor(
+  int doctorId,
+) async {
+  final db = await database;
+  final today = DateTime.now().toIso8601String().substring(0, 10);
+
+  final result = await db.rawQuery(
+    '''
+    SELECT 
+      COUNT(*) as bill_count,
+      SUM(total_amount) as total_income,
+      SUM(consultation_fee) as consultation_income,
+      SUM(medicine_charges) as medicine_income,
+      SUM(paid_amount) as paid_total,
+      SUM(balance_amount) as balance_total
+    FROM prescription_bills
+    WHERE doctor_id = ?
+      AND created_at LIKE ?
+    ''',
+    [doctorId, '$today%'],
+  );
+
+  return result.first;
+}
+
+Future<List<Map<String, dynamic>>> getTodayBillsByDoctor(
+  int doctorId,
+) async {
+  final db = await database;
+  final today = DateTime.now().toIso8601String().substring(0, 10);
+
+  return db.query(
+    'prescription_bills',
+    where: 'doctor_id = ? AND created_at LIKE ?',
+    whereArgs: [doctorId, '$today%'],
+    orderBy: 'id DESC',
+  );
+}
+
+Future<List<Map<String, dynamic>>> getAllBills() async {
+  final db = await database;
+
+  return db.query(
+    'prescription_bills',
+    orderBy: 'id DESC',
   );
 }
 }

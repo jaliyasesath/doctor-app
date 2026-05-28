@@ -5,6 +5,8 @@ import '../../patient/screens/add_patient_screen.dart' as patient_screen;
 import 'reception_queue_screen.dart';
 import '../../local_server/screens/reception_hotspot_connect_screen.dart';
 import 'reception_patient_search_screen.dart';
+import '../../prescription/screens/prescription_history_screen.dart';
+import 'reception_bills_screen.dart';
 
 
 class ReceptionDashboardScreen extends StatefulWidget {
@@ -175,6 +177,35 @@ _menuCard(
   );
 },
             ),
+            _menuCard(
+  icon: Icons.description_outlined,
+  title: 'Saved Prescriptions',
+  subtitle: 'View and print prescriptions',
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+           const PrescriptionHistoryScreen(
+  receptionMode: true,
+),
+      ),
+    );
+  },
+),
+_menuCard(
+  icon: Icons.receipt_long,
+  title: 'Bills',
+  subtitle: 'View bills and print receipts',
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const ReceptionBillsScreen(),
+      ),
+    );
+  },
+),
             _menuCard(
               icon: Icons.skip_next,
               title: 'Skipped Patients',
