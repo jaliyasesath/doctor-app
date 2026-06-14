@@ -89,6 +89,7 @@ bool _enableSmsReminder = false;
   int? loggedDoctorId;
 
   List<Map<String, dynamic>> customInstructions = [];
+  List<TemplateModel> _favoriteTemplates = [];
 
   final Map<String, String> defaultInstructions = {
     'Tablet': 'After meals',
@@ -192,6 +193,7 @@ final List<String> _diagnosisOptions = [
     _loadMasterMedicines();
 _loadCustomInstructions();
 _loadCustomClinicalChips();
+_loadFavoriteTemplates();
   }
 
   Future<void> _loadCustomInstructions() async {
@@ -208,6 +210,16 @@ _loadCustomClinicalChips();
       customInstructions = data;
     });
   }
+
+  Future<void> _loadFavoriteTemplates() async {
+  final templates = await TemplateService.getFavoriteTemplates();
+
+  if (!mounted) return;
+
+  setState(() {
+    _favoriteTemplates = templates;
+  });
+}
 
   Future<void> _loadCustomClinicalChips() async {
   final doctorId = await DoctorSession.getDoctorId();
@@ -1295,11 +1307,12 @@ _enableSmsReminder = false;
     }).toList();
 
     final template = TemplateModel(
-      name: result,
-      complaint: PrescriptionStore.complaint,
-      diagnosis: PrescriptionStore.diagnosis,
-      itemsJson: TemplateService.encodeItems(items),
-    );
+  name: result,
+  complaint: PrescriptionStore.complaint,
+  diagnosis: PrescriptionStore.diagnosis,
+  itemsJson: TemplateService.encodeItems(items),
+  isFavorite: true,
+);
 
     await TemplateService.saveTemplate(template);
 
@@ -1313,6 +1326,44 @@ _enableSmsReminder = false;
   void _openMedicinesScreen() {
     _openMedicinePicker();
   }
+
+  void _applyFavoriteTemplate(TemplateModel template) {
+  _savePatientDetailsToStore();
+
+  final items = TemplateService.decodeItems(template.itemsJson);
+
+  setState(() {
+    _complaintController.text = template.complaint;
+    _diagnosisController.text = template.diagnosis;
+
+    PrescriptionStore.setClinicalDetails(
+      complaintText: template.complaint,
+      diagnosisText: template.diagnosis,
+      visitNotesText: PrescriptionStore.visitNotes,
+    );
+
+    for (final item in items) {
+      PrescriptionStore.add(
+        PrescriptionItem(
+          medicineName: item['name']?.toString() ?? '',
+          dosage: item['dosage']?.toString() ?? '',
+          frequency: item['frequency']?.toString() ?? '',
+          duration: item['duration']?.toString() ?? '',
+          instructions: item['instructions']?.toString() ?? '',
+        ),
+      );
+    }
+
+    _syncSelectedClinicalChips();
+  });
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('${template.name} template applied'),
+      backgroundColor: Colors.green,
+    ),
+  );
+}
 
   void _openTemplateScreen() {
     _savePatientDetailsToStore();
@@ -2310,6 +2361,57 @@ Widget _buildBillingSection() {
   );
 }
 
+Widget _buildFavoriteTemplatesSection() {
+  if (_favoriteTemplates.isEmpty) {
+    return const SizedBox.shrink();
+  }
+
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.amber.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: Colors.amber.withOpacity(0.30),
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.star, color: Colors.amber),
+            SizedBox(width: 8),
+            Text(
+              'Quick Templates',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _favoriteTemplates.map((template) {
+            return ActionChip(
+              avatar: const Icon(
+                Icons.flash_on,
+                size: 18,
+                color: Colors.orange,
+              ),
+              label: Text(template.name),
+              onPressed: () => _applyFavoriteTemplate(template),
+            );
+          }).toList(),
+        ),
+      ],
+    ),
+  );
+}
+
   @override
 Widget build(BuildContext context) {
   final items = PrescriptionStore.items;
@@ -2393,6 +2495,9 @@ _buildFollowUpSection(),
 const SizedBox(height: 14),
 
 _buildBillingSection(),
+const SizedBox(height: 14),
+
+_buildFavoriteTemplatesSection(),
 const SizedBox(height: 14),
 
 _buildSmartClinicalField(

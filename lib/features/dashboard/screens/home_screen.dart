@@ -1,10 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../../../data/local/database_helper.dart';
+
 import '../../auth/data/doctor_session.dart';
-import '../../auth/screens/login_screen.dart';
 import '../../dashboard/screens/dashboard_analytics_screen.dart';
 import '../../license/data/license_api_service.dart';
-
 import '../../opd/screens/opd_fast_mode_screen.dart';
 import '../../patient/screens/patient_master_screen.dart';
 import '../../queue/screens/doctor_queue_screen.dart';
@@ -12,7 +13,6 @@ import '../../prescription/screens/patient_history_screen.dart';
 import '../../prescription/screens/prescription_history_screen.dart';
 import '../../prescription/screens/prescription_list_screen.dart';
 import '../../prescription/screens/qr_scan_screen.dart';
-
 import '../../sync/services/network_service.dart';
 import '../../sync/services/sync_service.dart';
 import '../../medicines/screens/medicine_screen.dart';
@@ -21,9 +21,6 @@ import '../../net_service/api_config.dart';
 import '../../net_service/auto_api_resolver.dart';
 import '../../local_server/screens/doctor_hotspot_qr_screen.dart';
 import '../../patient/data/api_patient_service.dart';
-import 'dart:async';
-import '../../license/screens/admin_subscription_screen.dart';
-
 import '../../followup/screens/follow_up_screen.dart';
 import '../../billing/screens/billing_report_screen.dart';
 import '../../license/screens/license_gate_screen.dart';
@@ -38,7 +35,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final LicenseApiService _licenseApiService = LicenseApiService();
-  
 
   bool _isSyncing = false;
   bool _isCheckingLicense = true;
@@ -47,43 +43,136 @@ class _HomeScreenState extends State<HomeScreen> {
   String _licenseMessage = '';
   String _planName = '';
   int _daysRemaining = 0;
+
   bool _connectionOnline = false;
-String _connectionMode = '';
-String _activeBaseUrl = '';
-Timer? _licenseTimer;
+  String _connectionMode = '';
+  String _activeBaseUrl = '';
 
-Map<String, dynamic> _queueSummary = {
-  'waiting': 0,
-  'serving': 0,
-  'completed': 0,
-  'skipped': 0,
-};
-Timer? _summaryTimer;
- @override
-void initState() {
-  super.initState();
-  _checkInternet();
-  _refreshConnectionStatus();
-  _checkLicenseOnDashboard();
-  _loadQueueSummary();
-  _licenseTimer = Timer.periodic(
-  const Duration(minutes: 1),
-  (_) {
+  String _doctorName = 'Doctor';
+
+  Timer? _licenseTimer;
+  Timer? _summaryTimer;
+
+  Map<String, dynamic> _queueSummary = {
+    'waiting': 0,
+    'serving': 0,
+    'completed': 0,
+    'skipped': 0,
+  };
+
+  Map<String, dynamic> _todayIncome = {
+    'bill_count': 0,
+    'total_income': 0,
+    'consultation_income': 0,
+    'medicine_income': 0,
+    'paid_total': 0,
+    'balance_total': 0,
+  };
+
+  int _todayFollowUpCount = 0;
+  int _pendingSyncCount = 0;
+
+  List<Map<String, dynamic>> _recentPrescriptions = [];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _loadDoctorName();
+    _checkInternet();
+    _refreshAll();
+
+    _licenseTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) {
+        if (!mounted) return;
+        _checkLicenseOnDashboard();
+      },
+    );
+
+    _summaryTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) {
+        if (!mounted) return;
+        _loadQueueSummary();
+      },
+    );
+  }
+
+  Future<void> _refreshAll() async {
+    await _refreshConnectionStatus();
+    await _checkLicenseOnDashboard();
+    await _loadQueueSummary();
+    await _loadDashboardLocalData();
+  }
+
+  Future<void> _loadDoctorName() async {
+    final name = await DoctorSession.getDoctorName();
+
     if (!mounted) return;
-    _checkLicenseOnDashboard();
-  },
-);
- 
 
-  _summaryTimer = Timer.periodic(
-  const Duration(seconds: 5),
-  (_) {
-    if (!mounted) return;
+    setState(() {
+      _doctorName = name?.isNotEmpty == true ? name! : 'Doctor';
+    });
+  }
 
-    _loadQueueSummary();
-  },
-);
-}
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    if (hour < 21) return 'Good Evening';
+    return 'Good Night';
+  }
+
+  String _getFormattedToday() {
+    final now = DateTime.now();
+
+    const days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+
+    return '${days[now.weekday - 1]}, ${now.day} ${months[now.month - 1]} ${now.year}';
+  }
+
+  String _getHeaderMessage() {
+    final waiting =
+        int.tryParse(_queueSummary['waiting']?.toString() ?? '0') ?? 0;
+
+    final serving =
+        int.tryParse(_queueSummary['serving']?.toString() ?? '0') ?? 0;
+
+    if (waiting > 0) {
+      return 'Welcome back. You have $waiting patient(s) waiting in the queue.';
+    }
+
+    if (serving > 0) {
+      return 'Welcome back. You are currently serving $serving patient(s).';
+    }
+
+    return 'Welcome back. Your queue is clear.';
+  }
 
   Future<void> _checkInternet() async {
     final online = await NetworkService.isOnline();
@@ -91,38 +180,101 @@ void initState() {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(online ? 'Internet ON ✅' : 'No Internet ❌')),
+      SnackBar(
+        content: Text(online ? 'Internet ON ✅' : 'No Internet ❌'),
+      ),
     );
   }
 
   Future<void> _checkLicenseOnDashboard() async {
-  if (!_licenseValid) {
-  setState(() => _isCheckingLicense = true);
-}
-  final trialExpired = await LicenseService.isTrialExpired();
+    if (!_licenseValid) {
+      setState(() => _isCheckingLicense = true);
+    }
 
-if (trialExpired) {
-  setState(() {
-    _licenseValid = false;
-    _licenseMessage = 'Trial expired. Please activate subscription.';
-    _isCheckingLicense = false;
-  });
+    final trialExpired = await LicenseService.isTrialExpired();
 
-  return;
-}
+    if (trialExpired) {
+      setState(() {
+        _licenseValid = false;
+        _licenseMessage = 'Trial expired. Please activate subscription.';
+        _isCheckingLicense = false;
+      });
+      return;
+    }
 
-  try {
-    final result = await _licenseApiService.getStatus();
+    try {
+      final result = await _licenseApiService.getStatus();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (result['success'] != true) {
-      final cachedValid =
-          await LicenseService.isCachedSubscriptionValid();
+      if (result['success'] != true) {
+        final cachedValid = await LicenseService.isCachedSubscriptionValid();
+
+        if (cachedValid) {
+          final cached = await LicenseService.getCachedSubscription();
+
+          setState(() {
+            _licenseValid = true;
+            _planName = cached['planName']?.toString() ?? 'Cached';
+            _daysRemaining =
+                int.tryParse(cached['daysRemaining']?.toString() ?? '0') ?? 0;
+            _licenseMessage =
+                'Offline license active - $_daysRemaining days remaining';
+            _isCheckingLicense = false;
+          });
+
+          return;
+        }
+
+        setState(() {
+          _licenseValid = false;
+          _licenseMessage =
+              result['message']?.toString() ?? 'License expired';
+          _isCheckingLicense = false;
+        });
+
+        return;
+      }
+
+      final data = Map<String, dynamic>.from(result['data'] as Map);
+
+      final isActive = data['isActive'] == true;
+      final isExpired = data['isExpired'] == true;
+      final days =
+          int.tryParse(data['daysRemaining']?.toString() ?? '0') ?? 0;
+
+      final endDateRaw = data['endDate']?.toString();
+      final endDate =
+          endDateRaw == null ? null : DateTime.tryParse(endDateRaw);
+
+      if (isActive && !isExpired && endDate != null) {
+        await LicenseService.saveSubscriptionCache(
+          planName: data['planName']?.toString() ?? '',
+          endDate: endDate,
+          daysRemaining: days,
+        );
+      }
+
+      setState(() {
+        _licenseValid = isActive && !isExpired;
+        _planName = data['planName']?.toString() ?? '';
+        _daysRemaining = days;
+        _licenseMessage = _licenseValid
+            ? '$_planName active - $_daysRemaining days remaining'
+            : 'License expired. Please renew subscription.';
+        _isCheckingLicense = false;
+      });
+
+      if (_licenseValid && days <= 7) {
+        _showExpiryWarning(days);
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      final cachedValid = await LicenseService.isCachedSubscriptionValid();
 
       if (cachedValid) {
-        final cached =
-            await LicenseService.getCachedSubscription();
+        final cached = await LicenseService.getCachedSubscription();
 
         setState(() {
           _licenseValid = true;
@@ -139,75 +291,11 @@ if (trialExpired) {
 
       setState(() {
         _licenseValid = false;
-        _licenseMessage =
-            result['message']?.toString() ?? 'License expired';
+        _licenseMessage = 'License check failed: $e';
         _isCheckingLicense = false;
       });
-
-      return;
     }
-
-    final data = Map<String, dynamic>.from(result['data'] as Map);
-
-    final isActive = data['isActive'] == true;
-    final isExpired = data['isExpired'] == true;
-    final days =
-        int.tryParse(data['daysRemaining']?.toString() ?? '0') ?? 0;
-
-    final endDateRaw = data['endDate']?.toString();
-    final endDate =
-        endDateRaw == null ? null : DateTime.tryParse(endDateRaw);
-
-    if (isActive && !isExpired && endDate != null) {
-      await LicenseService.saveSubscriptionCache(
-        planName: data['planName']?.toString() ?? '',
-        endDate: endDate,
-        daysRemaining: days,
-      );
-    }
-
-    setState(() {
-      _licenseValid = isActive && !isExpired;
-      _planName = data['planName']?.toString() ?? '';
-      _daysRemaining = days;
-      _licenseMessage = _licenseValid
-          ? '$_planName active - $_daysRemaining days remaining'
-          : 'License expired. Please renew subscription.';
-      _isCheckingLicense = false;
-    });
-
-    if (_licenseValid && days <= 7) {
-      _showExpiryWarning(days);
-    }
-  } catch (e) {
-    if (!mounted) return;
-
-    final cachedValid =
-        await LicenseService.isCachedSubscriptionValid();
-
-    if (cachedValid) {
-      final cached = await LicenseService.getCachedSubscription();
-
-      setState(() {
-        _licenseValid = true;
-        _planName = cached['planName']?.toString() ?? 'Cached';
-        _daysRemaining =
-            int.tryParse(cached['daysRemaining']?.toString() ?? '0') ?? 0;
-        _licenseMessage =
-            'Offline license active - $_daysRemaining days remaining';
-        _isCheckingLicense = false;
-      });
-
-      return;
-    }
-
-    setState(() {
-      _licenseValid = false;
-      _licenseMessage = 'License check failed: $e';
-      _isCheckingLicense = false;
-    });
   }
-}
 
   void _showExpiryWarning(int days) {
     Future.delayed(const Duration(milliseconds: 400), () {
@@ -273,15 +361,14 @@ if (trialExpired) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-  result.hasFailures
-      ? 'Sync error ❌ ${result.lastError}'
-      : 'Synced ✅ Doctors: ${result.doctorSuccess}, Patients: ${result.patientSuccess}, Medicines: ${result.medicineSuccess}, Rx: ${result.prescriptionSuccess}, Pull P: ${result.pulledPatients}, Pull Med: ${result.pulledMedicines}, Pull Rx: ${result.pulledPrescriptions}',
-),
+            result.hasFailures
+                ? 'Sync error ❌ ${result.lastError}'
+                : 'Synced ✅ Doctors: ${result.doctorSuccess}, Patients: ${result.patientSuccess}, Medicines: ${result.medicineSuccess}, Rx: ${result.prescriptionSuccess}',
+          ),
         ),
       );
 
-      await _checkLicenseOnDashboard();
-      await _loadQueueSummary();
+      await _refreshAll();
     } catch (e) {
       if (!mounted) return;
 
@@ -306,11 +393,9 @@ if (trialExpired) {
     Widget? screen;
 
     switch (title) {
-
-      case 'Hotspot QR':
-        screen = const DoctorHotspotQrScreen();
+      case 'Create Prescription':
+        screen = const PrescriptionListScreen();
         break;
-
       case 'OPD Fast Mode':
         screen = const OPDFastModeScreen();
         break;
@@ -318,10 +403,7 @@ if (trialExpired) {
         screen = const DashboardAnalyticsScreen();
         break;
       case 'Medicines':
-  screen = const MedicineScreen();
-  break;
-      case 'Create Prescription':
-        screen = const PrescriptionListScreen();
+        screen = const MedicineScreen();
         break;
       case 'Prescription History':
         screen = const PrescriptionHistoryScreen();
@@ -332,25 +414,21 @@ if (trialExpired) {
       case 'Patient Master':
         screen = const PatientMasterScreen();
         break;
-        case 'Today Queue':
-  screen = const DoctorQueueScreen();
-  break;
+      case 'Today Queue':
+        screen = const DoctorQueueScreen();
+        break;
       case 'Scan Prescription':
         screen = const QRScanScreen();
         break;
-      
-        
-  //       case 'Admin Subscriptions':
-  // screen = const AdminSubscriptionScreen();
-  // break;
-       
-
-case 'Follow-Ups':
-  screen = const FollowUpScreen();
-  break;
-  case 'Income Report':
-  screen = const BillingReportScreen();
-  break;
+      case 'Follow-Ups':
+        screen = const FollowUpScreen();
+        break;
+      case 'Income Report':
+        screen = const BillingReportScreen();
+        break;
+      case 'Hotspot QR':
+        screen = const DoctorHotspotQrScreen();
+        break;
     }
 
     if (screen != null) {
@@ -359,135 +437,201 @@ case 'Follow-Ups':
   }
 
   Future<void> _showConnectionModeDialog() async {
-  String currentMode =
-      ConnectionModeService.getCurrentMode();
+    String currentMode = ConnectionModeService.getCurrentMode();
 
-  await showDialog(
-    context: context,
-    builder: (_) {
-      return StatefulBuilder(
-        builder: (context, setStateDialog) {
-          return AlertDialog(
-            title: const Text('Connection Mode'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                RadioListTile(
-                  title: const Text('Auto'),
-                  value: 'auto',
-                  groupValue: currentMode,
-                  onChanged: (v) async {
-                    await ConnectionModeService
-                        .setAutoMode();
-
-                    setStateDialog(() {
-                      currentMode = 'auto';
-                    });
-                  },
-                ),
-                RadioListTile(
-                  title: const Text('Cloud'),
-                  value: 'cloud',
-                  groupValue: currentMode,
-                  onChanged: (v) async {
-                    await ConnectionModeService
-                        .setCloudMode();
-
-                    setStateDialog(() {
-                      currentMode = 'cloud';
-                    });
-                  },
-                ),
-                RadioListTile(
-                  title: const Text('Local WiFi'),
-                  value: 'wifi',
-                  groupValue: currentMode,
-                  onChanged: (v) async {
-                    await ConnectionModeService
-                        .setLocalWifiMode();
-
-                    setStateDialog(() {
-                      currentMode = 'wifi';
-                    });
-                  },
-                ),
-                RadioListTile(
-                  title: const Text('Doctor Hotspot'),
-                  value: 'hotspot',
-                  groupValue: currentMode,
-                  onChanged: (v) async {
-                    await ConnectionModeService
-                        .setHotspotMode();
-
-                    setStateDialog(() {
-                      currentMode = 'hotspot';
-                    });
-                  },
-                ),
-                RadioListTile(
-                  title: const Text('Offline Only'),
-                  value: 'offline',
-                  groupValue: currentMode,
-                  onChanged: (v) async {
-                    await ConnectionModeService
-                        .setOfflineMode();
-
-                    setStateDialog(() {
-                      currentMode = 'offline';
-                    });
-                  },
-                ),
-                const SizedBox(height: 12),
-                Text(
-  'Mode: ${currentMode.toUpperCase()}\n'
-  'Active Base URL:\n${ApiConfig.baseUrl}',
-  textAlign: TextAlign.center,
-  style: const TextStyle(fontSize: 12),
-),
-const SizedBox(height: 10),
-OutlinedButton.icon(
-  onPressed: () async {
-    await ConnectionModeService.setAutoMode();
-    await AutoApiResolver.resolve();
-
-    setStateDialog(() {
-      currentMode = 'auto';
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Auto detect refreshed'),
-      ),
-    );
-  },
-  icon: const Icon(Icons.refresh),
-  label: const Text('Retry Auto Detect'),
-),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-_refreshConnectionStatus();
-                  ScaffoldMessenger.of(context)
-                      .showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Mode changed: $currentMode',
-                      ),
+    await showDialog(
+      context: context,
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Connection Mode'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RadioListTile(
+                      title: const Text('Auto'),
+                      value: 'auto',
+                      groupValue: currentMode,
+                      onChanged: (v) async {
+                        await ConnectionModeService.setAutoMode();
+                        setStateDialog(() => currentMode = 'auto');
+                      },
                     ),
-                  );
-                },
-                child: const Text('OK'),
+                    RadioListTile(
+                      title: const Text('Cloud'),
+                      value: 'cloud',
+                      groupValue: currentMode,
+                      onChanged: (v) async {
+                        await ConnectionModeService.setCloudMode();
+                        setStateDialog(() => currentMode = 'cloud');
+                      },
+                    ),
+                    RadioListTile(
+                      title: const Text('Local WiFi'),
+                      value: 'wifi',
+                      groupValue: currentMode,
+                      onChanged: (v) async {
+                        await ConnectionModeService.setLocalWifiMode();
+                        setStateDialog(() => currentMode = 'wifi');
+                      },
+                    ),
+                    RadioListTile(
+                      title: const Text('Doctor Hotspot'),
+                      value: 'hotspot',
+                      groupValue: currentMode,
+                      onChanged: (v) async {
+                        await ConnectionModeService.setHotspotMode();
+                        setStateDialog(() => currentMode = 'hotspot');
+                      },
+                    ),
+                    RadioListTile(
+                      title: const Text('Offline Only'),
+                      value: 'offline',
+                      groupValue: currentMode,
+                      onChanged: (v) async {
+                        await ConnectionModeService.setOfflineMode();
+                        setStateDialog(() => currentMode = 'offline');
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Mode: ${currentMode.toUpperCase()}\n'
+                      'Active Base URL:\n${ApiConfig.baseUrl}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        await ConnectionModeService.setAutoMode();
+                        await AutoApiResolver.resolve();
+
+                        setStateDialog(() => currentMode = 'auto');
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Auto detect refreshed'),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry Auto Detect'),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          );
-        },
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _refreshConnectionStatus();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Mode changed: $currentMode')),
+                    );
+                  },
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _refreshConnectionStatus() async {
+    final online = await NetworkService.isOnline();
+
+    if (!mounted) return;
+
+    setState(() {
+      _connectionOnline = online;
+      _connectionMode = ConnectionModeService.getCurrentMode();
+      _activeBaseUrl = ApiConfig.baseUrl;
+    });
+  }
+
+  Future<void> _loadQueueSummary() async {
+    try {
+      final summary = await ApiPatientService().getQueueSummary();
+
+      if (!mounted) return;
+
+      setState(() {
+        _queueSummary = summary;
+      });
+    } catch (e) {
+      debugPrint('Queue summary load failed: $e');
+    }
+  }
+
+  Future<void> _loadDashboardLocalData() async {
+    try {
+      final doctorId = await DoctorSession.getDoctorId();
+
+      if (doctorId == null) return;
+
+      final income =
+          await DatabaseHelper.instance.getTodayIncomeSummaryByDoctor(doctorId);
+
+      final followUps =
+          await DatabaseHelper.instance.getTodayFollowUps(doctorId: doctorId);
+
+      final recent =
+          await DatabaseHelper.instance.getPrescriptionsByDoctorPaged(
+        doctorId,
+        limit: 5,
+        offset: 0,
       );
-    },
-  );
-}
+
+      final pendingPatients =
+          await DatabaseHelper.instance.getPendingPatients();
+
+      final pendingMedicines =
+          await DatabaseHelper.instance.getPendingMedicines();
+
+      final pendingPrescriptions =
+          await DatabaseHelper.instance.getPendingPrescriptions();
+
+      final pendingBills =
+          await DatabaseHelper.instance.getPendingBills();
+
+      if (!mounted) return;
+
+      setState(() {
+        _todayIncome = income;
+        _todayFollowUpCount = followUps.length;
+        _recentPrescriptions = recent;
+        _pendingSyncCount = pendingPatients.length +
+            pendingMedicines.length +
+            pendingPrescriptions.length +
+            pendingBills.length;
+      });
+    } catch (e) {
+      debugPrint('Dashboard local data load failed: $e');
+    }
+  }
+
+  double _toDouble(dynamic value) {
+    if (value == null) return 0;
+    return double.tryParse(value.toString()) ?? 0;
+  }
+
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.045),
+          blurRadius: 16,
+          offset: const Offset(0, 6),
+        ),
+      ],
+    );
+  }
 
   Widget _buildLicenseBlock() {
     return Center(
@@ -507,10 +651,7 @@ _refreshConnectionStatus();
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 10),
-                Text(
-                  _licenseMessage,
-                  textAlign: TextAlign.center,
-                ),
+                Text(_licenseMessage, textAlign: TextAlign.center),
                 const SizedBox(height: 18),
                 ElevatedButton.icon(
                   onPressed: _checkLicenseOnDashboard,
@@ -529,338 +670,947 @@ _refreshConnectionStatus();
     );
   }
 
-  Widget _buildCard(String title, IconData icon, Color color) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () => _navigate(title),
-      child: Container(
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 40, color: color),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  Future<void> _refreshConnectionStatus() async {
-  final online = await NetworkService.isOnline();
-
-  if (!mounted) return;
-
-  setState(() {
-    _connectionOnline = online;
-    _connectionMode = ConnectionModeService.getCurrentMode();
-    _activeBaseUrl = ApiConfig.baseUrl;
-  });
-}
-
-Future<void> _loadQueueSummary() async {
-  try {
-    final summary = await ApiPatientService().getQueueSummary();
-
-    if (!mounted) return;
-
-    setState(() {
-      _queueSummary = summary;
-    });
-  } catch (e) {
-  debugPrint('Queue summary load failed: $e');
-}
-}
-
-
-
-Widget _summaryCard(
-  String title,
-  String count,
-  Color color,
-  IconData icon,
-) {
-  return Container(
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.12),
-      borderRadius: BorderRadius.circular(14),
-    ),
-    padding: const EdgeInsets.all(12),
-    child: Row(
-      children: [
-        CircleAvatar(
-          backgroundColor: color,
-          child: Icon(icon, color: Colors.white),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                count,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
- Widget _buildDashboard() {
-  final items = [
-    _buildCard('OPD Fast Mode', Icons.flash_on, Colors.red),
-    _buildCard('Analytics', Icons.bar_chart, Colors.deepPurple),
-    _buildCard(
-  'Income Report',
-  Icons.account_balance_wallet,
-  Colors.green,
-),
-//     _buildCard(
-//   'Admin Subscriptions',
-//   Icons.workspace_premium,
-//   Colors.deepPurple,
-// ),
-    _buildCard('Medicines', Icons.medication, Colors.blue),
-    _buildCard('Today Queue', Icons.queue, Colors.deepOrange),
-    _buildCard('Follow-Ups', Icons.notifications_active, Colors.orange),
-    _buildCard('Create Prescription', Icons.note_add, Colors.green),
-    _buildCard('Prescription History', Icons.history, Colors.orange),
-    _buildCard('Patient History', Icons.search, Colors.teal),
-    _buildCard('Patient Master', Icons.people_alt, Colors.brown),
-    _buildCard('Scan Prescription', Icons.qr_code_scanner, Colors.indigo),
-   
-    _buildCard('Hotspot QR', Icons.qr_code_2, Colors.blueGrey),
-  ];
-
-  return Column(
-    children: [
-
-        // CONNECTION STATUS
-    Container(
+  Widget _headerCard() {
+    return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 10,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFF0F4CBF),
+            Color(0xFF1769E0),
+            Color(0xFF0F766E),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
       ),
-      decoration: BoxDecoration(
-        color: _connectionOnline
-            ? Colors.green.withOpacity(0.08)
-            : Colors.red.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            _connectionOnline
-                ? Icons.cloud_done
-                : Icons.cloud_off,
-            size: 18,
-            color:
-                _connectionOnline
-                    ? Colors.green
-                    : Colors.red,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              _connectionOnline
-                  ? 'Online Mode'
-                  : 'Offline Mode',
-              style: TextStyle(
-                color:
-                    _connectionOnline
-                        ? Colors.green
-                        : Colors.red,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-
-    // LICENSE STATUS
-    Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 10,
-      ),
-      decoration: BoxDecoration(
-        color: _daysRemaining <= 7
-            ? Colors.orange.withOpacity(0.08)
-            : Colors.blue.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.verified_user,
-            size: 18,
-            color:
-                _daysRemaining <= 7
-                    ? Colors.orange
-                    : Colors.blue,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '$_planName • $_daysRemaining days remaining',
-              style: TextStyle(
-                color:
-                    _daysRemaining <= 7
-                        ? Colors.orange
-                        : Colors.blue,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-
-    // QUEUE SUMMARY
-    
-
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        child: GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: 2.3,
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _summaryCard(
-              'Waiting',
-              _queueSummary['waiting'].toString(),
-              Colors.orange,
-              Icons.queue,
+            Row(
+              children: [
+                const CircleAvatar(
+                  radius: 28,
+                  backgroundColor: Colors.white,
+                  child: Icon(
+                    Icons.local_hospital,
+                    color: Color(0xFF1769E0),
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${_getGreeting()},',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        'Dr. $_doctorName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 25,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: _showConnectionModeDialog,
+                  icon: const Icon(Icons.settings, color: Colors.white),
+                ),
+                IconButton(
+                  onPressed: _logout,
+                  icon: const Icon(Icons.logout, color: Colors.white),
+                ),
+              ],
             ),
-            _summaryCard(
-              'Serving',
-              _queueSummary['serving'].toString(),
-              Colors.green,
-              Icons.local_hospital,
+            const SizedBox(height: 18),
+            Text(
+              _getFormattedToday(),
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-            _summaryCard(
-              'Completed',
-              _queueSummary['completed'].toString(),
-              Colors.blue,
-              Icons.check_circle,
+            const SizedBox(height: 6),
+            Text(
+              _getHeaderMessage(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-            _summaryCard(
-              'Skipped',
-              _queueSummary['skipped'].toString(),
-              Colors.red,
-              Icons.skip_next,
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: _statusPill(
+                    icon:
+                        _connectionOnline ? Icons.cloud_done : Icons.cloud_off,
+                    text: _connectionOnline
+                        ? 'Cloud Mode • Online'
+                        : 'Offline Mode Active',
+                    color:
+                        _connectionOnline ? Colors.greenAccent : Colors.orange,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _statusPill(
+                    icon: Icons.verified_user,
+                    text: '$_planName • $_daysRemaining days',
+                    color: _daysRemaining <= 7 ? Colors.orange : Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            _statusPill(
+              icon: Icons.sync,
+              text: _pendingSyncCount == 0
+                  ? 'All data synced'
+                  : '$_pendingSyncCount record(s) pending sync',
+              color: _pendingSyncCount == 0 ? Colors.greenAccent : Colors.amber,
             ),
           ],
         ),
       ),
+    );
+  }
 
-      
-
-      
-
-
-      Expanded(
-        child: GridView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: items.length,
-          gridDelegate:
-              const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-          ),
-          itemBuilder: (_, index) => items[index],
-        ),
+  Widget _statusPill({
+    required IconData icon,
+    required String text,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
       ),
-    ],
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+ Widget _primaryPrescriptionButton() {
+  return InkWell(
+    onTap: () => _navigate('Today Queue'),
+    borderRadius: BorderRadius.circular(24),
+    child: Container(
+      margin: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF6D00), Color(0xFFFF9800)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withOpacity(0.25),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: const Row(
+        children: [
+          CircleAvatar(
+            radius: 31,
+            backgroundColor: Colors.white,
+            child: Icon(Icons.groups, color: Color(0xFFFF6D00), size: 34),
+          ),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Today Queue',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 21,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'View and manage today’s patients',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.arrow_forward_ios, color: Colors.white),
+        ],
+      ),
+    ),
   );
 }
 
-@override
-void dispose() {
-  _summaryTimer?.cancel();
-  _licenseTimer?.cancel();
-  super.dispose();
-}
+  Widget _queueSummaryCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: _cardDecoration(),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  "Today's Queue Summary",
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+              ),
+              TextButton(
+                onPressed: () => _navigate('Today Queue'),
+                child: const Text('View Queue'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _queueMini(
+                'Waiting',
+                _queueSummary['waiting'].toString(),
+                Icons.groups,
+                Colors.deepOrange,
+              ),
+              _queueMini(
+                'Serving',
+                _queueSummary['serving'].toString(),
+                Icons.person,
+                Colors.green,
+              ),
+              _queueMini(
+                'Completed',
+                _queueSummary['completed'].toString(),
+                Icons.check_circle,
+                Colors.blue,
+              ),
+              _queueMini(
+                'Skipped',
+                _queueSummary['skipped'].toString(),
+                Icons.close,
+                Colors.red,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _queueMini(String title, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Column(
+        children: [
+          CircleAvatar(
+            backgroundColor: color.withOpacity(0.13),
+            child: Icon(icon, color: color, size: 21),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 11, color: Colors.black54),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionCard({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required List<Widget> children,
+    String? subtitle,
+  }) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: _cardDecoration(),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (subtitle != null)
+                Text(
+                  subtitle,
+                  style: const TextStyle(fontSize: 12, color: Colors.black45),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _featureScroll(List<Widget> items) {
+    return SizedBox(
+      height: 132,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (_, index) {
+          return SizedBox(
+            width: MediaQuery.of(context).size.width - 96,
+            child: items[index],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _featureCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    bool compact = false,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        height: 125,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: color.withOpacity(0.10)),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 30,
+              backgroundColor: color.withOpacity(0.18),
+              child: Icon(icon, color: color, size: 30),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.black54,
+                      fontSize: 14,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: color, size: 30),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+  String _formatRecentDate(dynamic value) {
+    if (value == null) return '';
+
+    final raw = value.toString();
+    final date = DateTime.tryParse(raw);
+
+    if (date == null) return raw;
+
+    final now = DateTime.now();
+
+    final isToday =
+        date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
+
+    final hour = date.hour.toString().padLeft(2, '0');
+    final minute = date.minute.toString().padLeft(2, '0');
+
+    if (isToday) {
+      return 'Today $hour:$minute';
+    }
+
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  String _safeText(dynamic value, String fallback) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? fallback : text;
+  }
+
+  Widget _recentActivitySection() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const CircleAvatar(
+                backgroundColor: Color(0xFFEFF6FF),
+                child: Icon(Icons.trending_up, color: Colors.blue),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Recent Activity',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Latest prescriptions and visits',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () => _navigate('Prescription History'),
+                child: const Text('View All'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (_recentPrescriptions.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Column(
+                children: [
+                  Icon(
+                    Icons.receipt_long_outlined,
+                    size: 36,
+                    color: Colors.black38,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'No recent prescriptions found',
+                    style: TextStyle(
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ..._recentPrescriptions.map((rx) {
+              final rxNo = _safeText(rx['prescription_no'], 'RX');
+              final patientName = _safeText(rx['patient_name'], 'Patient');
+              final diagnosis = _safeText(rx['diagnosis'], 'No diagnosis');
+              final complaint = _safeText(rx['complaint'], '');
+              final date = _formatRecentDate(
+                rx['created_at'] ?? rx['prescription_date'],
+              );
+
+              return InkWell(
+                onTap: () => _navigate('Prescription History'),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.blue.withOpacity(0.08),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.10),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.receipt_long,
+                          color: Colors.blue,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              patientName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    rxNo,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.blue,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                if (date.isNotEmpty) ...[
+                                  const Text(
+                                    ' • ',
+                                    style: TextStyle(color: Colors.black38),
+                                  ),
+                                  Flexible(
+                                    child: Text(
+                                      date,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.black54,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              complaint.isNotEmpty
+                                  ? '$diagnosis • $complaint'
+                                  : diagnosis,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: Colors.black26,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboard() {
+    final totalIncome = _toDouble(_todayIncome['total_income']);
+
+    return RefreshIndicator(
+      onRefresh: _refreshAll,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          children: [
+            _headerCard(),
+            _primaryPrescriptionButton(),
+            const SizedBox(height: 8),
+            _queueSummaryCard(),
+
+            _sectionCard(
+              title: "Today's Operations",
+              icon: Icons.star,
+              color: Colors.orange,
+              subtitle: 'Top priority',
+              children: [
+                _featureScroll([
+                  _featureCard(
+  title: 'Create Prescription',
+  subtitle: 'Start a new prescription',
+  icon: Icons.note_add,
+  color: Colors.blue,
+  onTap: () => _navigate('Create Prescription'),
+),
+                  _featureCard(
+                    title: 'Follow-Ups',
+                    subtitle: '$_todayFollowUpCount due today',
+                    icon: Icons.notifications_active,
+                    color: Colors.amber,
+                    onTap: () => _navigate('Follow-Ups'),
+                  ),
+                  _featureCard(
+                    title: 'Billing / Income',
+                    subtitle: 'Rs. ${totalIncome.toStringAsFixed(2)} today',
+                    icon: Icons.account_balance_wallet,
+                    color: Colors.green,
+                    onTap: () => _navigate('Income Report'),
+                  ),
+                  _featureCard(
+                    title: 'Sync Now',
+                    subtitle: _pendingSyncCount == 0
+                        ? 'All data synced'
+                        : '$_pendingSyncCount pending',
+                    icon: Icons.sync,
+                    color: Colors.blue,
+                    onTap: _syncNow,
+                  ),
+                ]),
+              ],
+            ),
+
+            _sectionCard(
+              title: 'Patient Management',
+              icon: Icons.people_alt,
+              color: Colors.blue,
+              subtitle: 'Patients',
+              children: [
+                _featureScroll([
+                  _featureCard(
+                    title: 'Patients',
+                    subtitle: 'Add, edit and manage patient records',
+                    icon: Icons.groups,
+                    color: Colors.blue,
+                    onTap: () => _navigate('Patient Master'),
+                  ),
+                  _featureCard(
+                    title: 'Patient History',
+                    subtitle: 'View patient treatment and visit history',
+                    icon: Icons.person_search,
+                    color: Colors.teal,
+                    onTap: () => _navigate('Patient History'),
+                  ),
+                ]),
+              ],
+            ),
+
+            _sectionCard(
+              title: 'Clinical',
+              icon: Icons.assignment,
+              color: Colors.deepPurple,
+              subtitle: 'Records',
+              children: [
+                _featureScroll([
+                  _featureCard(
+                    title: 'Medicines',
+                    subtitle: 'Manage medicine master data',
+                    icon: Icons.medication,
+                    color: Colors.deepPurple,
+                    onTap: () => _navigate('Medicines'),
+                  ),
+                  _featureCard(
+                    title: 'Prescription History',
+                    subtitle: 'View all prescription records',
+                    icon: Icons.history,
+                    color: Colors.blue,
+                    onTap: () => _navigate('Prescription History'),
+                  ),
+                ]),
+              ],
+            ),
+
+            _recentActivitySection(),
+
+            _sectionCard(
+              title: 'Tools',
+              icon: Icons.construction,
+              color: Colors.blueGrey,
+              subtitle: 'Utilities',
+              children: [
+                _featureScroll([
+                  _featureCard(
+                    title: 'QR Scan',
+                    subtitle: 'Scan prescription QR code',
+                    icon: Icons.qr_code_scanner,
+                    color: Colors.blue,
+                    onTap: () => _navigate('Scan Prescription'),
+                  ),
+                  _featureCard(
+                    title: 'OPD Fast Mode',
+                    subtitle: 'Quick OPD consultation mode',
+                    icon: Icons.flash_on,
+                    color: Colors.red,
+                    onTap: () => _navigate('OPD Fast Mode'),
+                  ),
+                  _featureCard(
+                    title: 'Hotspot QR',
+                    subtitle: 'Share hotspot connection QR',
+                    icon: Icons.qr_code_2,
+                    color: Colors.blueGrey,
+                    onTap: () => _navigate('Hotspot QR'),
+                  ),
+                  _featureCard(
+                    title: 'Analytics',
+                    subtitle: 'Reports and clinic insights',
+                    icon: Icons.bar_chart,
+                    color: Colors.deepPurple,
+                    onTap: () => _navigate('Analytics'),
+                  ),
+                ]),
+              ],
+            ),
+
+            const SizedBox(height: 95),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _onBottomNavTap(int index) {
+    switch (index) {
+      case 0:
+        break;
+      case 1:
+        _navigate('Today Queue');
+        break;
+      case 2:
+        _navigate('Create Prescription');
+        break;
+      case 3:
+        _navigate('Income Report');
+        break;
+      case 4:
+        _showMoreSheet();
+        break;
+    }
+  }
+
+  void _showMoreSheet() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'More Options',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.people_alt),
+                title: const Text('Patients'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigate('Patient Master');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.person_search),
+                title: const Text('Patient History'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigate('Patient History');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.history),
+                title: const Text('Prescription History'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigate('Prescription History');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.qr_code_scanner),
+                title: const Text('QR Scan'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigate('Scan Prescription');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.sync),
+                title: const Text('Sync Now'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _syncNow();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.settings_ethernet),
+                title: const Text('Connection Mode'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showConnectionModeDialog();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _summaryTimer?.cancel();
+    _licenseTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    
     if (_isCheckingLicense) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    
-
     return Scaffold(
-      
-      appBar: AppBar(
-        title: const Text('Doctor Dashboard'),
-       actions: [
-  IconButton(
-    icon: const Icon(Icons.settings_ethernet),
-    tooltip: 'Connection Mode',
-    onPressed: _showConnectionModeDialog,
-  ),
-  IconButton(
-    icon: const Icon(Icons.logout),
-    onPressed: _logout,
-  ),
-],
-      ),
+      backgroundColor: const Color(0xFFF5F7FB),
+      body: _licenseValid ? _buildDashboard() : _buildLicenseBlock(),
       floatingActionButton: _licenseValid
-          ? FloatingActionButton.extended(
-              onPressed: _isSyncing ? null : _syncNow,
-              icon: _isSyncing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.sync),
-              label: Text(_isSyncing ? 'Syncing' : 'Sync'),
+          ? FloatingActionButton(
+              backgroundColor: const Color(0xFF2563EB),
+              onPressed: () => _navigate('Create Prescription'),
+              child: const Icon(Icons.add, color: Colors.white),
             )
           : null,
-      body: _licenseValid ? _buildDashboard() : _buildLicenseBlock(),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: _licenseValid
+          ? BottomAppBar(
+              shape: const CircularNotchedRectangle(),
+              notchMargin: 8,
+              child: SizedBox(
+                height: 64,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _bottomItem(Icons.home, 'Home', 0),
+                    _bottomItem(Icons.queue, 'Queue', 1),
+                    const SizedBox(width: 48),
+                    _bottomItem(Icons.account_balance_wallet, 'Billing', 3),
+                    _bottomItem(Icons.more_horiz, 'More', 4),
+                  ],
+                ),
+              ),
+            )
+          : null,
+    );
+  }
+
+  Widget _bottomItem(IconData icon, String label, int index) {
+    final selected = index == 0;
+
+    return InkWell(
+      onTap: () => _onBottomNavTap(index),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            color: selected ? const Color(0xFF2563EB) : Colors.black45,
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: selected ? const Color(0xFF2563EB) : Colors.black45,
+              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
