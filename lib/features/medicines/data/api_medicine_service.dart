@@ -29,149 +29,187 @@ class ApiMedicineService {
   }
 
   Map<String, dynamic> _medicineBody({
-    int? doctorId,
-    int? serverId,
-    required String name,
-    String? generic,
-    String? brand,
-    String? group,
-    String? doseForm,
-    String? strength,
-    bool isFavorite = false,
-  }) {
-    return {
-      'id': serverId,
-      'doctorId': doctorId,
-      'medicineName': name,
-      'genericName': generic ?? '',
-      'brandName': brand ?? '',
-      'drugGroup': group ?? '',
-      'medicineType': doseForm ?? '',
-      'defaultDosage': strength ?? '',
-      'defaultFrequency': '',
-      'defaultDuration': '',
-      'instructions': '',
-      'isFavorite': isFavorite,
-    };
-  }
+  int? doctorId,
+  int? serverId,
+  required String name,
+  String? generic,
+  String? brand,
+  String? group,
+  String? doseForm,
+  String? strength,
+  String? customDosage,
+  String? customFrequency,
+  String? customDuration,
+  String? customInstructions,
+  double sellingPrice = 0,
+  double costPrice = 0,
+  bool isFavorite = false,
+}) {
+  return {
+    'id': serverId,
+    'doctorId': doctorId,
+    'medicineName': name,
+    'genericName': generic ?? '',
+    'brandName': brand ?? '',
+    'drugGroup': group ?? '',
+    'medicineType': doseForm ?? '',
+    'defaultDosage': strength ?? '',
+    'defaultFrequency': '',
+    'defaultDuration': '',
+    'instructions': '',
+    'customDosage': customDosage ?? '',
+    'customFrequency': customFrequency ?? '',
+    'customDuration': customDuration ?? '',
+    'customInstructions': customInstructions ?? '',
+    'sellingPrice': sellingPrice,
+    'costPrice': costPrice,
+    'isFavorite': isFavorite,
+    'isGlobal': false,
+    'assignedDoctorIds': [],
+  };
+}
 
   Future<Map<String, dynamic>> createMedicine({
-    required int doctorId,
-    required String name,
-    String? generic,
-    String? brand,
-    String? group,
-    String? doseForm,
-    String? strength,
-    bool isFavorite = false,
-  }) async {
-    try {
-      final token = await _getToken();
+  required int doctorId,
+  required String name,
+  String? generic,
+  String? brand,
+  String? group,
+  String? doseForm,
+  String? strength,
+  String? customDosage,
+  String? customFrequency,
+  String? customDuration,
+  String? customInstructions,
+  double sellingPrice = 0,
+  double costPrice = 0,
+  bool isFavorite = false,
+}) async {
+  try {
+    final token = await _getToken();
 
-      final response = await http
-          .post(
-            _uri('/Medicines'),
-            headers: _headers(token ?? ''),
-            body: jsonEncode(
-              _medicineBody(
-                doctorId: doctorId,
-                name: name,
-                generic: generic,
-                brand: brand,
-                group: group,
-                doseForm: doseForm,
-                strength: strength,
-                isFavorite: isFavorite,
-              ),
+    final response = await http
+        .post(
+          _uri('/Medicines'),
+          headers: _headers(token ?? ''),
+          body: jsonEncode(
+            _medicineBody(
+              doctorId: doctorId,
+              name: name,
+              generic: generic,
+              brand: brand,
+              group: group,
+              doseForm: doseForm,
+              strength: strength,
+              customDosage: customDosage,
+              customFrequency: customFrequency,
+              customDuration: customDuration,
+              customInstructions: customInstructions,
+              sellingPrice: sellingPrice,
+              costPrice: costPrice,
+              isFavorite: isFavorite,
             ),
-          )
-          .timeout(const Duration(seconds: 15));
+          ),
+        )
+        .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200 ||
-          response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-
-        return {
-          'success': true,
-          'serverId':
-              data['id'] ??
-              data['Id'] ??
-              data['serverId'],
-        };
-      }
+    if (response.statusCode == 200 ||
+        response.statusCode == 201) {
+      final data = jsonDecode(response.body);
 
       return {
-        'success': false,
-        'error':
-            'Medicine create failed: '
-            '${response.statusCode} ${response.body}',
-      };
-    } catch (e) {
-      return {
-        'success': false,
-        'error': e.toString(),
+        'success': true,
+        'serverId':
+            data['id'] ??
+            data['Id'] ??
+            data['serverId'],
       };
     }
+
+    return {
+      'success': false,
+      'error':
+          'Medicine create failed: '
+          '${response.statusCode} ${response.body}',
+    };
+  } catch (e) {
+    return {
+      'success': false,
+      'error': e.toString(),
+    };
   }
+}
 
   Future<Map<String, dynamic>> updateMedicine({
-    required int serverId,
-    required String name,
-    String? generic,
-    String? brand,
-    String? group,
-    String? doseForm,
-    String? strength,
-    bool isFavorite = false,
-  }) async {
-    try {
-      final token = await _getToken();
+  required int serverId,
+  required String name,
+  String? generic,
+  String? brand,
+  String? group,
+  String? doseForm,
+  String? strength,
+  String? customDosage,
+  String? customFrequency,
+  String? customDuration,
+  String? customInstructions,
+  double sellingPrice = 0,
+  double costPrice = 0,
+  bool isFavorite = false,
+}) async {
+  try {
+    final token = await _getToken();
 
-      final response = await http
-          .put(
-            _uri('/Medicines/$serverId'),
-            headers: _headers(token ?? ''),
-            body: jsonEncode(
-              _medicineBody(
-                serverId: serverId,
-                name: name,
-                generic: generic,
-                brand: brand,
-                group: group,
-                doseForm: doseForm,
-                strength: strength,
-                isFavorite: isFavorite,
-              ),
+    final response = await http
+        .put(
+          _uri('/Medicines/$serverId'),
+          headers: _headers(token ?? ''),
+          body: jsonEncode(
+            _medicineBody(
+              serverId: serverId,
+              name: name,
+              generic: generic,
+              brand: brand,
+              group: group,
+              doseForm: doseForm,
+              strength: strength,
+              customDosage: customDosage,
+              customFrequency: customFrequency,
+              customDuration: customDuration,
+              customInstructions: customInstructions,
+              sellingPrice: sellingPrice,
+              costPrice: costPrice,
+              isFavorite: isFavorite,
             ),
-          )
-          .timeout(const Duration(seconds: 15));
+          ),
+        )
+        .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        return {
-          'success': true,
-          'serverId':
-              data['id'] ??
-              data['Id'] ??
-              data['serverId'] ??
-              serverId,
-        };
-      }
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
 
       return {
-        'success': false,
-        'error':
-            'Medicine update failed: '
-            '${response.statusCode} ${response.body}',
-      };
-    } catch (e) {
-      return {
-        'success': false,
-        'error': e.toString(),
+        'success': true,
+        'serverId':
+            data['id'] ??
+            data['Id'] ??
+            data['serverId'] ??
+            serverId,
       };
     }
+
+    return {
+      'success': false,
+      'error':
+          'Medicine update failed: '
+          '${response.statusCode} ${response.body}',
+    };
+  } catch (e) {
+    return {
+      'success': false,
+      'error': e.toString(),
+    };
   }
+}
 
   Future<Map<String, dynamic>> deleteMedicine({
     required int serverId,

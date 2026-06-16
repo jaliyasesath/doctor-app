@@ -282,18 +282,33 @@ class SyncService {
         final map = Map<String, dynamic>.from(m as Map);
 
         await _db.upsertMedicineFromServer(
-          doctorId: doctorId,
-          serverId: map['id'] as int,
-          medicineName: (map['medicineName'] ?? '').toString(),
-          genericName: map['genericName']?.toString(),
-          brandName: map['brandName']?.toString(),
-          drugGroup: map['drugGroup']?.toString(),
-          doseForm: map['medicineType']?.toString(),
-          strength: map['defaultDosage']?.toString(),
-          isFavorite: map['isFavorite'] == true ? 1 : 0,
-          createdAt: map['createdAt']?.toString(),
-          updatedAt: map['updatedAt']?.toString(),
-        );
+  doctorId: doctorId,
+  serverId: map['id'] as int,
+  medicineName: (map['medicineName'] ?? '').toString(),
+  genericName: map['genericName']?.toString(),
+  brandName: map['brandName']?.toString(),
+  drugGroup: map['drugGroup']?.toString(),
+  doseForm: map['medicineType']?.toString(),
+  strength: map['defaultDosage']?.toString(),
+
+  customDosage: map['customDosage']?.toString(),
+  customFrequency: map['customFrequency']?.toString(),
+  customDuration: map['customDuration']?.toString(),
+  customInstructions: map['customInstructions']?.toString(),
+
+  sellingPrice: double.tryParse(
+        map['sellingPrice']?.toString() ?? '0',
+      ) ??
+      0,
+  costPrice: double.tryParse(
+        map['costPrice']?.toString() ?? '0',
+      ) ??
+      0,
+
+  isFavorite: map['isFavorite'] == true ? 1 : 0,
+  createdAt: map['createdAt']?.toString(),
+  updatedAt: map['updatedAt']?.toString(),
+);
 
         result.pulledMedicines++;
 
@@ -534,26 +549,56 @@ if (isDeleted) {
 
         if (serverId != null && serverId != 0) {
           apiResult = await _medicineApi.updateMedicine(
-            serverId: serverId as int,
-            name: med['medicine_name']?.toString() ?? '',
-            generic: med['generic_name']?.toString(),
-            brand: med['brand_name']?.toString(),
-            group: med['drug_group']?.toString(),
-            doseForm: med['dose_form']?.toString(),
-            strength: med['strength']?.toString(),
-            isFavorite: med['is_favorite'] == 1,
-          );
+  serverId: serverId as int,
+  name: med['medicine_name']?.toString() ?? '',
+  generic: med['generic_name']?.toString(),
+  brand: med['brand_name']?.toString(),
+  group: med['drug_group']?.toString(),
+  doseForm: med['dose_form']?.toString(),
+  strength: med['strength']?.toString(),
+
+  customDosage: med['custom_dosage']?.toString(),
+  customFrequency: med['custom_frequency']?.toString(),
+  customDuration: med['custom_duration']?.toString(),
+  customInstructions: med['custom_instructions']?.toString(),
+
+  sellingPrice: double.tryParse(
+        med['selling_price']?.toString() ?? '0',
+      ) ??
+      0,
+  costPrice: double.tryParse(
+        med['cost_price']?.toString() ?? '0',
+      ) ??
+      0,
+
+  isFavorite: med['is_favorite'] == 1,
+);
         } else {
-          apiResult = await _medicineApi.createMedicine(
-            doctorId: med['doctor_id'] as int,
-            name: med['medicine_name']?.toString() ?? '',
-            generic: med['generic_name']?.toString(),
-            brand: med['brand_name']?.toString(),
-            group: med['drug_group']?.toString(),
-            doseForm: med['dose_form']?.toString(),
-            strength: med['strength']?.toString(),
-            isFavorite: med['is_favorite'] == 1,
-          );
+         apiResult = await _medicineApi.createMedicine(
+  doctorId: med['doctor_id'] as int,
+  name: med['medicine_name']?.toString() ?? '',
+  generic: med['generic_name']?.toString(),
+  brand: med['brand_name']?.toString(),
+  group: med['drug_group']?.toString(),
+  doseForm: med['dose_form']?.toString(),
+  strength: med['strength']?.toString(),
+
+  customDosage: med['custom_dosage']?.toString(),
+  customFrequency: med['custom_frequency']?.toString(),
+  customDuration: med['custom_duration']?.toString(),
+  customInstructions: med['custom_instructions']?.toString(),
+
+  sellingPrice: double.tryParse(
+        med['selling_price']?.toString() ?? '0',
+      ) ??
+      0,
+  costPrice: double.tryParse(
+        med['cost_price']?.toString() ?? '0',
+      ) ??
+      0,
+
+  isFavorite: med['is_favorite'] == 1,
+);
         }
 
         if (apiResult['success'] == true && apiResult['serverId'] != null) {

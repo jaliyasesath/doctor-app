@@ -23,7 +23,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-     version: 29,
+     version: 30,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -183,9 +183,20 @@ await db.execute('''
         drug_group TEXT,
         dose_form TEXT,
         strength TEXT,
-        selling_price REAL DEFAULT 0,
+
+custom_dosage TEXT,
+
+custom_frequency TEXT,
+
+custom_duration TEXT,
+
+custom_instructions TEXT,
+
+selling_price REAL DEFAULT 0,
+
 cost_price REAL DEFAULT 0,
-        is_favorite INTEGER DEFAULT 0,
+
+is_favorite INTEGER DEFAULT 0,
         sync_status TEXT DEFAULT 'pending',
         created_at TEXT,
         updated_at TEXT,
@@ -553,6 +564,34 @@ if (oldVersion < 29) {
       'ALTER TABLE medicines ADD COLUMN cost_price REAL DEFAULT 0',
     );
   } catch (_) {}
+}
+
+if (oldVersion < 30) {
+
+  try {
+    await db.execute(
+      'ALTER TABLE medicines ADD COLUMN custom_dosage TEXT',
+    );
+  } catch (_) {}
+
+  try {
+    await db.execute(
+      'ALTER TABLE medicines ADD COLUMN custom_frequency TEXT',
+    );
+  } catch (_) {}
+
+  try {
+    await db.execute(
+      'ALTER TABLE medicines ADD COLUMN custom_duration TEXT',
+    );
+  } catch (_) {}
+
+  try {
+    await db.execute(
+      'ALTER TABLE medicines ADD COLUMN custom_instructions TEXT',
+    );
+  } catch (_) {}
+
 }
 
 
@@ -1289,54 +1328,67 @@ Future<int> permanentlyDeleteMedicine(int id) async {
     );
   }
 
-  Future<void> upsertMedicineFromServer({
-    required int doctorId,
-    required int serverId,
-    required String medicineName,
-    String? genericName,
-    String? brandName,
-    String? drugGroup,
-    String? doseForm,
-    String? strength,
-    int isFavorite = 0,
-    String? createdAt,
-    String? updatedAt,
-  }) async {
-    final db = await database;
+ Future<void> upsertMedicineFromServer({
+  required int doctorId,
+  required int serverId,
+  required String medicineName,
+  String? genericName,
+  String? brandName,
+  String? drugGroup,
+  String? doseForm,
+  String? strength,
+  String? customDosage,
+  String? customFrequency,
+  String? customDuration,
+  String? customInstructions,
+  double sellingPrice = 0,
+  double costPrice = 0,
+  int isFavorite = 0,
+  String? createdAt,
+  String? updatedAt,
+}) async {
+  final db = await database;
 
-    final existing = await db.query(
+  final existing = await db.query(
+    'medicines',
+    where: 'server_id = ? AND doctor_id = ?',
+    whereArgs: [serverId, doctorId],
+    limit: 1,
+  );
+
+  final data = {
+    'server_id': serverId,
+    'doctor_id': doctorId,
+    'medicine_name': medicineName,
+    'generic_name': genericName ?? '',
+    'brand_name': brandName ?? '',
+    'drug_group': drugGroup ?? '',
+    'dose_form': doseForm ?? '',
+    'strength': strength ?? '',
+    'custom_dosage': customDosage ?? '',
+    'custom_frequency': customFrequency ?? '',
+    'custom_duration': customDuration ?? '',
+    'custom_instructions': customInstructions ?? '',
+    'selling_price': sellingPrice,
+    'cost_price': costPrice,
+    'is_favorite': isFavorite,
+    'sync_status': 'synced',
+    'is_deleted': 0,
+    'created_at': createdAt ?? DateTime.now().toIso8601String(),
+    'updated_at': updatedAt ?? DateTime.now().toIso8601String(),
+  };
+
+  if (existing.isEmpty) {
+    await db.insert('medicines', data);
+  } else {
+    await db.update(
       'medicines',
-      where: 'server_id = ? AND doctor_id = ?',
-      whereArgs: [serverId, doctorId],
-      limit: 1,
+      data,
+      where: 'id = ?',
+      whereArgs: [existing.first['id']],
     );
-
-    final data = {
-      'server_id': serverId,
-      'doctor_id': doctorId,
-      'medicine_name': medicineName,
-      'generic_name': genericName ?? '',
-      'brand_name': brandName ?? '',
-      'drug_group': drugGroup ?? '',
-      'dose_form': doseForm ?? '',
-      'strength': strength ?? '',
-      'is_favorite': isFavorite,
-      'sync_status': 'synced',
-      'created_at': createdAt ?? DateTime.now().toIso8601String(),
-      'updated_at': updatedAt ?? DateTime.now().toIso8601String(),
-    };
-
-    if (existing.isEmpty) {
-      await db.insert('medicines', data);
-    } else {
-      await db.update(
-        'medicines',
-        data,
-        where: 'id = ?',
-        whereArgs: [existing.first['id']],
-      );
-    }
   }
+}
 
   bool hasDrugGroupAllergy({
     required String patientAllergies,
