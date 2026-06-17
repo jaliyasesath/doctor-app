@@ -23,7 +23,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-     version: 30,
+     version: 31,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -178,6 +178,11 @@ await db.execute('''
         server_id INTEGER,
         doctor_id INTEGER,
         medicine_name TEXT NOT NULL,
+        custom_medicine_name TEXT,
+custom_generic_name TEXT,
+custom_brand_name TEXT,
+custom_drug_group TEXT,
+custom_medicine_type TEXT,
         generic_name TEXT,
         brand_name TEXT,
         drug_group TEXT,
@@ -592,6 +597,38 @@ if (oldVersion < 30) {
     );
   } catch (_) {}
 
+}
+
+if (oldVersion < 31) {
+  try {
+    await db.execute(
+      'ALTER TABLE medicines ADD COLUMN custom_medicine_name TEXT',
+    );
+  } catch (_) {}
+
+  try {
+    await db.execute(
+      'ALTER TABLE medicines ADD COLUMN custom_generic_name TEXT',
+    );
+  } catch (_) {}
+
+  try {
+    await db.execute(
+      'ALTER TABLE medicines ADD COLUMN custom_brand_name TEXT',
+    );
+  } catch (_) {}
+
+  try {
+    await db.execute(
+      'ALTER TABLE medicines ADD COLUMN custom_drug_group TEXT',
+    );
+  } catch (_) {}
+
+  try {
+    await db.execute(
+      'ALTER TABLE medicines ADD COLUMN custom_medicine_type TEXT',
+    );
+  } catch (_) {}
 }
 
 
@@ -1331,19 +1368,31 @@ Future<int> permanentlyDeleteMedicine(int id) async {
  Future<void> upsertMedicineFromServer({
   required int doctorId,
   required int serverId,
+
   required String medicineName,
+
   String? genericName,
   String? brandName,
   String? drugGroup,
   String? doseForm,
   String? strength,
+
+  String? customMedicineName,
+  String? customGenericName,
+  String? customBrandName,
+  String? customDrugGroup,
+  String? customMedicineType,
+
   String? customDosage,
   String? customFrequency,
   String? customDuration,
   String? customInstructions,
+
   double sellingPrice = 0,
   double costPrice = 0,
+
   int isFavorite = 0,
+
   String? createdAt,
   String? updatedAt,
 }) async {
@@ -1356,11 +1405,18 @@ Future<int> permanentlyDeleteMedicine(int id) async {
     limit: 1,
   );
 
-  final data = {
-    'server_id': serverId,
-    'doctor_id': doctorId,
-    'medicine_name': medicineName,
-    'generic_name': genericName ?? '',
+final data = {
+  'server_id': serverId,
+  'doctor_id': doctorId,
+
+  'medicine_name': medicineName,
+  'custom_medicine_name': customMedicineName ?? '',
+  'custom_generic_name': customGenericName ?? '',
+  'custom_brand_name': customBrandName ?? '',
+  'custom_drug_group': customDrugGroup ?? '',
+  'custom_medicine_type': customMedicineType ?? '',
+
+  'generic_name': genericName ?? '',
     'brand_name': brandName ?? '',
     'drug_group': drugGroup ?? '',
     'dose_form': doseForm ?? '',

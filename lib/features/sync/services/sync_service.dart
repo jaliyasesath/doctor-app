@@ -115,7 +115,7 @@ class SyncService {
   }
 
   Future<void> pullPatients(SyncResult result) async {
-  final doctorId = await DoctorSession.getDoctorId();
+  final doctorId = await DoctorSession.getActiveDoctorIdForData();
 
   if (doctorId == null) {
     result.lastError = 'Doctor session not found';
@@ -169,7 +169,7 @@ class SyncService {
   
 
   Future<void> pullPrescriptions(SyncResult result) async {
-  final doctorId = await DoctorSession.getDoctorId();
+  final doctorId = await DoctorSession.getActiveDoctorIdForData();
 
   if (doctorId == null) {
     result.lastError = 'Doctor session not found';
@@ -251,7 +251,7 @@ class SyncService {
 }
 
   Future<void> pullMedicines(SyncResult result) async {
-  final doctorId = await DoctorSession.getDoctorId();
+  final doctorId = await DoctorSession.getActiveDoctorIdForData();
 
   if (doctorId == null) {
     result.lastError = 'Doctor session not found';
@@ -290,6 +290,11 @@ class SyncService {
   drugGroup: map['drugGroup']?.toString(),
   doseForm: map['medicineType']?.toString(),
   strength: map['defaultDosage']?.toString(),
+  customMedicineName: map['customMedicineName']?.toString(),
+customGenericName: map['customGenericName']?.toString(),
+customBrandName: map['customBrandName']?.toString(),
+customDrugGroup: map['customDrugGroup']?.toString(),
+customMedicineType: map['customMedicineType']?.toString(),
 
   customDosage: map['customDosage']?.toString(),
   customFrequency: map['customFrequency']?.toString(),
@@ -556,6 +561,11 @@ if (isDeleted) {
   group: med['drug_group']?.toString(),
   doseForm: med['dose_form']?.toString(),
   strength: med['strength']?.toString(),
+  customMedicineName: med['custom_medicine_name']?.toString(),
+customGenericName: med['custom_generic_name']?.toString(),
+customBrandName: med['custom_brand_name']?.toString(),
+customDrugGroup: med['custom_drug_group']?.toString(),
+customMedicineType: med['custom_medicine_type']?.toString(),
 
   customDosage: med['custom_dosage']?.toString(),
   customFrequency: med['custom_frequency']?.toString(),
@@ -574,14 +584,23 @@ if (isDeleted) {
   isFavorite: med['is_favorite'] == 1,
 );
         } else {
-         apiResult = await _medicineApi.createMedicine(
-  doctorId: med['doctor_id'] as int,
+         final activeDoctorId =
+    await DoctorSession.getActiveDoctorIdForData();
+
+apiResult = await _medicineApi.createMedicine(
+  doctorId: activeDoctorId ??
+    (med['doctor_id'] as int),
   name: med['medicine_name']?.toString() ?? '',
   generic: med['generic_name']?.toString(),
   brand: med['brand_name']?.toString(),
   group: med['drug_group']?.toString(),
   doseForm: med['dose_form']?.toString(),
   strength: med['strength']?.toString(),
+  customMedicineName: med['custom_medicine_name']?.toString(),
+customGenericName: med['custom_generic_name']?.toString(),
+customBrandName: med['custom_brand_name']?.toString(),
+customDrugGroup: med['custom_drug_group']?.toString(),
+customMedicineType: med['custom_medicine_type']?.toString(),
 
   customDosage: med['custom_dosage']?.toString(),
   customFrequency: med['custom_frequency']?.toString(),

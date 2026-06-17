@@ -11,11 +11,14 @@ class DoctorSession {
   static const String _biometricEnabledKey =
       'logged_in_biometric_enabled';
 
-  // ✅ NEW ROLE KEYS
   static const String _roleKey = 'logged_in_role';
   static const String _lastRoleKey = 'last_role';
 
-  // Doctor Stamp Fields
+  static const String _parentDoctorIdKey =
+      'logged_in_parent_doctor_id';
+  static const String _lastParentDoctorIdKey =
+      'last_parent_doctor_id';
+
   static const String _contactNumberKey = 'logged_in_contact_number';
   static const String _qualificationsKey = 'logged_in_qualifications';
   static const String _professionKey = 'logged_in_profession';
@@ -45,14 +48,10 @@ class DoctorSession {
 
   static bool _parseBool(dynamic value) {
     if (value is bool) return value;
-
     if (value is int) return value == 1;
-
     if (value is String) {
-      return value == '1' ||
-          value.toLowerCase() == 'true';
+      return value == '1' || value.toLowerCase() == 'true';
     }
-
     return false;
   }
 
@@ -62,13 +61,10 @@ class DoctorSession {
   ) {
     for (final key in keys) {
       final value = data[key];
-
-      if (value != null &&
-          value.toString().trim().isNotEmpty) {
+      if (value != null && value.toString().trim().isNotEmpty) {
         return value.toString();
       }
     }
-
     return '';
   }
 
@@ -86,6 +82,12 @@ class DoctorSession {
     if (id <= 0) {
       throw Exception('Invalid local doctor id for session');
     }
+
+    final parentDoctorId = _parseId(
+      doctor['parentDoctorId'] ??
+          doctor['ParentDoctorId'] ??
+          doctor['parent_doctor_id'],
+    );
 
     final doctorName = _readString(
       doctor,
@@ -117,14 +119,12 @@ class DoctorSession {
       ['password'],
     );
 
-    // ✅ ROLE
     final role = _readString(
       doctor,
       ['role', 'Role'],
     );
 
-    final safeRole =
-        role.isEmpty ? 'Doctor' : role;
+    final safeRole = role.isEmpty ? 'Doctor' : role;
 
     final contactNumber = _readString(
       doctor,
@@ -167,6 +167,11 @@ class DoctorSession {
 
     await prefs.setInt(_doctorIdKey, id);
 
+    await prefs.setInt(
+      _parentDoctorIdKey,
+      parentDoctorId,
+    );
+
     await prefs.setString(
       _doctorNameKey,
       doctorName,
@@ -202,7 +207,6 @@ class DoctorSession {
       biometricEnabled,
     );
 
-    // ✅ SAVE ROLE
     await prefs.setString(
       _roleKey,
       safeRole,
@@ -233,10 +237,14 @@ class DoctorSession {
       affiliation,
     );
 
-    // Save last login for biometric
     await prefs.setInt(
       _lastDoctorIdKey,
       id,
+    );
+
+    await prefs.setInt(
+      _lastParentDoctorIdKey,
+      parentDoctorId,
     );
 
     await prefs.setString(
@@ -274,7 +282,6 @@ class DoctorSession {
       biometricEnabled,
     );
 
-    // ✅ SAVE LAST ROLE
     await prefs.setString(
       _lastRoleKey,
       safeRole,
@@ -313,57 +320,43 @@ class DoctorSession {
     final prefs = await SharedPreferences.getInstance();
 
     final id = prefs.getInt(_doctorIdKey);
-
     final email = prefs.getString(_emailKey);
-
     final password = prefs.getString(_passwordKey);
 
-    if (id == null ||
-        email == null ||
-        password == null) {
+    if (id == null || email == null || password == null) {
       return null;
     }
 
     return {
       'id': id,
-      'doctor_name':
-          prefs.getString(_doctorNameKey) ?? '',
+      'doctor_name': prefs.getString(_doctorNameKey) ?? '',
       'email': email,
       'password': password,
+      'role': prefs.getString(_roleKey) ?? 'Doctor',
 
-      // ✅ ROLE
-      'role':
-          prefs.getString(_roleKey) ?? 'Doctor',
+      'parentDoctorId':
+          prefs.getInt(_parentDoctorIdKey) ?? 0,
+      'parent_doctor_id':
+          prefs.getInt(_parentDoctorIdKey) ?? 0,
 
       'contact_number':
           prefs.getString(_contactNumberKey) ?? '',
-
       'medical_center_name':
           prefs.getString(_medicalCenterKey) ?? '',
-
       'specialization':
           prefs.getString(_specializationKey) ?? '',
-
       'clinic_address':
           prefs.getString(_clinicAddressKey) ?? '',
-
       'qualifications':
           prefs.getString(_qualificationsKey) ?? '',
-
       'profession':
           prefs.getString(_professionKey) ?? '',
-
       'slmc_reg_no':
           prefs.getString(_slmcRegNoKey) ?? '',
-
       'affiliation':
           prefs.getString(_affiliationKey) ?? '',
-
       'biometric_enabled':
-          (prefs.getBool(
-                    _biometricEnabledKey,
-                  ) ??
-                  false)
+          (prefs.getBool(_biometricEnabledKey) ?? false)
               ? 1
               : 0,
     };
@@ -375,13 +368,36 @@ class DoctorSession {
     return prefs.getInt(_doctorIdKey);
   }
 
+  static Future<int?> getParentDoctorId() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final value = prefs.getInt(_parentDoctorIdKey);
+
+    if (value == null || value <= 0) {
+      return null;
+    }
+
+    return value;
+  }
+
+  static Future<int?> getActiveDoctorIdForData() async {
+    final role = await getRole();
+    final doctorId = await getDoctorId();
+
+    if (role.toLowerCase() == 'reception') {
+      final parentDoctorId = await getParentDoctorId();
+      return parentDoctorId ?? doctorId;
+    }
+
+    return doctorId;
+  }
+
   static Future<String> getDoctorName() async {
     final prefs = await SharedPreferences.getInstance();
 
     return prefs.getString(_doctorNameKey) ?? '';
   }
 
-  // ✅ NEW ROLE HELPER
   static Future<String> getRole() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -442,29 +458,22 @@ class DoctorSession {
     return prefs.getString(_affiliationKey) ?? '';
   }
 
-  static Future<Map<String, dynamic>>
-      getDoctorStamp() async {
+  static Future<Map<String, dynamic>> getDoctorStamp() async {
     final prefs = await SharedPreferences.getInstance();
 
     return {
       'doctor_name':
           prefs.getString(_doctorNameKey) ?? '',
-
       'qualifications':
           prefs.getString(_qualificationsKey) ?? '',
-
       'profession':
           prefs.getString(_professionKey) ?? '',
-
       'slmc_reg_no':
           prefs.getString(_slmcRegNoKey) ?? '',
-
       'affiliation':
           prefs.getString(_affiliationKey) ?? '',
-
       'contact_number':
           prefs.getString(_contactNumberKey) ?? '',
-
       'signature_path':
           prefs.getString(_signaturePathKey) ?? '',
     };
@@ -474,6 +483,7 @@ class DoctorSession {
     final prefs = await SharedPreferences.getInstance();
 
     await prefs.remove(_doctorIdKey);
+    await prefs.remove(_parentDoctorIdKey);
     await prefs.remove(_doctorNameKey);
     await prefs.remove(_medicalCenterKey);
     await prefs.remove(_specializationKey);
@@ -481,10 +491,7 @@ class DoctorSession {
     await prefs.remove(_emailKey);
     await prefs.remove(_passwordKey);
     await prefs.remove(_biometricEnabledKey);
-
-    // ✅ REMOVE ROLE
     await prefs.remove(_roleKey);
-
     await prefs.remove(_contactNumberKey);
     await prefs.remove(_qualificationsKey);
     await prefs.remove(_professionKey);
@@ -503,34 +510,26 @@ class DoctorSession {
 
     return {
       'id': id,
-
+      'parentDoctorId':
+          prefs.getInt(_lastParentDoctorIdKey) ?? 0,
+      'parent_doctor_id':
+          prefs.getInt(_lastParentDoctorIdKey) ?? 0,
       'doctor_name':
           prefs.getString(_lastDoctorNameKey) ?? '',
-
       'medical_center_name':
           prefs.getString(_lastMedicalCenterKey) ?? '',
-
       'specialization':
           prefs.getString(_lastSpecializationKey) ?? '',
-
       'clinic_address':
           prefs.getString(_lastClinicAddressKey) ?? '',
-
       'email':
           prefs.getString(_lastEmailKey) ?? '',
-
       'password':
           prefs.getString(_lastPasswordKey) ?? '',
-
-      // ✅ LAST ROLE
       'role':
           prefs.getString(_lastRoleKey) ?? 'Doctor',
-
       'biometric_enabled':
-          (prefs.getBool(
-                    _lastBiometricEnabledKey,
-                  ) ??
-                  false)
+          (prefs.getBool(_lastBiometricEnabledKey) ?? false)
               ? 1
               : 0,
     };

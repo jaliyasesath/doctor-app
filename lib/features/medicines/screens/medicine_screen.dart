@@ -42,10 +42,13 @@ class _MedicineScreenState extends State<MedicineScreen> {
     super.dispose();
   }
 
-  Future<void> _init() async {
-    doctorId = await DoctorSession.getDoctorId();
-    await _loadMedicines();
-  }
+ Future<void> _init() async {
+
+  doctorId =
+      await DoctorSession.getActiveDoctorIdForData();
+
+  await _loadMedicines();
+}
 
   Future<void> _loadMedicines() async {
     if (doctorId == null) return;
@@ -175,6 +178,26 @@ class _MedicineScreenState extends State<MedicineScreen> {
   }
 
   Future<void> _deleteMedicine(int id) async {
+    final role =
+    await DoctorSession.getRole();
+
+if (role.toLowerCase() ==
+    'reception') {
+
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context)
+      .showSnackBar(
+
+    const SnackBar(
+      content: Text(
+        'Reception cannot delete medicines',
+      ),
+    ),
+  );
+
+  return;
+}
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -224,6 +247,25 @@ class _MedicineScreenState extends State<MedicineScreen> {
   Widget _buildMedicineCard(Map<String, dynamic> med) {
     final isFavorite = (med['is_favorite'] ?? 0) == 1;
     final status = med['sync_status']?.toString() ?? 'pending';
+    final medicineName =
+    (med['custom_medicine_name'] ?? '').toString().isNotEmpty
+        ? med['custom_medicine_name'].toString()
+        : med['medicine_name']?.toString() ?? '';
+
+final genericName =
+    (med['custom_generic_name'] ?? '').toString().isNotEmpty
+        ? med['custom_generic_name'].toString()
+        : med['generic_name']?.toString() ?? '';
+
+final drugGroup =
+    (med['custom_drug_group'] ?? '').toString().isNotEmpty
+        ? med['custom_drug_group'].toString()
+        : med['drug_group']?.toString() ?? '';
+
+final strength =
+    (med['custom_dosage'] ?? '').toString().isNotEmpty
+        ? med['custom_dosage'].toString()
+        : med['strength']?.toString() ?? '';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -239,21 +281,21 @@ class _MedicineScreenState extends State<MedicineScreen> {
           onPressed: () => _toggleFavorite(med),
         ),
         title: Text(
-          med['medicine_name']?.toString() ?? '',
+  medicineName,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if ((med['generic_name'] ?? '').toString().isNotEmpty)
-              Text('Generic: ${med['generic_name']}'),
-            if ((med['drug_group'] ?? '').toString().isNotEmpty)
-              Text(
-                'Group: ${med['drug_group']}',
+           if (genericName.isNotEmpty)
+  Text('Generic: $genericName'),
+if (drugGroup.isNotEmpty)
+  Text(
+    'Group: $drugGroup',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-            if ((med['strength'] ?? '').toString().isNotEmpty)
-              Text('Strength: ${med['strength']}'),
+            if (strength.isNotEmpty)
+  Text('Strength: $strength'),
             const SizedBox(height: 4),
             Row(
               children: [
@@ -449,26 +491,54 @@ final TextEditingController _costPriceController =
   }
 
   Future<void> _loadDoctor() async {
-    doctorId = await DoctorSession.getDoctorId();
-  }
+
+  doctorId =
+      await DoctorSession.getActiveDoctorIdForData();
+
+}
 
   void _fillData() {
-    final med = widget.medicine;
-    if (med == null) return;
+  final med = widget.medicine;
+  if (med == null) return;
 
-    _medicineNameController.text = med['medicine_name']?.toString() ?? '';
-    _genericNameController.text = med['generic_name']?.toString() ?? '';
-    _brandNameController.text = med['brand_name']?.toString() ?? '';
-    _drugGroupController.text = med['drug_group']?.toString() ?? '';
-    _doseFormController.text = med['dose_form']?.toString() ?? '';
-    _strengthController.text = med['strength']?.toString() ?? '';
-    _sellingPriceController.text =
-    med['selling_price']?.toString() ?? '';
+  _medicineNameController.text =
+      (med['custom_medicine_name'] ?? '').toString().isNotEmpty
+          ? med['custom_medicine_name'].toString()
+          : med['medicine_name']?.toString() ?? '';
 
-_costPriceController.text =
-    med['cost_price']?.toString() ?? '';
-    isFavorite = (med['is_favorite'] ?? 0) == 1;
-  }
+  _genericNameController.text =
+      (med['custom_generic_name'] ?? '').toString().isNotEmpty
+          ? med['custom_generic_name'].toString()
+          : med['generic_name']?.toString() ?? '';
+
+  _brandNameController.text =
+      (med['custom_brand_name'] ?? '').toString().isNotEmpty
+          ? med['custom_brand_name'].toString()
+          : med['brand_name']?.toString() ?? '';
+
+  _drugGroupController.text =
+      (med['custom_drug_group'] ?? '').toString().isNotEmpty
+          ? med['custom_drug_group'].toString()
+          : med['drug_group']?.toString() ?? '';
+
+  _doseFormController.text =
+      (med['custom_medicine_type'] ?? '').toString().isNotEmpty
+          ? med['custom_medicine_type'].toString()
+          : med['dose_form']?.toString() ?? '';
+
+  _strengthController.text =
+      (med['custom_dosage'] ?? '').toString().isNotEmpty
+          ? med['custom_dosage'].toString()
+          : med['strength']?.toString() ?? '';
+
+  _sellingPriceController.text =
+      med['selling_price']?.toString() ?? '';
+
+  _costPriceController.text =
+      med['cost_price']?.toString() ?? '';
+
+  isFavorite = (med['is_favorite'] ?? 0) == 1;
+}
 
   @override
   void dispose() {
@@ -526,19 +596,47 @@ _costPriceController.dispose();
     setState(() => saving = true);
 
     final data = {
-      'doctor_id': doctorId,
-      'medicine_name': _medicineNameController.text.trim(),
-      'generic_name': _genericNameController.text.trim(),
-      'brand_name': _brandNameController.text.trim(),
-      'drug_group': _drugGroupController.text.trim(),
-      'dose_form': _doseFormController.text.trim(),
-      'strength': _strengthController.text.trim(),
-'selling_price':
-    double.tryParse(_sellingPriceController.text.trim()) ?? 0,
-'cost_price':
-    double.tryParse(_costPriceController.text.trim()) ?? 0,
-'is_favorite': isFavorite ? 1 : 0,
-    };
+  'doctor_id': doctorId,
+
+  // Master fields keep unchanged for existing assigned medicines
+  'medicine_name': isEdit
+      ? widget.medicine!['medicine_name']?.toString() ?? ''
+      : _medicineNameController.text.trim(),
+
+  'generic_name': isEdit
+      ? widget.medicine!['generic_name']?.toString() ?? ''
+      : _genericNameController.text.trim(),
+
+  'brand_name': isEdit
+      ? widget.medicine!['brand_name']?.toString() ?? ''
+      : _brandNameController.text.trim(),
+
+  'drug_group': isEdit
+      ? widget.medicine!['drug_group']?.toString() ?? ''
+      : _drugGroupController.text.trim(),
+
+  'dose_form': isEdit
+      ? widget.medicine!['dose_form']?.toString() ?? ''
+      : _doseFormController.text.trim(),
+
+  'strength': isEdit
+      ? widget.medicine!['strength']?.toString() ?? ''
+      : _strengthController.text.trim(),
+
+  // Doctor-specific editable fields
+  'custom_medicine_name': _medicineNameController.text.trim(),
+  'custom_generic_name': _genericNameController.text.trim(),
+  'custom_brand_name': _brandNameController.text.trim(),
+  'custom_drug_group': _drugGroupController.text.trim(),
+  'custom_medicine_type': _doseFormController.text.trim(),
+  'custom_dosage': _strengthController.text.trim(),
+
+  'selling_price':
+      double.tryParse(_sellingPriceController.text.trim()) ?? 0,
+  'cost_price':
+      double.tryParse(_costPriceController.text.trim()) ?? 0,
+  'is_favorite': isFavorite ? 1 : 0,
+};
 
     try {
       if (isEdit) {
