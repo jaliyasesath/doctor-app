@@ -20,7 +20,7 @@ class ApiConfig {
   
 
          static const String cloudBaseUrl =
-    'http://169.58.2.100';
+    'http://169.58.2.100:5219/api';
 
   // =========================================
   // LOCAL WIFI API (PC/LAPTOP API)
