@@ -21,6 +21,7 @@ class ApiConfig {
 
          static const String cloudBaseUrl =
     'https://fastcareinternational.org/api';
+    // 'https://fastcareinternational.org/api';
 
   // =========================================
   // LOCAL WIFI API (PC/LAPTOP API)
