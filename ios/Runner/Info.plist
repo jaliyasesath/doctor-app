@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Doctor App login සඳහා Face ID භාවිතා කරයි.</string>
+	<string>Verify Face ID .</string>
 
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
