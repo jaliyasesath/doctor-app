@@ -10,19 +10,25 @@ class NetworkService {
         await AutoApiResolver.resolve();
       }
 
-      final baseUrl = ApiConfig.baseUrl;
+      final baseUrl = ApiConfig.baseUrl.trim();
 
-      if (baseUrl.trim().isEmpty) {
+      if (baseUrl.isEmpty) {
         return false;
       }
 
-      final base = baseUrl.replaceAll('/api', '');
+      // ApiConfig base URLs already end with /api or /API.
+      // Appending /Health avoids producing /API/api/Health.
+      final normalizedBaseUrl = baseUrl.replaceFirst(
+        RegExp(r'/+$'),
+        '',
+      );
+      final healthUri = Uri.parse('$normalizedBaseUrl/Health');
 
       final response = await http
-          .get(Uri.parse('$base/api/Health'))
-          .timeout(const Duration(seconds: 4));
+          .get(healthUri)
+          .timeout(const Duration(seconds: 6));
 
-      return response.statusCode == 200;
+      return response.statusCode >= 200 && response.statusCode < 300;
     } catch (_) {
       return false;
     }
