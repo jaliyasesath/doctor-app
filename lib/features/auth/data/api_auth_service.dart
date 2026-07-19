@@ -51,6 +51,7 @@ class ApiAuthService {
             'password': password,
             'contactNumber': contactNumber,
             'specialization': specialization,
+            'medicalCenterName': medicalCenterName,
             'role': role,
             'qualifications': qualifications,
             'profession': profession,

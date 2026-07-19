@@ -23,6 +23,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
   String _error = '';
 
   List<dynamic> _patients = [];
+  List<dynamic> _previousPendingPatients = [];
 
   @override
   void initState() {
@@ -56,6 +57,9 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
       setState(() {
         _loading = true;
         _patients = [];
+        if (tab == 'waiting') {
+          _previousPendingPatients = [];
+        }
         _selectedTab = tab;
         _error = '';
       });
@@ -77,6 +81,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
         'patientCode': p['server_id'] != null ? 'P${p['server_id']}' : 'OFF-${p['id']}',
         'queueNo': p['queue_no'] ?? p['id'],
         'queueStatus': p['queue_status'] ?? defaultStatus,
+        'queueDate': p['queue_date'],
         'patientName': p['patient_name'] ?? '',
         'patientAge': p['patient_age'] ?? '',
         'patientGender': p['patient_gender'] ?? '',
@@ -91,28 +96,30 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
 
     try {
       final data = await _api.getWaitingPatients();
+      final previous = await _api.getPreviousPendingPatients();
 
       if (!mounted) return;
 
       setState(() {
         _patients = data;
+        _previousPendingPatients = previous;
         _loading = false;
       });
     } catch (_) {
       try {
         final db = await DatabaseHelper.instance.database;
 
-        final localPatients = await db.query(
-          'patients',
-          where: 'queue_status = ? OR queue_status = ?',
-          whereArgs: ['Waiting', 'Serving'],
-          orderBy: 'queue_no ASC, id ASC',
-        );
+        final localPatients = await DatabaseHelper.instance
+            .getTodayQueuePatients(status: 'waiting');
+        final previousPatients = await DatabaseHelper.instance
+            .getPreviousPendingQueuePatients();
 
         if (!mounted) return;
 
         setState(() {
           _patients = _mapLocalPatients(localPatients, 'Waiting');
+          _previousPendingPatients =
+              _mapLocalPatients(previousPatients, 'Waiting');
           _loading = false;
           _error = '';
         });
@@ -143,12 +150,8 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
       try {
         final db = await DatabaseHelper.instance.database;
 
-        final localPatients = await db.query(
-          'patients',
-          where: 'queue_status = ?',
-          whereArgs: ['Completed'],
-          orderBy: 'queue_no ASC, id ASC',
-        );
+        final localPatients = await DatabaseHelper.instance
+            .getTodayQueuePatients(status: 'Completed');
 
         if (!mounted) return;
 
@@ -184,12 +187,8 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
       try {
         final db = await DatabaseHelper.instance.database;
 
-        final localPatients = await db.query(
-          'patients',
-          where: 'queue_status = ?',
-          whereArgs: ['Skipped'],
-          orderBy: 'queue_no ASC, id ASC',
-        );
+        final localPatients = await DatabaseHelper.instance
+            .getTodayQueuePatients(status: 'Skipped');
 
         if (!mounted) return;
 
@@ -235,7 +234,51 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
     }
   }
 
-  Widget _patientCard(Map<String, dynamic> p) {
+  Future<void> _movePatientToToday(int id) async {
+    try {
+      await _api.movePatientToToday(id);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Patient moved to today queue'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      await _loadWaiting(silent: false);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Move failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _completePatient(int id) async {
+    try {
+      await _api.completePatient(id);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Patient completed')),
+      );
+
+      await _reloadCurrentTab(silent: false);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Complete failed: $e')),
+      );
+    }
+  }
+
+  Widget _patientCard(
+    Map<String, dynamic> p, {
+    bool isPreviousPending = false,
+  }) {
     final id = p['id'] as int;
     final code = p['patientCode']?.toString() ?? '-';
     final queueNo = p['queueNo']?.toString() ?? '-';
@@ -244,6 +287,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
     final gender = p['patientGender']?.toString() ?? '';
     final phone = p['phoneNumber']?.toString() ?? '';
     final status = p['queueStatus']?.toString() ?? '';
+    final queueDate = p['queueDate']?.toString() ?? '';
 
     final isServing = status == 'Serving';
     final isCompleted = status == 'Completed';
@@ -293,7 +337,45 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
             Text('Patient ID: $code'),
             Text('Age/Gender: $age / $gender'),
             if (phone.isNotEmpty) Text('Phone: $phone'),
+            if (queueDate.isNotEmpty)
+              Text(
+                'Queue Date: ${queueDate.split('T').first}',
+                style: TextStyle(
+                  color: isPreviousPending
+                      ? Colors.deepOrange
+                      : Colors.black54,
+                  fontWeight: isPreviousPending
+                      ? FontWeight.w600
+                      : FontWeight.normal,
+                ),
+              ),
             const SizedBox(height: 12),
+            if (isPreviousPending)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () => _movePatientToToday(id),
+                    icon: const Icon(Icons.today),
+                    label: const Text('Move to Today'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _completePatient(id),
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('Complete'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _skipPatient(id),
+                    icon: const Icon(Icons.remove_circle_outline),
+                    label: const Text('Remove'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red,
+                    ),
+                  ),
+                ],
+              )
+            else
             Row(
               children: [
                 Expanded(
@@ -336,25 +418,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
                   ),
                   const SizedBox(width: 10),
                   ElevatedButton.icon(
-                    onPressed: () async {
-                      try {
-                        await _api.completePatient(id);
-
-                        if (!mounted) return;
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Patient completed')),
-                        );
-
-                        await _reloadCurrentTab(silent: false);
-                      } catch (e) {
-                        if (!mounted) return;
-
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Complete failed: $e')),
-                        );
-                      }
-                    },
+                    onPressed: () => _completePatient(id),
                     icon: const Icon(Icons.check),
                     label: const Text('Complete'),
                   ),
@@ -385,7 +449,8 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
       );
     }
 
-    if (_patients.isEmpty) {
+    if (_patients.isEmpty &&
+        (_selectedTab != 'waiting' || _previousPendingPatients.isEmpty)) {
       return Center(
         child: Text(
           _selectedTab == 'completed'
@@ -399,13 +464,101 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
 
     return RefreshIndicator(
       onRefresh: () => _reloadCurrentTab(silent: false),
-      child: ListView.builder(
+      child: ListView(
         padding: const EdgeInsets.all(16),
-        itemCount: _patients.length,
-        itemBuilder: (_, index) {
-          final patient = Map<String, dynamic>.from(_patients[index] as Map);
-          return _patientCard(patient);
-        },
+        children: [
+          if (_selectedTab == 'waiting') ...[
+            _queueSectionHeader(
+              icon: Icons.today,
+              title: "Today's Patients",
+              count: _patients.length,
+              color: Colors.blue,
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (_patients.isEmpty && _selectedTab == 'waiting')
+            _emptySection('No patients in today queue')
+          else
+            ..._patients.map((item) {
+              final patient = Map<String, dynamic>.from(item as Map);
+              return _patientCard(patient);
+            }),
+          if (_selectedTab == 'waiting' &&
+              _previousPendingPatients.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            _queueSectionHeader(
+              icon: Icons.warning_amber_rounded,
+              title: 'Previous Pending',
+              count: _previousPendingPatients.length,
+              color: Colors.deepOrange,
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              'Patients still waiting from earlier dates',
+              style: TextStyle(color: Colors.black54, fontSize: 12),
+            ),
+            const SizedBox(height: 10),
+            ..._previousPendingPatients.map((item) {
+              final patient = Map<String, dynamic>.from(item as Map);
+              return _patientCard(
+                patient,
+                isPreviousPending: true,
+              );
+            }),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _queueSectionHeader({
+    required IconData icon,
+    required String title,
+    required int count,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: color),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        CircleAvatar(
+          radius: 14,
+          backgroundColor: color.withOpacity(0.12),
+          child: Text(
+            '$count',
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _emptySection(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.black54),
       ),
     );
   }

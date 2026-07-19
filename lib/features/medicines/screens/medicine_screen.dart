@@ -16,6 +16,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
   final ScrollController _scrollController = ScrollController();
 
   int? doctorId;
+  bool isReception = false;
 
   bool loading = true;
   bool _isLoadingMore = false;
@@ -43,9 +44,9 @@ class _MedicineScreenState extends State<MedicineScreen> {
   }
 
  Future<void> _init() async {
-
-  doctorId =
-      await DoctorSession.getActiveDoctorIdForData();
+  final role = await DoctorSession.getRole();
+  doctorId = await DoctorSession.getActiveDoctorIdForData();
+  isReception = role.toLowerCase() == 'reception';
 
   await _loadMedicines();
 }
@@ -324,12 +325,13 @@ if (drugGroup.isNotEmpty)
               _deleteMedicine(med['id'] as int);
             }
           },
-          itemBuilder: (_) => const [
+          itemBuilder: (_) => [
             PopupMenuItem(
               value: 'edit',
-              child: Text('Edit'),
+              child: Text(isReception ? 'Edit Price' : 'Edit'),
             ),
-            PopupMenuItem(
+            if (!isReception)
+            const PopupMenuItem(
               value: 'delete',
               child: Text('Delete'),
             ),
@@ -395,17 +397,20 @@ if (drugGroup.isNotEmpty)
       appBar: AppBar(
         title: Text('Medicines (${medicines.length})'),
         actions: [
+          if (!isReception)
           IconButton(
             onPressed: () => _openMedicineForm(),
             icon: const Icon(Icons.add),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openMedicineForm(),
-        icon: const Icon(Icons.add),
-        label: const Text('Add Medicine'),
-      ),
+      floatingActionButton: isReception
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _openMedicineForm(),
+              icon: const Icon(Icons.add),
+              label: const Text('Add Medicine'),
+            ),
       body: SafeArea(
         child: Column(
           children: [
@@ -433,9 +438,11 @@ if (drugGroup.isNotEmpty)
               child: loading
                   ? const Center(child: CircularProgressIndicator())
                   : medicines.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Text(
-                            'No medicines found.\nTap + to add medicine.',
+                            isReception
+                                ? 'No medicines available for this doctor.'
+                                : 'No medicines found.\nTap + to add medicine.',
                             textAlign: TextAlign.center,
                           ),
                         )
@@ -479,6 +486,8 @@ final TextEditingController _costPriceController =
 
   bool isFavorite = false;
   bool saving = false;
+  bool isReception = false;
+  bool roleLoaded = false;
   int? doctorId;
 
   bool get isEdit => widget.medicine != null;
@@ -491,10 +500,17 @@ final TextEditingController _costPriceController =
   }
 
   Future<void> _loadDoctor() async {
+    final role = await DoctorSession.getRole();
+    final activeDoctorId =
+        await DoctorSession.getActiveDoctorIdForData();
 
-  doctorId =
-      await DoctorSession.getActiveDoctorIdForData();
+    if (!mounted) return;
 
+    setState(() {
+      doctorId = activeDoctorId;
+      isReception = role.toLowerCase() == 'reception';
+      roleLoaded = true;
+    });
 }
 
   void _fillData() {
@@ -560,6 +576,12 @@ _costPriceController.dispose();
     return null;
   }
 
+  String _existingMedicineValue(String key) {
+    final medicine = widget.medicine;
+    if (medicine == null) return '';
+    return medicine[key]?.toString() ?? '';
+  }
+
   Widget _field({
   required TextEditingController controller,
   required String label,
@@ -567,10 +589,12 @@ _costPriceController.dispose();
   bool requiredField = false,
   String? hint,
   TextInputType keyboardType = TextInputType.text,
+  bool enabled = true,
 }) {
   return TextFormField(
     controller: controller,
     keyboardType: keyboardType,
+      enabled: enabled,
       validator: requiredField ? (v) => _required(v, label) : null,
       decoration: InputDecoration(
         labelText: requiredField ? '$label *' : label,
@@ -584,6 +608,15 @@ _costPriceController.dispose();
   }
 
   Future<void> _saveMedicine() async {
+    if (isReception && !isEdit) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Reception cannot create medicines'),
+        ),
+      );
+      return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     if (doctorId == null) {
@@ -624,12 +657,24 @@ _costPriceController.dispose();
       : _strengthController.text.trim(),
 
   // Doctor-specific editable fields
-  'custom_medicine_name': _medicineNameController.text.trim(),
-  'custom_generic_name': _genericNameController.text.trim(),
-  'custom_brand_name': _brandNameController.text.trim(),
-  'custom_drug_group': _drugGroupController.text.trim(),
-  'custom_medicine_type': _doseFormController.text.trim(),
-  'custom_dosage': _strengthController.text.trim(),
+  'custom_medicine_name': isReception
+      ? _existingMedicineValue('custom_medicine_name')
+      : _medicineNameController.text.trim(),
+  'custom_generic_name': isReception
+      ? _existingMedicineValue('custom_generic_name')
+      : _genericNameController.text.trim(),
+  'custom_brand_name': isReception
+      ? _existingMedicineValue('custom_brand_name')
+      : _brandNameController.text.trim(),
+  'custom_drug_group': isReception
+      ? _existingMedicineValue('custom_drug_group')
+      : _drugGroupController.text.trim(),
+  'custom_medicine_type': isReception
+      ? _existingMedicineValue('custom_medicine_type')
+      : _doseFormController.text.trim(),
+  'custom_dosage': isReception
+      ? _existingMedicineValue('custom_dosage')
+      : _strengthController.text.trim(),
 
   'selling_price':
       double.tryParse(_sellingPriceController.text.trim()) ?? 0,
@@ -674,7 +719,17 @@ _costPriceController.dispose();
 
   @override
   Widget build(BuildContext context) {
-    final title = isEdit ? 'Edit Medicine' : 'Add Medicine';
+    if (!roleLoaded) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final title = isReception
+        ? 'Update Medicine Price'
+        : isEdit
+            ? 'Edit Medicine'
+            : 'Add Medicine';
 
     return Scaffold(
       appBar: AppBar(
@@ -694,6 +749,7 @@ _costPriceController.dispose();
                     label: 'Medicine Name',
                     icon: Icons.medication,
                     requiredField: true,
+                    enabled: !isReception,
                     hint: 'Example: Amoxicillin',
                   ),
                   const SizedBox(height: 14),
@@ -701,6 +757,7 @@ _costPriceController.dispose();
                     controller: _genericNameController,
                     label: 'Generic Name',
                     icon: Icons.science_outlined,
+                    enabled: !isReception,
                     hint: 'Example: Amoxicillin',
                   ),
                   const SizedBox(height: 14),
@@ -708,6 +765,7 @@ _costPriceController.dispose();
                     controller: _brandNameController,
                     label: 'Brand Name',
                     icon: Icons.local_offer_outlined,
+                    enabled: !isReception,
                     hint: 'Example: Amoxil',
                   ),
                   const SizedBox(height: 14),
@@ -715,6 +773,7 @@ _costPriceController.dispose();
                     controller: _drugGroupController,
                     label: 'Drug Group',
                     icon: Icons.category_outlined,
+                    enabled: !isReception,
                     hint: 'Example: Penicillin / NSAID',
                   ),
                   const SizedBox(height: 14),
@@ -722,6 +781,7 @@ _costPriceController.dispose();
                     controller: _doseFormController,
                     label: 'Dose Form',
                     icon: Icons.inventory_2_outlined,
+                    enabled: !isReception,
                     hint: 'Tablet / Capsule / Syrup',
                   ),
                   const SizedBox(height: 14),
@@ -729,6 +789,7 @@ _costPriceController.dispose();
                     controller: _strengthController,
                     label: 'Strength',
                     icon: Icons.speed_outlined,
+                    enabled: !isReception,
                     hint: '500mg / 250mg / 5ml',
                   ),
                   const SizedBox(height: 14),
@@ -780,7 +841,9 @@ _field(
                         saving
                             ? 'Saving...'
                             : isEdit
-                                ? 'Update Medicine'
+                                ? isReception
+                                    ? 'Update Price'
+                                    : 'Update Medicine'
                                 : 'Save Medicine',
                       ),
                     ),

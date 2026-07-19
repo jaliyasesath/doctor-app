@@ -1,4 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../data/local/database_helper.dart';
+import '../../auth/data/doctor_session.dart';
 import '../models/prescription_item.dart';
 
 class PrescriptionStore {
@@ -74,14 +77,30 @@ class PrescriptionStore {
   }
 
   static Future<String> generatePersistentRxNumber() async {
+    final doctorId = await DoctorSession.getActiveDoctorIdForData();
+
+    if (doctorId == null || doctorId <= 0) {
+      throw Exception('Doctor session not found for Rx number generation');
+    }
+
+    final year = DateTime.now().year;
     final prefs = await SharedPreferences.getInstance();
+    final counterKey = 'last_rx_number_${doctorId}_$year';
 
-    final int lastNumber = prefs.getInt('last_rx_number') ?? 0;
-    final int nextNumber = lastNumber + 1;
+    final savedNumber = prefs.getInt(counterKey) ?? 0;
+    final databaseNumber =
+        await DatabaseHelper.instance.getLastPrescriptionSequence(
+      doctorId: doctorId,
+      year: year,
+    );
 
-    await prefs.setInt('last_rx_number', nextNumber);
+    final lastNumber = savedNumber > databaseNumber
+        ? savedNumber
+        : databaseNumber;
+    final nextNumber = lastNumber + 1;
 
-    final int year = DateTime.now().year;
+    await prefs.setInt(counterKey, nextNumber);
+
     return '$year-${nextNumber.toString().padLeft(4, '0')}';
   }
 }

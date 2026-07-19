@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../auth/data/doctor_session.dart';
-import '../../patient/screens/add_patient_screen.dart' as patient_screen;
-import 'reception_queue_screen.dart';
 import '../../local_server/screens/reception_hotspot_connect_screen.dart';
-import 'reception_patient_search_screen.dart';
+import '../../medicines/screens/medicine_screen.dart';
+import '../../patient/screens/add_patient_screen.dart' as patient_screen;
 import '../../prescription/screens/prescription_history_screen.dart';
 import 'reception_bills_screen.dart';
-
+import 'reception_patient_search_screen.dart';
+import 'reception_queue_screen.dart';
 
 class ReceptionDashboardScreen extends StatefulWidget {
   const ReceptionDashboardScreen({super.key});
@@ -30,16 +30,7 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
     final doctorName = await DoctorSession.getDoctorName();
 
     if (!mounted) return;
-
-    setState(() {
-      name = doctorName;
-    });
-  }
-
-  void _comingSoon(String title) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$title coming soon')),
-    );
+    setState(() => name = doctorName);
   }
 
   Widget _menuCard({
@@ -49,14 +40,18 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
     required VoidCallback onTap,
   }) {
     return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.black.withOpacity(0.06)),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
           radius: 24,
-          child: Icon(icon),
+          backgroundColor: Colors.blue.withOpacity(0.10),
+          child: Icon(icon, color: Colors.blue.shade700),
         ),
         title: Text(
           title,
@@ -66,6 +61,13 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: onTap,
       ),
+    );
+  }
+
+  void _open(Widget screen) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => screen),
     );
   }
 
@@ -83,7 +85,6 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
               await DoctorSession.clearSession();
 
               if (!mounted) return;
-
               Navigator.pushNamedAndRemoveUntil(
                 context,
                 '/',
@@ -100,7 +101,11 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: Colors.blue,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0F4CBF), Color(0xFF0F766E)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Column(
@@ -124,100 +129,60 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
             ),
             const SizedBox(height: 16),
             _menuCard(
-  icon: Icons.person_add_alt_1,
-  title: 'Register Patient',
-  subtitle: 'Add name, age, gender, phone, address',
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const patient_screen.AddPatientScreen(),
-      ),
-    );
-  },
-),
-
-_menuCard(
-  icon: Icons.qr_code_scanner,
-  title: 'Connect Doctor Hotspot',
-  subtitle: 'Scan Doctor QR and connect local server',
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const ReceptionHotspotConnectScreen(),
-      ),
-    );
-  },
-),
+              icon: Icons.person_add_alt_1,
+              title: 'Register Patient',
+              subtitle: 'Add name, age, gender, phone and address',
+              onTap: () =>
+                  _open(const patient_screen.AddPatientScreen()),
+            ),
+            _menuCard(
+              icon: Icons.qr_code_scanner,
+              title: 'Connect Doctor Hotspot',
+              subtitle: 'Scan Doctor QR and connect local server',
+              onTap: () =>
+                  _open(const ReceptionHotspotConnectScreen()),
+            ),
             _menuCard(
               icon: Icons.queue,
               title: 'Today Queue',
-              subtitle: 'View waiting patients in order',
-              onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const ReceptionQueueScreen(initialTab: 'waiting'),
-    ),
-  );
-},
+              subtitle: 'View today and previous pending patients',
+              onTap: () => _open(
+                const ReceptionQueueScreen(initialTab: 'waiting'),
+              ),
+            ),
+            _menuCard(
+              icon: Icons.medication_outlined,
+              title: 'Medicines',
+              subtitle: 'View medicines and update doctor prices',
+              onTap: () => _open(const MedicineScreen()),
             ),
             _menuCard(
               icon: Icons.search,
               title: 'Search Patients',
               subtitle: 'Find patient by ID, name or phone',
-              onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) =>
-          const ReceptionPatientSearchScreen(),
-    ),
-  );
-},
+              onTap: () => _open(const ReceptionPatientSearchScreen()),
             ),
             _menuCard(
-  icon: Icons.description_outlined,
-  title: 'Saved Prescriptions',
-  subtitle: 'View and print prescriptions',
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-           const PrescriptionHistoryScreen(
-  receptionMode: true,
-),
-      ),
-    );
-  },
-),
-_menuCard(
-  icon: Icons.receipt_long,
-  title: 'Bills',
-  subtitle: 'View bills and print receipts',
-  onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const ReceptionBillsScreen(),
-      ),
-    );
-  },
-),
+              icon: Icons.description_outlined,
+              title: 'Saved Prescriptions',
+              subtitle: 'View and print prescriptions',
+              onTap: () => _open(
+                const PrescriptionHistoryScreen(receptionMode: true),
+              ),
+            ),
+            _menuCard(
+              icon: Icons.receipt_long,
+              title: 'Bills',
+              subtitle: 'View bills and print receipts',
+              onTap: () => _open(const ReceptionBillsScreen()),
+            ),
             _menuCard(
               icon: Icons.skip_next,
               title: 'Skipped Patients',
-              subtitle: 'Patients skipped by doctor',
-              onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const ReceptionQueueScreen(initialTab: 'skipped'),
-    ),
-  );
-},
+              subtitle: 'View patients removed from the queue',
+              onTap: () => _open(
+                const ReceptionQueueScreen(initialTab: 'skipped'),
+              ),
             ),
           ],
         ),

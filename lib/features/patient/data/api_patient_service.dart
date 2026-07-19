@@ -362,6 +362,101 @@ required String importantAlerts,
     throw Exception('Failed to load waiting patients (${response.statusCode})');
   }
 
+  Future<List<dynamic>> getPreviousPendingPatients() async {
+    try {
+      final token = await _getToken();
+
+      final response = await http
+          .get(
+            _uri('/Patients/previous-pending'),
+            headers: _headers(token ?? ''),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (_isSuccess(response)) {
+        return jsonDecode(response.body) as List<dynamic>;
+      }
+
+      throw Exception(
+        'Failed to load previous pending patients '
+        '(${response.statusCode})',
+      );
+    } catch (_) {
+      final db = await DatabaseHelper.instance.database;
+      final today = DateTime.now().toIso8601String().split('T').first;
+
+      final rows = await db.query(
+        'patients',
+        where:
+            'date(queue_date) < date(?) AND '
+            '(queue_status = ? OR queue_status = ?)',
+        whereArgs: [today, 'Waiting', 'Serving'],
+        orderBy: 'queue_date ASC, queue_no ASC, id ASC',
+      );
+
+      return rows.map((p) {
+        return {
+          'id': p['id'],
+          'patientCode':
+              p['server_id'] != null ? 'P${p['server_id']}' : 'OFF-${p['id']}',
+          'queueNo': p['queue_no'] ?? p['id'],
+          'queueStatus': p['queue_status'] ?? 'Waiting',
+          'queueDate': p['queue_date'],
+          'patientName': p['patient_name'] ?? '',
+          'patientAge': p['patient_age'] ?? '',
+          'patientGender': p['patient_gender'] ?? '',
+          'phoneNumber': p['phone_number'] ?? '',
+          'address': p['address'] ?? '',
+        };
+      }).toList();
+    }
+  }
+
+  Future<void> movePatientToToday(int id) async {
+    try {
+      final token = await _getToken();
+
+      final response = await http
+          .post(
+            _uri('/Patients/$id/move-to-today'),
+            headers: _headers(token ?? ''),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (!_isSuccess(response)) {
+        throw Exception('API move-to-today failed');
+      }
+    } catch (_) {
+      final db = await DatabaseHelper.instance.database;
+      final today = DateTime.now().toIso8601String().split('T').first;
+
+      final result = await db.rawQuery(
+        '''
+        SELECT MAX(queue_no) AS max_no
+        FROM patients
+        WHERE date(queue_date) = date(?)
+        ''',
+        [today],
+      );
+
+      final nextQueueNo =
+          ((result.first['max_no'] as num?)?.toInt() ?? 0) + 1;
+
+      await db.update(
+        'patients',
+        {
+          'queue_date': today,
+          'queue_no': nextQueueNo,
+          'queue_status': 'Waiting',
+          'sync_status': 'pending',
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+    }
+  }
+
   Future<List<dynamic>> getSkippedPatients() async {
     final token = await _getToken();
 

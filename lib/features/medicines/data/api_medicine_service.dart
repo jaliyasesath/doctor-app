@@ -274,39 +274,93 @@ customMedicineType: customMedicineType,
     }
   }
 
- Future<List<dynamic>> getMedicines({
+Future<List<dynamic>> getMedicines({
   int page = 1,
   int pageSize = 100,
-  String? updatedAfter,
 }) async {
-  try {
-    final token = await _getToken();
+  final token = await _getToken();
 
-    final query =
-        '/Medicines?page=$page&pageSize=$pageSize'
-        '${updatedAfter != null ? '&updatedAfter=$updatedAfter' : ''}';
-
-    final response = await http
-        .get(
-          _uri(query),
-          headers: _headers(token ?? ''),
-        )
-        .timeout(const Duration(seconds: 15));
-
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-
-      if (decoded is Map && decoded['data'] != null) {
-        return decoded['data'] as List<dynamic>;
-      }
-
-      return decoded as List<dynamic>;
-    }
-
-    return [];
-  } catch (e) {
-    print('Get medicines error: $e');
-    return [];
+  if (token == null || token.isEmpty) {
+    throw Exception('Authentication token not found');
   }
+
+  final uri = _uri('/Medicines').replace(
+    queryParameters: {
+      'page': page.toString(),
+      'pageSize': pageSize.toString(),
+    },
+  );
+
+  final response = await http
+      .get(
+        uri,
+        headers: _headers(token),
+      )
+      .timeout(const Duration(seconds: 20));
+
+  if (response.statusCode != 200) {
+    throw Exception(
+      'Medicine download failed: '
+      '${response.statusCode} ${response.body}',
+    );
+  }
+
+  final decoded = jsonDecode(response.body);
+
+  if (decoded is Map && decoded['data'] is List) {
+    return List<dynamic>.from(decoded['data'] as List);
+  }
+
+  if (decoded is List) {
+    return List<dynamic>.from(decoded);
+  }
+
+  throw Exception('Invalid medicine response format');
+}
+
+Future<List<dynamic>> getMedicineChanges({
+  required String updatedAfter,
+  int page = 1,
+  int pageSize = 100,
+}) async {
+  final token = await _getToken();
+
+  if (token == null || token.isEmpty) {
+    throw Exception('Authentication token not found');
+  }
+
+  final uri = _uri('/Medicines/sync').replace(
+    queryParameters: {
+      'updatedAfter': updatedAfter,
+      'page': page.toString(),
+      'pageSize': pageSize.toString(),
+    },
+  );
+
+  final response = await http
+      .get(
+        uri,
+        headers: _headers(token),
+      )
+      .timeout(const Duration(seconds: 20));
+
+  if (response.statusCode != 200) {
+    throw Exception(
+      'Medicine incremental sync failed: '
+      '${response.statusCode} ${response.body}',
+    );
+  }
+
+  final decoded = jsonDecode(response.body);
+
+  if (decoded is Map && decoded['data'] is List) {
+    return List<dynamic>.from(decoded['data'] as List);
+  }
+
+  if (decoded is List) {
+    return List<dynamic>.from(decoded);
+  }
+
+  throw Exception('Invalid medicine sync response format');
 }
 }

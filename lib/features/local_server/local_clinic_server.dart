@@ -13,6 +13,9 @@ class LocalClinicServer {
 
   static bool get isRunning => _running;
 
+  static String get _today =>
+      DateTime.now().toIso8601String().split('T').first;
+
   static Future<void> start({int port = 8080}) async {
     if (_running) return;
 
@@ -25,69 +28,82 @@ class LocalClinicServer {
         'mode': 'local',
       });
     });
+
     router.get('/api/Patients/summary', (Request request) async {
-  final db = await DatabaseHelper.instance.database;
+      final db = await DatabaseHelper.instance.database;
 
-  Future<int> countStatus(String status) async {
-    final result = await db.rawQuery(
-      '''
-      SELECT COUNT(*) as count
-      FROM patients
-      WHERE queue_status = ?
-      ''',
-      [status],
-    );
+      Future<int> countStatus(String status) async {
+        final result = await db.rawQuery(
+          '''
+          SELECT COUNT(*) AS count
+          FROM patients
+          WHERE date(queue_date) = date(?)
+            AND queue_status = ?
+          ''',
+          [_today, status],
+        );
 
-    return (result.first['count'] as int?) ?? 0;
-  }
+        return (result.first['count'] as int?) ?? 0;
+      }
 
-  return _json({
-    'waiting': await countStatus('Waiting'),
-    'serving': await countStatus('Now Serving'),
-    'completed': await countStatus('Completed'),
-    'skipped': await countStatus('Skipped'),
-  });
-});
+      final previousPending = await db.rawQuery(
+        '''
+        SELECT COUNT(*) AS count
+        FROM patients
+        WHERE date(queue_date) < date(?)
+          AND (queue_status = ? OR queue_status = ?)
+        ''',
+        [_today, 'Waiting', 'Serving'],
+      );
+
+      return _json({
+        'waiting': await countStatus('Waiting'),
+        'serving': await countStatus('Serving'),
+        'completed': await countStatus('Completed'),
+        'skipped': await countStatus('Skipped'),
+        'previousPending':
+            (previousPending.first['count'] as int?) ?? 0,
+      });
+    });
 
     router.get('/api/Patients/waiting', (Request request) async {
-      return _json(await _patientsByStatus('Waiting'));
+      return _json(
+        await _todayPatientsByStatuses(['Waiting', 'Serving']),
+      );
     });
 
     router.get('/api/Patients/skipped', (Request request) async {
-      return _json(await _patientsByStatus('Skipped'));
+      return _json(await _todayPatientsByStatuses(['Skipped']));
     });
 
     router.get('/api/Patients/completed', (Request request) async {
-  return _json(await _patientsByStatus('Completed'));
-});
+      return _json(await _todayPatientsByStatuses(['Completed']));
+    });
+
+    router.get('/api/Patients/previous-pending',
+        (Request request) async {
+      return _json(await _previousPendingPatients());
+    });
 
     router.post('/api/Patients', (Request request) async {
       final body = await request.readAsString();
       final data = jsonDecode(body) as Map<String, dynamic>;
-
       final db = await DatabaseHelper.instance.database;
 
-final today = DateTime.now()
-    .toIso8601String()
-    .split('T')
-    .first;
+      final result = await db.rawQuery(
+        '''
+        SELECT MAX(queue_no) AS max_no
+        FROM patients
+        WHERE date(queue_date) = date(?)
+        ''',
+        [_today],
+      );
 
-final result = await db.rawQuery(
-  '''
-  SELECT MAX(queue_no) as max_no
-  FROM patients
-  WHERE queue_date = ?
-  ''',
-  [today],
-);
-
-final lastQueue =
-    (result.first['max_no'] as int?) ?? 0;
-
-final newQueueNo = lastQueue + 1;
+      final nextQueueNo =
+          ((result.first['max_no'] as num?)?.toInt() ?? 0) + 1;
 
       final localId = await DatabaseHelper.instance.insertPatient({
-        'doctor_id': 0,
+        'doctor_id': data['doctorId'] ?? 0,
         'patient_name': data['patientName']?.toString() ?? '',
         'patient_age': data['age']?.toString() ??
             data['patientAge']?.toString() ??
@@ -98,9 +114,12 @@ final newQueueNo = lastQueue + 1;
         'phone_number': data['phoneNumber']?.toString() ?? '',
         'address': data['address']?.toString() ?? '',
         'notes': data['notes']?.toString() ?? '',
+        'allergies': data['allergies']?.toString() ?? '',
+        'chronic_diseases': data['chronicDiseases']?.toString() ?? '',
+        'important_alerts': data['importantAlerts']?.toString() ?? '',
         'queue_status': 'Waiting',
-'queue_no': newQueueNo,
-'queue_date': today,
+        'queue_no': nextQueueNo,
+        'queue_date': _today,
         'sync_status': 'pending',
       });
 
@@ -108,17 +127,42 @@ final newQueueNo = lastQueue + 1;
         'success': true,
         'offline': true,
         'localServer': true,
+        'id': localId,
         'serverId': localId,
         'patientCode': 'OFF-$localId',
-        'queueNo': newQueueNo,
+        'queueNo': nextQueueNo,
         'queueStatus': 'Waiting',
+        'queueDate': _today,
+      });
+    });
+
+    router.post('/api/Patients/<id|[0-9]+>/move-to-today',
+        (Request request, String id) async {
+      final patientId = int.tryParse(id) ?? 0;
+      await DatabaseHelper.instance.moveQueuePatientToToday(patientId);
+
+      final patient =
+          await DatabaseHelper.instance.getPatientById(patientId);
+
+      if (patient == null) {
+        return _json(
+          {'success': false, 'message': 'Patient not found'},
+          statusCode: 404,
+        );
+      }
+
+      return _json({
+        'success': true,
+        'patientId': patientId,
+        'queueNo': patient['queue_no'],
+        'queueStatus': patient['queue_status'],
+        'queueDate': patient['queue_date'],
       });
     });
 
     router.post('/api/Patients/<id|[0-9]+>/complete',
         (Request request, String id) async {
       await _updatePatientStatus(id, 'Completed');
-
       return _json({
         'success': true,
         'message': 'Patient completed',
@@ -129,40 +173,35 @@ final newQueueNo = lastQueue + 1;
     router.post('/api/Patients/<id|[0-9]+>/skip',
         (Request request, String id) async {
       await _updatePatientStatus(id, 'Skipped');
-
       return _json({
         'success': true,
-        'message': 'Patient skipped',
+        'message': 'Patient removed from queue',
         'patientId': int.tryParse(id) ?? 0,
       });
     });
 
     router.post('/api/Patients/<id|[0-9]+>/serving',
-    (Request request, String id) async {
-
-  await _updatePatientStatus(id, 'Now Serving');
-
-  return _json({
-    'success': true,
-    'message': 'Patient now serving',
-    'patientId': int.tryParse(id) ?? 0,
-  });
-});
+        (Request request, String id) async {
+      await _updatePatientStatus(id, 'Serving');
+      return _json({
+        'success': true,
+        'message': 'Patient now serving',
+        'patientId': int.tryParse(id) ?? 0,
+      });
+    });
 
     final handler = const Pipeline()
         .addMiddleware(logRequests())
         .addMiddleware(_corsMiddleware())
         .addHandler(router.call);
 
-    _server = await shelf_io.serve(
-      handler,
-      '0.0.0.0',
-      port,
-    );
-
+    _server = await shelf_io.serve(handler, '0.0.0.0', port);
     _running = true;
 
-    print('Local Clinic Server running on ${_server!.address.address}:$port');
+    print(
+      'Local Clinic Server running on '
+      '${_server!.address.address}:$port',
+    );
   }
 
   static Future<void> stop() async {
@@ -171,34 +210,63 @@ final newQueueNo = lastQueue + 1;
     _running = false;
   }
 
-  static Future<List<Map<String, dynamic>>> _patientsByStatus(
-    String status,
+  static Future<List<Map<String, dynamic>>> _todayPatientsByStatuses(
+    List<String> statuses,
   ) async {
     final db = await DatabaseHelper.instance.database;
+    final placeholders = List.filled(statuses.length, '?').join(', ');
 
-    final patients = await db.query(
-      'patients',
-      where: 'queue_status = ?',
-      whereArgs: [status],
-      orderBy: 'id ASC',
+    final patients = await db.rawQuery(
+      '''
+      SELECT *
+      FROM patients
+      WHERE date(queue_date) = date(?)
+        AND queue_status IN ($placeholders)
+      ORDER BY queue_no ASC, id ASC
+      ''',
+      [_today, ...statuses],
     );
 
-    return patients.map((p) {
-      return {
-        'id': p['id'],
-        'patientCode': p['server_id'] != null
-            ? 'P${p['server_id']}'
-            : 'OFF-${p['id']}',
-        'queueNo': p['queue_no'] ?? p['id'],
-        'queueStatus': p['queue_status'] ?? status,
-        'patientName': p['patient_name'] ?? '',
-        'patientAge': p['patient_age'] ?? '',
-        'patientGender': p['patient_gender'] ?? '',
-        'phoneNumber': p['phone_number'] ?? '',
-        'address': p['address'] ?? '',
-        'notes': p['notes'] ?? '',
-      };
-    }).toList();
+    return patients.map(_mapPatient).toList();
+  }
+
+  static Future<List<Map<String, dynamic>>>
+      _previousPendingPatients() async {
+    final db = await DatabaseHelper.instance.database;
+
+    final patients = await db.rawQuery(
+      '''
+      SELECT *
+      FROM patients
+      WHERE date(queue_date) < date(?)
+        AND (queue_status = ? OR queue_status = ?)
+      ORDER BY queue_date ASC, queue_no ASC, id ASC
+      ''',
+      [_today, 'Waiting', 'Serving'],
+    );
+
+    return patients.map(_mapPatient).toList();
+  }
+
+  static Map<String, dynamic> _mapPatient(Map<String, dynamic> patient) {
+    return {
+      'id': patient['id'],
+      'patientCode': patient['server_id'] != null
+          ? 'P${patient['server_id']}'
+          : 'OFF-${patient['id']}',
+      'queueNo': patient['queue_no'] ?? patient['id'],
+      'queueStatus': patient['queue_status'] ?? 'Waiting',
+      'queueDate': patient['queue_date'],
+      'patientName': patient['patient_name'] ?? '',
+      'patientAge': patient['patient_age'] ?? '',
+      'patientGender': patient['patient_gender'] ?? '',
+      'phoneNumber': patient['phone_number'] ?? '',
+      'address': patient['address'] ?? '',
+      'notes': patient['notes'] ?? '',
+      'allergies': patient['allergies'] ?? '',
+      'chronicDiseases': patient['chronic_diseases'] ?? '',
+      'importantAlerts': patient['important_alerts'] ?? '',
+    };
   }
 
   static Future<void> _updatePatientStatus(
@@ -212,6 +280,7 @@ final newQueueNo = lastQueue + 1;
       'patients',
       {
         'queue_status': status,
+        'sync_status': 'pending',
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',
@@ -235,12 +304,8 @@ final newQueueNo = lastQueue + 1;
         }
 
         final response = await innerHandler(request);
-
         return response.change(
-          headers: {
-            ...response.headers,
-            ..._corsHeaders(),
-          },
+          headers: {...response.headers, ..._corsHeaders()},
         );
       };
     };

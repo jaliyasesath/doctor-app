@@ -1,6 +1,8 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../../features/auth/data/doctor_session.dart';
+
 class DatabaseHelper {
 
   
@@ -1078,15 +1080,47 @@ Future<void> deletePrescriptionItems(int prescriptionId) async {
 
   Future<Map<String, dynamic>?> getPrescriptionByNo(String rxNo) async {
     final db = await database;
+    final doctorId = await DoctorSession.getActiveDoctorIdForData();
+
+    if (doctorId == null || doctorId <= 0) return null;
 
     final result = await db.query(
       'prescriptions',
-      where: 'prescription_no = ?',
-      whereArgs: [rxNo],
+      where: 'prescription_no = ? AND doctor_id = ?',
+      whereArgs: [rxNo, doctorId],
       limit: 1,
     );
 
     return result.isNotEmpty ? result.first : null;
+  }
+
+  Future<int> getLastPrescriptionSequence({
+    required int doctorId,
+    required int year,
+  }) async {
+    final db = await database;
+    final prefix = '$year-';
+
+    final rows = await db.query(
+      'prescriptions',
+      columns: ['prescription_no'],
+      where: 'doctor_id = ? AND prescription_no LIKE ?',
+      whereArgs: [doctorId, '$prefix%'],
+    );
+
+    var maximum = 0;
+
+    for (final row in rows) {
+      final rxNo = row['prescription_no']?.toString() ?? '';
+      if (!rxNo.startsWith(prefix)) continue;
+
+      final sequence = int.tryParse(rxNo.substring(prefix.length));
+      if (sequence != null && sequence > maximum) {
+        maximum = sequence;
+      }
+    }
+
+    return maximum;
   }
 
   Future<int> deletePrescription(int id) async {
@@ -1444,6 +1478,25 @@ final data = {
       whereArgs: [existing.first['id']],
     );
   }
+}
+
+Future<void> markMedicineDeletedFromServer({
+  required int doctorId,
+  required int serverId,
+  String? updatedAt,
+}) async {
+  final db = await database;
+
+  await db.update(
+    'medicines',
+    {
+      'is_deleted': 1,
+      'sync_status': 'synced',
+      'updated_at': updatedAt ?? DateTime.now().toIso8601String(),
+    },
+    where: 'doctor_id = ? AND server_id = ?',
+    whereArgs: [doctorId, serverId],
+  );
 }
 
   bool hasDrugGroupAllergy({
@@ -2357,6 +2410,75 @@ Future<List<Map<String, dynamic>>> getAllBills() async {
   return db.query(
     'prescription_bills',
     orderBy: 'id DESC',
+  );
+}
+
+Future<List<Map<String, dynamic>>> getTodayQueuePatients({
+  String? status,
+}) async {
+  final db = await database;
+  final today = DateTime.now().toIso8601String().split('T').first;
+
+  if (status == null || status == 'waiting') {
+    return db.query(
+      'patients',
+      where:
+          'date(queue_date) = date(?) AND '
+          '(queue_status = ? OR queue_status = ?)',
+      whereArgs: [today, 'Waiting', 'Serving'],
+      orderBy: 'queue_no ASC, id ASC',
+    );
+  }
+
+  return db.query(
+    'patients',
+    where: 'date(queue_date) = date(?) AND queue_status = ?',
+    whereArgs: [today, status],
+    orderBy: 'queue_no ASC, id ASC',
+  );
+}
+
+Future<List<Map<String, dynamic>>> getPreviousPendingQueuePatients() async {
+  final db = await database;
+  final today = DateTime.now().toIso8601String().split('T').first;
+
+  return db.query(
+    'patients',
+    where:
+        'date(queue_date) < date(?) AND '
+        '(queue_status = ? OR queue_status = ?)',
+    whereArgs: [today, 'Waiting', 'Serving'],
+    orderBy: 'queue_date ASC, queue_no ASC, id ASC',
+  );
+}
+
+Future<void> moveQueuePatientToToday(int patientId) async {
+  final db = await database;
+  final today = DateTime.now().toIso8601String().split('T').first;
+
+  final result = await db.rawQuery(
+    '''
+    SELECT MAX(queue_no) AS max_no
+    FROM patients
+    WHERE date(queue_date) = date(?)
+    ''',
+    [today],
+  );
+
+  final nextQueueNo =
+      ((result.first['max_no'] as num?)?.toInt() ?? 0) + 1;
+
+  await db.update(
+    'patients',
+    {
+      'queue_date': today,
+      'queue_no': nextQueueNo,
+      'queue_status': 'Waiting',
+      'sync_status': 'pending',
+      'updated_at': DateTime.now().toIso8601String(),
+    },
+    where: 'id = ?',
+    whereArgs: [patientId],
   );
 }
 }

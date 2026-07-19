@@ -27,6 +27,8 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
       TextEditingController();
   final TextEditingController _specializationController =
       TextEditingController();
+  final TextEditingController _medicalCenterNameController =
+      TextEditingController();
 
   final TextEditingController _qualificationsController =
       TextEditingController();
@@ -50,6 +52,7 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     _passwordController.dispose();
     _contactNumberController.dispose();
     _specializationController.dispose();
+    _medicalCenterNameController.dispose();
     _qualificationsController.dispose();
     _professionController.dispose();
     _slmcRegNoController.dispose();
@@ -100,6 +103,7 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
         password: _passwordController.text.trim(),
         contactNumber: _contactNumberController.text.trim(),
         specialization: _specializationController.text.trim(),
+        medicalCenterName: _medicalCenterNameController.text.trim(),
         role: _selectedRole,
         qualifications: _qualificationsController.text.trim(),
         profession: _professionController.text.trim(),
@@ -430,6 +434,12 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
                   const SizedBox(height: 14),
                   if (!isReception) ...[
                     _field(
+                      controller: _medicalCenterNameController,
+                      label: 'Channeling Center Name',
+                      icon: Icons.local_hospital_outlined,
+                    ),
+                    const SizedBox(height: 14),
+                    _field(
                       controller: _specializationController,
                       label: 'Specialization',
                       icon: Icons.medical_information_outlined,
@@ -528,3 +538,4 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     );
   }
 }
+

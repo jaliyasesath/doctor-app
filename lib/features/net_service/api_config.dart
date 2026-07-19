@@ -20,7 +20,7 @@ class ApiConfig {
   
 
          static const String cloudBaseUrl =
-    'https://fastcareinternational.org/api';
+    'http://169.58.40.160:5219/API';
     // 'https://fastcareinternational.org/api';
 
   // =========================================

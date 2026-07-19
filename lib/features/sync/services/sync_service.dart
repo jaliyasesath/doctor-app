@@ -251,91 +251,101 @@ class SyncService {
 }
 
   Future<void> pullMedicines(SyncResult result) async {
-  final doctorId = await DoctorSession.getActiveDoctorIdForData();
+    final doctorId = await DoctorSession.getActiveDoctorIdForData();
 
-  if (doctorId == null) {
-    result.lastError = 'Doctor session not found';
-    return;
-  }
-
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final String? lastSyncAt = null;
-
-    int page = 1;
-    const pageSize = 100;
-
-    final syncStartedAt = DateTime.now().toUtc().toIso8601String();
-
-    while (true) {
-      final medicines = await _medicineApi.getMedicines(
-        page: page,
-        pageSize: pageSize,
-        updatedAfter: lastSyncAt,
-      );
-
-      if (medicines.isEmpty) {
-        break;
-      }
-
-      for (final m in medicines) {
-        final map = Map<String, dynamic>.from(m as Map);
-
-        await _db.upsertMedicineFromServer(
-  doctorId: doctorId,
-  serverId: map['id'] as int,
-  medicineName: (map['medicineName'] ?? '').toString(),
-  genericName: map['genericName']?.toString(),
-  brandName: map['brandName']?.toString(),
-  drugGroup: map['drugGroup']?.toString(),
-  doseForm: map['medicineType']?.toString(),
-  strength: map['defaultDosage']?.toString(),
-  customMedicineName: map['customMedicineName']?.toString(),
-customGenericName: map['customGenericName']?.toString(),
-customBrandName: map['customBrandName']?.toString(),
-customDrugGroup: map['customDrugGroup']?.toString(),
-customMedicineType: map['customMedicineType']?.toString(),
-
-  customDosage: map['customDosage']?.toString(),
-  customFrequency: map['customFrequency']?.toString(),
-  customDuration: map['customDuration']?.toString(),
-  customInstructions: map['customInstructions']?.toString(),
-
-  sellingPrice: double.tryParse(
-        map['sellingPrice']?.toString() ?? '0',
-      ) ??
-      0,
-  costPrice: double.tryParse(
-        map['costPrice']?.toString() ?? '0',
-      ) ??
-      0,
-
-  isFavorite: map['isFavorite'] == true ? 1 : 0,
-  createdAt: map['createdAt']?.toString(),
-  updatedAt: map['updatedAt']?.toString(),
-);
-
-        result.pulledMedicines++;
-
-        if (result.pulledMedicines % 100 == 0) {
-          await Future.delayed(
-            const Duration(milliseconds: 1),
-          );
-        }
-      }
-
-      page++;
+    if (doctorId == null) {
+      result.lastError = 'Doctor session not found';
+      return;
     }
 
-    await prefs.setString(
-      'last_medicines_sync_at',
-      syncStartedAt,
-    );
-  } catch (e) {
-    result.lastError = 'Pull medicines error: $e';
-    print('Pull medicines error: $e');
+    final prefs = await SharedPreferences.getInstance();
+    final lastSyncAt = prefs.getString('last_medicines_sync_at');
+    final syncStartedAt = DateTime.now().toUtc().toIso8601String();
+
+    try {
+      int page = 1;
+      const pageSize = 100;
+
+      while (true) {
+        final medicines = lastSyncAt == null
+            ? await _medicineApi.getMedicines(
+                page: page,
+                pageSize: pageSize,
+              )
+            : await _medicineApi.getMedicineChanges(
+                updatedAfter: lastSyncAt,
+                page: page,
+                pageSize: pageSize,
+              );
+
+        if (medicines.isEmpty) break;
+
+        for (final item in medicines) {
+          final map = Map<String, dynamic>.from(item as Map);
+          final serverId = int.tryParse(map['id']?.toString() ?? '');
+
+          if (serverId == null) continue;
+
+          if (map['isDeleted'] == true) {
+            await _db.markMedicineDeletedFromServer(
+              doctorId: doctorId,
+              serverId: serverId,
+              updatedAt: map['updatedAt']?.toString(),
+            );
+            result.pulledMedicines++;
+            continue;
+          }
+
+          await _db.upsertMedicineFromServer(
+            doctorId: doctorId,
+            serverId: serverId,
+            medicineName: (map['medicineName'] ?? '').toString(),
+            genericName: map['genericName']?.toString(),
+            brandName: map['brandName']?.toString(),
+            drugGroup: map['drugGroup']?.toString(),
+            doseForm: map['medicineType']?.toString(),
+            strength: map['defaultDosage']?.toString(),
+            customMedicineName: map['customMedicineName']?.toString(),
+            customGenericName: map['customGenericName']?.toString(),
+            customBrandName: map['customBrandName']?.toString(),
+            customDrugGroup: map['customDrugGroup']?.toString(),
+            customMedicineType: map['customMedicineType']?.toString(),
+            customDosage: map['customDosage']?.toString(),
+            customFrequency: map['customFrequency']?.toString(),
+            customDuration: map['customDuration']?.toString(),
+            customInstructions: map['customInstructions']?.toString(),
+            sellingPrice: double.tryParse(
+                  map['sellingPrice']?.toString() ?? '0',
+                ) ??
+                0,
+            costPrice: double.tryParse(
+                  map['costPrice']?.toString() ?? '0',
+                ) ??
+                0,
+            isFavorite: map['isFavorite'] == true ? 1 : 0,
+            createdAt: map['createdAt']?.toString(),
+            updatedAt: map['updatedAt']?.toString(),
+          );
+
+          result.pulledMedicines++;
+        }
+
+        if (medicines.length < pageSize) break;
+        page++;
+      }
+
+      // Advance only after every page and local write succeeds.
+      await prefs.setString(
+        'last_medicines_sync_at',
+        syncStartedAt,
+      );
+    } catch (e) {
+      // Keep old timestamp so the next auto-sync retries all failed changes.
+      result.medicineFailed++;
+      result.lastError = 'Pull medicines error: $e';
+      print('Pull medicines error: $e');
+    }
   }
-}
 
   Future<void> syncDoctors(SyncResult result) async {
     final pendingDoctors = await _db.getPendingDoctors();
