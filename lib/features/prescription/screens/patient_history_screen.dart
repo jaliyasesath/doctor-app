@@ -1,5 +1,7 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 import 'patient_profile_screen.dart';
@@ -13,13 +15,9 @@ class PatientHistoryScreen extends StatefulWidget {
 
 class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
-
   List<Map<String, dynamic>> _results = [];
-
   bool _isLoading = false;
-
   int? _doctorId;
-
   Timer? _searchDebounce;
 
   @override
@@ -28,9 +26,15 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
     _initDoctor();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchDebounce?.cancel();
+    super.dispose();
+  }
+
   Future<void> _initDoctor() async {
     final doctorId = await DoctorSession.getDoctorId();
-
     if (!mounted) return;
 
     if (doctorId == null) {
@@ -41,7 +45,6 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
     }
 
     _doctorId = doctorId;
-
     await DatabaseHelper.instance.assignOldLocalDataToDoctor(doctorId);
   }
 
@@ -49,175 +52,338 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
     final query = _searchController.text.trim();
 
     if (_doctorId == null) {
-      final doctorId = await DoctorSession.getDoctorId();
-      if (doctorId == null) return;
-      _doctorId = doctorId;
+      _doctorId = await DoctorSession.getDoctorId();
+      if (_doctorId == null) return;
     }
 
     if (query.isEmpty) {
-      setState(() {
-        _results = [];
-      });
+      if (mounted) setState(() => _results = []);
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final data = await DatabaseHelper.instance.searchPatientsByDoctor(
         _doctorId!,
         query,
       );
-
       if (!mounted) return;
-
       setState(() {
         _results = data;
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
-
-      setState(() {
-        _isLoading = false;
-      });
-
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Search failed: $e')),
       );
     }
   }
 
-  void _openPatientProfile(Map<String, dynamic> patient) {
-    final patientId = patient['id'] as int;
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    setState(() {});
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      _search,
+    );
+  }
 
+  String _value(Map<String, dynamic> p, List<String> keys) {
+    for (final key in keys) {
+      final value = p[key]?.toString().trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+    return '';
+  }
+
+  String _name(Map<String, dynamic> p) =>
+      _value(p, ['patient_name', 'patientName']);
+  String _age(Map<String, dynamic> p) =>
+      _value(p, ['patient_age', 'patientAge', 'age']);
+  String _gender(Map<String, dynamic> p) =>
+      _value(p, ['patient_gender', 'patientGender', 'gender']);
+  String _phone(Map<String, dynamic> p) =>
+      _value(p, ['phone_number', 'phoneNumber']);
+
+  void _openPatientProfile(Map<String, dynamic> patient) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PatientProfileScreen(
-          patientId: patientId,
+        builder: (_) => PatientProfileScreen(patientId: patient['id'] as int),
+      ),
+    );
+  }
+
+  Widget _patientCard(Map<String, dynamic> patient) {
+    final name = _name(patient);
+    final age = _age(patient);
+    final gender = _gender(patient);
+    final phone = _phone(patient);
+    final allergies = _value(patient, ['allergies']);
+    final initial = name.isEmpty ? 'P' : name[0].toUpperCase();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A0F172A),
+            blurRadius: 14,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: () => _openPatientProfile(patient),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+                  ),
+                  borderRadius: BorderRadius.circular(17),
+                ),
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name.isEmpty ? 'Unnamed Patient' : name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '${age.isEmpty ? 'Age -' : '$age yrs'}  •  '
+                      '${gender.isEmpty ? 'Not specified' : gender}',
+                      style: const TextStyle(color: Color(0xFF64748B)),
+                    ),
+                    if (phone.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.phone_outlined,
+                            size: 15,
+                            color: Color(0xFF64748B),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            phone,
+                            style: const TextStyle(color: Color(0xFF475569)),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (allergies.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF1F2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Allergy: $allergies',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFBE123C),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: Color(0xFF94A3B8),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Future<void> _refresh() async {
-    if (_searchController.text.trim().isNotEmpty) {
-      await _search();
-    }
-  }
-
-  String _getName(Map<String, dynamic> patient) {
-    return (patient['patient_name'] ??
-            patient['patientName'] ??
-            '')
-        .toString();
-  }
-
-  String _getAge(Map<String, dynamic> patient) {
-    return (patient['patient_age'] ??
-            patient['patientAge'] ??
-            patient['age'] ??
-            '')
-        .toString();
-  }
-
-  String _getGender(Map<String, dynamic> patient) {
-    return (patient['patient_gender'] ??
-            patient['patientGender'] ??
-            patient['gender'] ??
-            '')
-        .toString();
-  }
-
-  String _getPhone(Map<String, dynamic> patient) {
-    return (patient['phone_number'] ??
-            patient['phoneNumber'] ??
-            '')
-        .toString();
-  }
-
-  @override
-void dispose() {
-  _searchController.dispose();
-  _searchDebounce?.cancel();
-  super.dispose();
-}
-
-  Widget _buildPatientTile(Map<String, dynamic> item) {
-    final phone = _getPhone(item);
-    final subtitlePhone = phone.trim().isEmpty ? 'No phone' : phone;
-
-    return ListTile(
-      leading: const Icon(Icons.person),
-      title: Text(_getName(item)),
-      subtitle: Text(
-        'Age: ${_getAge(item)} | ${_getGender(item)} | $subtitlePhone',
-      ),
-      trailing: const Icon(Icons.arrow_forward),
-      onTap: () => _openPatientProfile(item),
+  Widget _emptyState() {
+    final hasQuery = _searchController.text.trim().isNotEmpty;
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(28, 90, 28, 20),
+      children: [
+        Container(
+          width: 76,
+          height: 76,
+          decoration: const BoxDecoration(
+            color: Color(0xFFE6FFFB),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.manage_search_rounded,
+            size: 38,
+            color: Color(0xFF0F766E),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          hasQuery ? 'No patients found' : 'Search patient history',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 7),
+        Text(
+          hasQuery
+              ? 'Try a different name or phone number.'
+              : 'Enter a patient name or phone number to view previous visits.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Color(0xFF64748B), height: 1.5),
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF4F7FB),
       appBar: AppBar(
-        title: const Text('Patient History'),
+        backgroundColor: const Color(0xFFF4F7FB),
+        surfaceTintColor: Colors.transparent,
+        title: const Text(
+          'Patient History',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search patient name or phone...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0F766E), Color(0xFF115E59)],
               ),
-              onChanged: (_) {
-  _searchDebounce?.cancel();
-
-  _searchDebounce = Timer(
-    const Duration(milliseconds: 350),
-    () {
-      _search();
-    },
-  );
-},
+              borderRadius: BorderRadius.circular(24),
             ),
-          ),
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: CircularProgressIndicator(),
-            ),
-          Expanded(
-            child: _results.isEmpty
-                ? RefreshIndicator(
-                    onRefresh: _refresh,
-                    child: ListView(
-                      children: const [
-                        SizedBox(height: 180),
-                        Center(child: Text('No results')),
-                      ],
-                    ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: _refresh,
-                    child: ListView.builder(
-                      itemCount: _results.length,
-                      itemBuilder: (context, index) {
-                        final item = _results[index];
-                        return _buildPatientTile(item);
-                      },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Find a patient',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                const Text(
+                  'Search by patient name or phone number',
+                  style: TextStyle(color: Color(0xFFCCFBF1)),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _searchController,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: (_) => _search(),
+                  onChanged: _onSearchChanged,
+                  decoration: InputDecoration(
+                    hintText: 'Name or phone number...',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _searchController.text.isEmpty
+                        ? null
+                        : IconButton(
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _results = []);
+                            },
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
                     ),
                   ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+            child: Row(
+              children: [
+                Text(
+                  _results.isEmpty
+                      ? 'Patient directory'
+                      : '${_results.length} patient${_results.length == 1 ? '' : 's'} found',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF475569),
+                  ),
+                ),
+                const Spacer(),
+                if (_isLoading)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 5),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _search,
+              child: _results.isEmpty
+                  ? _emptyState()
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      itemCount: _results.length,
+                      itemBuilder: (_, index) => _patientCard(_results[index]),
+                    ),
+            ),
           ),
         ],
       ),

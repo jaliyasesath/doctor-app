@@ -279,15 +279,19 @@ if (prescriptions.isNotEmpty) {
     final notes = _getPatientNotes();
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0F766E), Color(0xFF115E59)],
+        ),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: const Color(0xFF0F766E).withOpacity(0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -297,15 +301,16 @@ if (prescriptions.isNotEmpty) {
           Text(
             name.isEmpty ? 'Patient' : name,
             style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
             ),
           ),
           const SizedBox(height: 6),
           Text(
             '${age.isEmpty ? '-' : '$age yrs'} • ${gender.isEmpty ? '-' : gender}',
             style: const TextStyle(
-              color: Colors.black54,
+              color: Color(0xFFCCFBF1),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -338,9 +343,9 @@ if (prescriptions.isNotEmpty) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.orange.shade100),
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFDE68A)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -409,10 +414,10 @@ if (prescriptions.isNotEmpty) {
   return Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.blue.shade50,
-      borderRadius: BorderRadius.circular(18),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
       border: Border.all(
-        color: Colors.blue.shade100,
+        color: const Color(0xFFCCFBF1),
       ),
     ),
     child: Column(
@@ -423,7 +428,7 @@ if (prescriptions.isNotEmpty) {
           children: [
             Icon(
               Icons.timeline,
-              color: Colors.blue,
+              color: Color(0xFF0F766E),
             ),
             SizedBox(width: 8),
             Text(
@@ -487,14 +492,28 @@ if (prescriptions.isNotEmpty) {
         spo2.isNotEmpty;
 
     return Card(
+      elevation: 0,
+      color: Colors.white,
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-        leading: const Icon(Icons.receipt_long, color: Colors.blue),
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE6FFFB),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: const Icon(
+            Icons.receipt_long_outlined,
+            color: Color(0xFF0F766E),
+          ),
+        ),
         title: Text(
           'Rx: ${rxNo.isEmpty ? id.toString() : rxNo}',
           style: const TextStyle(fontWeight: FontWeight.bold),
@@ -556,6 +575,10 @@ if (prescriptions.isNotEmpty) {
                     const SizedBox(width: 8),
                     Expanded(
                       child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F766E),
+                          foregroundColor: Colors.white,
+                        ),
                         icon: const Icon(Icons.repeat),
                         label: const Text('Repeat'),
                         onPressed: () => _repeatPrescription(item),
@@ -581,8 +604,10 @@ if (prescriptions.isNotEmpty) {
         _patient == null ? 'Patient Profile' : _getPatientName();
 
     return Scaffold(
-      backgroundColor: const Color(0xfff6f8fb),
+      backgroundColor: const Color(0xFFF4F7FB),
       appBar: AppBar(
+        backgroundColor: const Color(0xFFF4F7FB),
+        surfaceTintColor: Colors.transparent,
         title: Text(patientName.isEmpty ? 'Patient Profile' : patientName),
       ),
       body: _isLoading
@@ -590,7 +615,7 @@ if (prescriptions.isNotEmpty) {
           : RefreshIndicator(
               onRefresh: _refresh,
               child: ListView(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
                 children: [
                   _buildCompactHeader(),
                   const SizedBox(height: 12),
@@ -601,8 +626,9 @@ _buildPatientTimelineCard(),
                   const Text(
                     'Previous Visits',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
                     ),
                   ),
                   const SizedBox(height: 10),

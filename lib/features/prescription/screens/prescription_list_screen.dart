@@ -666,9 +666,68 @@ String selectedDurationUnit = 'Days';
                   : null;
 
           return AlertDialog(
-            title: const Text('Add Medicine'),
+            backgroundColor: const Color(0xFFF8FAFC),
+            surfaceTintColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 18,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(20, 18, 12, 8),
+            title: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.medication_outlined,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Add Medicine',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Select medicine and set directions',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.pop(context, false),
+                  icon: const Icon(Icons.close_rounded),
+                ),
+              ],
+            ),
+            contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
             content: SizedBox(
               width: double.maxFinite,
+              height: MediaQuery.sizeOf(context).height * 0.70,
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -741,12 +800,43 @@ String selectedDurationUnit = 'Days';
 
                     TextField(
                       controller: searchController,
-                      decoration: const InputDecoration(
+                      autofocus: true,
+                      decoration: InputDecoration(
                         labelText: 'Search Medicine',
                         hintText:
                             'Type medicine / group / brand',
-                        prefixIcon: Icon(Icons.search),
-                        border: OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: searchController.text.isEmpty
+                            ? null
+                            : IconButton(
+                                onPressed: () {
+                                  searchController.clear();
+                                  setDialogState(() {
+                                    filteredMedicines =
+                                        List.from(masterMedicines);
+                                  });
+                                },
+                                icon: const Icon(Icons.close_rounded),
+                              ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF0F766E),
+                            width: 1.5,
+                          ),
+                        ),
                       ),
                       onChanged: (value) {
                         final q =
@@ -808,12 +898,14 @@ String selectedDurationUnit = 'Days';
                     const SizedBox(height: 12),
 
                     Container(
-                      height: 190,
+                      height: 230,
                       decoration: BoxDecoration(
-                        border:
-                            Border.all(color: Colors.black12),
+                        color: Colors.white,
+                        border: Border.all(
+                          color: const Color(0xFFE2E8F0),
+                        ),
                         borderRadius:
-                            BorderRadius.circular(10),
+                            BorderRadius.circular(18),
                       ),
                       child: filteredMedicines.isEmpty
                           ? const Center(
@@ -849,18 +941,26 @@ String selectedDurationUnit = 'Days';
                                     matchedAllergies.isNotEmpty;
 
                                 return Container(
+                                  margin: const EdgeInsets.fromLTRB(
+                                    8,
+                                    6,
+                                    8,
+                                    2,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: hasAllergyRisk
                                         ? Colors.red.withOpacity(0.05)
-                                        : null,
-                                    border: hasAllergyRisk
-                                        ? const Border(
-                                            left: BorderSide(
-                                              color: Colors.red,
-                                              width: 4,
-                                            ),
-                                          )
-                                        : null,
+                                        : isSelected
+                                            ? const Color(0xFFE6FFFB)
+                                            : const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: hasAllergyRisk
+                                          ? Colors.red.shade300
+                                          : isSelected
+                                              ? const Color(0xFF14B8A6)
+                                              : const Color(0xFFE2E8F0),
+                                    ),
                                   ),
                                   child: ListTile(
                                   selected: isSelected,
@@ -943,13 +1043,27 @@ String selectedDurationUnit = 'Days';
                             ),
                     ),
 
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 18),
+
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Prescription details',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
 
                     TextField(
                       controller: dosageController,
                       decoration: const InputDecoration(
                         labelText: 'Dosage',
                         hintText: 'Example: 500mg',
+                        prefixIcon: Icon(Icons.science_outlined),
                         border: OutlineInputBorder(),
                       ),
                     ),
@@ -960,6 +1074,7 @@ String selectedDurationUnit = 'Days';
                       value: selectedFrequency,
                       decoration: const InputDecoration(
                         labelText: 'Frequency',
+                        prefixIcon: Icon(Icons.schedule_rounded),
                         border: OutlineInputBorder(),
                       ),
                       items: const [
@@ -1085,16 +1200,29 @@ CheckboxListTile(
                 ),
               ),
             ),
+            actionsPadding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
             actions: [
-              TextButton(
+              OutlinedButton(
                 onPressed: () =>
                     Navigator.pop(context, false),
                 child: const Text('Cancel'),
               ),
               ElevatedButton(
-                onPressed: () =>
-                    Navigator.pop(context, true),
-                child: const Text('Add'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F766E),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 22,
+                    vertical: 13,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                onPressed: selected == null
+                    ? null
+                    : () => Navigator.pop(context, true),
+                child: const Text('Add to Prescription'),
               ),
             ],
           );
