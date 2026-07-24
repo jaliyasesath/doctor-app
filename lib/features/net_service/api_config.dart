@@ -1,57 +1,41 @@
 class ApiConfig {
   // =========================================
   // CONNECTION MODES
-  // auto     = choose best automatically
-  // cloud    = online hosted API
-  // wifi     = local PC API (same WiFi)
-  // hotspot  = doctor phone local server
-  // offline  = local SQLite only
   // =========================================
 
-  static String mode = 'auto';
+  // Local API එක force කිරීමට wifi දාන්න.
+  static String mode = 'wifi';
 
   // =========================================
-  // CLOUD API (PERMANENT FUTURE SERVER)
-  // Replace later with:
-  // https://api.yourclinic.com/api
-  
+  // CLOUD API - VPS
+  // Local testing වෙලාවේ භාවිතා නොවේ.
   // =========================================
 
-  
-
-         static const String cloudBaseUrl =
-    'http://169.58.40.160:5219/API';
-    // 'https://fastcareinternational.org/api';
+  static const String cloudBaseUrl =
+      'http://169.58.40.160:5219/API';
 
   // =========================================
-  // LOCAL WIFI API (PC/LAPTOP API)
-  // Same WiFi router required
+  // LOCAL WIFI API
+  // Computer IPv4 address = 192.168.8.91
   // =========================================
 
   static const String localWifiBaseUrl =
-      //'http://192.168.8.91:5219/api';
-       'http://172.20.10.4:5219/api';
-
-      
-
+      'http://192.168.8.91:5219/api';
 
   // =========================================
-  // DOCTOR PHONE HOTSPOT LOCAL SERVER
-  // Automatically updated after QR scan
+  // DOCTOR PHONE HOTSPOT SERVER
   // =========================================
 
   static const String hotspotBaseUrl =
       'http://192.168.43.1:8080/api';
 
-  static String customHotspotBaseUrl =
-      hotspotBaseUrl;
+  static String customHotspotBaseUrl = hotspotBaseUrl;
 
   // =========================================
-  // AUTO MODE RESOLUTION
+  // AUTO MODE URL
   // =========================================
 
-  static String _resolvedAutoBaseUrl =
-      cloudBaseUrl;
+  static String _resolvedAutoBaseUrl = cloudBaseUrl;
 
   // =========================================
   // CURRENT ACTIVE BASE URL
@@ -59,7 +43,6 @@ class ApiConfig {
 
   static String get baseUrl {
     switch (mode) {
-
       case 'cloud':
         return cloudBaseUrl;
 
@@ -90,19 +73,15 @@ class ApiConfig {
   // AUTO MODE URL UPDATE
   // =========================================
 
-  static void setResolvedAutoBaseUrl(
-    String url,
-  ) {
+  static void setResolvedAutoBaseUrl(String url) {
     _resolvedAutoBaseUrl = url;
   }
 
   // =========================================
-  // HOTSPOT QR URL UPDATE
+  // HOTSPOT URL UPDATE
   // =========================================
 
-  static void setHotspotBaseUrl(
-    String url,
-  ) {
+  static void setHotspotBaseUrl(String url) {
     customHotspotBaseUrl = url;
   }
 
@@ -110,18 +89,9 @@ class ApiConfig {
   // HELPERS
   // =========================================
 
-  static bool get isOffline =>
-      mode == 'offline';
-
-  static bool get isCloud =>
-      mode == 'cloud';
-
-  static bool get isWifi =>
-      mode == 'wifi';
-
-  static bool get isHotspot =>
-      mode == 'hotspot';
-
-  static bool get isAuto =>
-      mode == 'auto';
+  static bool get isOffline => mode == 'offline';
+  static bool get isCloud => mode == 'cloud';
+  static bool get isWifi => mode == 'wifi';
+  static bool get isHotspot => mode == 'hotspot';
+  static bool get isAuto => mode == 'auto';
 }

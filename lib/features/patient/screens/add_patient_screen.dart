@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/app_error_ui.dart';
 import '../data/api_patient_service.dart';
-
 
 class AddPatientScreen extends StatefulWidget {
   const AddPatientScreen({super.key});
@@ -18,8 +18,8 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
   final _allergiesController = TextEditingController();
-final _chronicController = TextEditingController();
-final _alertsController = TextEditingController();
+  final _chronicController = TextEditingController();
+  final _alertsController = TextEditingController();
 
   final ApiPatientService _api = ApiPatientService();
 
@@ -33,8 +33,8 @@ final _alertsController = TextEditingController();
     _phoneController.dispose();
     _addressController.dispose();
     _allergiesController.dispose();
-_chronicController.dispose();
-_alertsController.dispose();
+    _chronicController.dispose();
+    _alertsController.dispose();
     super.dispose();
   }
 
@@ -58,9 +58,9 @@ _alertsController.dispose();
         phone: _phoneController.text.trim(),
         address: _addressController.text.trim(),
         notes: '',
-allergies: _allergiesController.text.trim(),
-chronicDiseases: _chronicController.text.trim(),
-importantAlerts: _alertsController.text.trim(),
+        allergies: _allergiesController.text.trim(),
+        chronicDiseases: _chronicController.text.trim(),
+        importantAlerts: _alertsController.text.trim(),
       );
 
       if (!mounted) return;
@@ -73,10 +73,8 @@ importantAlerts: _alertsController.text.trim(),
         context: context,
         builder: (_) => AlertDialog(
           title: Text(
-  offline
-      ? 'Patient Saved Offline'
-      : 'Patient Registered',
-),
+            offline ? 'Patient Saved Offline' : 'Patient Registered',
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -95,20 +93,22 @@ importantAlerts: _alertsController.text.trim(),
       );
 
       _nameController.clear();
-_ageController.clear();
-_phoneController.clear();
-_addressController.clear();
+      _ageController.clear();
+      _phoneController.clear();
+      _addressController.clear();
 
-_allergiesController.clear();
-_chronicController.clear();
-_alertsController.clear();
+      _allergiesController.clear();
+      _chronicController.clear();
+      _alertsController.clear();
 
       setState(() => _gender = 'Male');
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Patient save failed: $e')),
+      AppErrorUi.show(
+        context,
+        e,
+        onRetry: _savePatient,
       );
     } finally {
       if (mounted) {
@@ -226,30 +226,26 @@ _alertsController.clear();
                       maxLines: 2,
                     ),
                     _field(
-  controller: _allergiesController,
-  label: 'Allergies',
-  icon: Icons.warning_amber_rounded,
-  requiredField: false,
-),
-
-const SizedBox(height: 14),
-
-_field(
-  controller: _chronicController,
-  label: 'Chronic Diseases',
-  icon: Icons.monitor_heart_outlined,
-  requiredField: false,
-),
-
-const SizedBox(height: 14),
-
-_field(
-  controller: _alertsController,
-  label: 'Important Alerts',
-  icon: Icons.notification_important_outlined,
-  requiredField: false,
-  maxLines: 2,
-),
+                      controller: _allergiesController,
+                      label: 'Allergies',
+                      icon: Icons.warning_amber_rounded,
+                      requiredField: false,
+                    ),
+                    const SizedBox(height: 14),
+                    _field(
+                      controller: _chronicController,
+                      label: 'Chronic Diseases',
+                      icon: Icons.monitor_heart_outlined,
+                      requiredField: false,
+                    ),
+                    const SizedBox(height: 14),
+                    _field(
+                      controller: _alertsController,
+                      label: 'Important Alerts',
+                      icon: Icons.notification_important_outlined,
+                      requiredField: false,
+                      maxLines: 2,
+                    ),
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,

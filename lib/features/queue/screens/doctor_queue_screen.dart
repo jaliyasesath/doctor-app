@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/errors/offline_fallback_policy.dart';
+import '../../../core/widgets/app_error_ui.dart';
 import '../../../data/local/database_helper.dart';
 import '../../patient/data/api_patient_service.dart';
 import '../../prescription/screens/prescription_list_screen.dart';
@@ -19,6 +21,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
   final ApiPatientService _api = ApiPatientService();
 
   bool _loading = true;
+  bool _refreshing = false;
   String _selectedTab = 'waiting';
   String _error = '';
 
@@ -32,7 +35,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
     _loadWaiting();
 
     _autoRefreshTimer = Timer.periodic(
-      const Duration(seconds: 5),
+      const Duration(seconds: 15),
       (_) {
         if (!mounted) return;
         _reloadCurrentTab(silent: true);
@@ -41,12 +44,20 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
   }
 
   Future<void> _reloadCurrentTab({bool silent = false}) async {
-    if (_selectedTab == 'completed') {
-      await _loadCompleted(silent: silent);
-    } else if (_selectedTab == 'skipped') {
-      await _loadSkipped(silent: silent);
-    } else {
-      await _loadWaiting(silent: silent);
+    if (_refreshing) return;
+
+    _refreshing = true;
+
+    try {
+      if (_selectedTab == 'completed') {
+        await _loadCompleted(silent: silent);
+      } else if (_selectedTab == 'skipped') {
+        await _loadSkipped(silent: silent);
+      } else {
+        await _loadWaiting(silent: silent);
+      }
+    } finally {
+      _refreshing = false;
     }
   }
 
@@ -78,7 +89,8 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
     return localPatients.map((p) {
       return {
         'id': p['id'],
-        'patientCode': p['server_id'] != null ? 'P${p['server_id']}' : 'OFF-${p['id']}',
+        'patientCode':
+            p['server_id'] != null ? 'P${p['server_id']}' : 'OFF-${p['id']}',
         'queueNo': p['queue_no'] ?? p['id'],
         'queueStatus': p['queue_status'] ?? defaultStatus,
         'queueDate': p['queue_date'],
@@ -105,14 +117,22 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
         _previousPendingPatients = previous;
         _loading = false;
       });
-    } catch (_) {
+    } catch (error) {
+      if (!OfflineFallbackPolicy.isAllowed(error)) {
+        if (!mounted) return;
+        setState(() {
+          _error = AppErrorUiModel.fromError(error).message;
+          _loading = false;
+        });
+        return;
+      }
       try {
         final db = await DatabaseHelper.instance.database;
 
         final localPatients = await DatabaseHelper.instance
             .getTodayQueuePatients(status: 'waiting');
-        final previousPatients = await DatabaseHelper.instance
-            .getPreviousPendingQueuePatients();
+        final previousPatients =
+            await DatabaseHelper.instance.getPreviousPendingQueuePatients();
 
         if (!mounted) return;
 
@@ -127,7 +147,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
         if (!mounted) return;
 
         setState(() {
-          _error = localError.toString();
+          _error = AppErrorUiModel.fromError(localError).message;
           _loading = false;
         });
       }
@@ -146,7 +166,15 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
         _patients = data;
         _loading = false;
       });
-    } catch (_) {
+    } catch (error) {
+      if (!OfflineFallbackPolicy.isAllowed(error)) {
+        if (!mounted) return;
+        setState(() {
+          _error = AppErrorUiModel.fromError(error).message;
+          _loading = false;
+        });
+        return;
+      }
       try {
         final db = await DatabaseHelper.instance.database;
 
@@ -164,7 +192,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
         if (!mounted) return;
 
         setState(() {
-          _error = localError.toString();
+          _error = AppErrorUiModel.fromError(localError).message;
           _loading = false;
         });
       }
@@ -183,7 +211,15 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
         _patients = data;
         _loading = false;
       });
-    } catch (_) {
+    } catch (error) {
+      if (!OfflineFallbackPolicy.isAllowed(error)) {
+        if (!mounted) return;
+        setState(() {
+          _error = AppErrorUiModel.fromError(error).message;
+          _loading = false;
+        });
+        return;
+      }
       try {
         final db = await DatabaseHelper.instance.database;
 
@@ -201,7 +237,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
         if (!mounted) return;
 
         setState(() {
-          _error = localError.toString();
+          _error = AppErrorUiModel.fromError(localError).message;
           _loading = false;
         });
       }
@@ -228,8 +264,10 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Skip failed: $e')),
+      AppErrorUi.show(
+        context,
+        e,
+        onRetry: () => _skipPatient(id),
       );
     }
   }
@@ -250,8 +288,10 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
       await _loadWaiting(silent: false);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Move failed: $e')),
+      AppErrorUi.show(
+        context,
+        e,
+        onRetry: () => _movePatientToToday(id),
       );
     }
   }
@@ -269,8 +309,10 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
       await _reloadCurrentTab(silent: false);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Complete failed: $e')),
+      AppErrorUi.show(
+        context,
+        e,
+        onRetry: () => _completePatient(id),
       );
     }
   }
@@ -315,7 +357,8 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
                 Expanded(
                   child: Text(
                     name.isEmpty ? 'Unnamed Patient' : name,
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.bold),
                   ),
                 ),
                 Chip(
@@ -328,7 +371,8 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
                               : Colors.blueGrey,
                   label: Text(
                     status,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
               ],
@@ -341,12 +385,9 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
               Text(
                 'Queue Date: ${queueDate.split('T').first}',
                 style: TextStyle(
-                  color: isPreviousPending
-                      ? Colors.deepOrange
-                      : Colors.black54,
-                  fontWeight: isPreviousPending
-                      ? FontWeight.w600
-                      : FontWeight.normal,
+                  color: isPreviousPending ? Colors.deepOrange : Colors.black54,
+                  fontWeight:
+                      isPreviousPending ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
             const SizedBox(height: 12),
@@ -376,55 +417,55 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
                 ],
               )
             else
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      if (!isCompleted && !isSkipped) {
-                        try {
-                          await _api.setServingPatient(id);
-                        } catch (_) {}
-                      }
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        if (!isCompleted && !isSkipped) {
+                          try {
+                            await _api.setServingPatient(id);
+                          } catch (_) {}
+                        }
 
-                      if (!mounted) return;
+                        if (!mounted) return;
 
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PrescriptionListScreen(
-                            patientName: name,
-                            patientAge: age,
-                            patientGender: gender,
-                            patientPhone: phone,
-                            patientAddress: p['address']?.toString() ?? '',
-                            existingPatientId: id,
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PrescriptionListScreen(
+                              patientName: name,
+                              patientAge: age,
+                              patientGender: gender,
+                              patientPhone: phone,
+                              patientAddress: p['address']?.toString() ?? '',
+                              existingPatientId: id,
+                            ),
                           ),
-                        ),
-                      );
+                        );
 
-                      await _reloadCurrentTab(silent: false);
-                    },
-                    icon: const Icon(Icons.open_in_new),
-                    label: Text(isCompleted ? 'View' : 'Open'),
+                        await _reloadCurrentTab(silent: false);
+                      },
+                      icon: const Icon(Icons.open_in_new),
+                      label: Text(isCompleted ? 'View' : 'Open'),
+                    ),
                   ),
-                ),
-                if (_selectedTab == 'waiting') ...[
-                  const SizedBox(width: 10),
-                  OutlinedButton.icon(
-                    onPressed: () => _skipPatient(id),
-                    icon: const Icon(Icons.skip_next),
-                    label: const Text('Skip'),
-                  ),
-                  const SizedBox(width: 10),
-                  ElevatedButton.icon(
-                    onPressed: () => _completePatient(id),
-                    icon: const Icon(Icons.check),
-                    label: const Text('Complete'),
-                  ),
+                  if (_selectedTab == 'waiting') ...[
+                    const SizedBox(width: 10),
+                    OutlinedButton.icon(
+                      onPressed: () => _skipPatient(id),
+                      icon: const Icon(Icons.skip_next),
+                      label: const Text('Skip'),
+                    ),
+                    const SizedBox(width: 10),
+                    ElevatedButton.icon(
+                      onPressed: () => _completePatient(id),
+                      icon: const Icon(Icons.check),
+                      label: const Text('Complete'),
+                    ),
+                  ],
                 ],
-              ],
-            ),
+              ),
           ],
         ),
       ),

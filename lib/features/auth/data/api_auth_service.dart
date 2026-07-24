@@ -1,9 +1,13 @@
 import '../../../data/local/database_helper.dart';
+import '../../../core/errors/api_error_classifier.dart';
+import '../../../core/errors/app_exception.dart';
 import '../../../features/net_service/api_client.dart';
 import '../../../features/net_service/token_storage.dart';
 import '../../license/data/license_cache_service.dart';
 import '../../net_service/network_service.dart';
+import 'credential_storage.dart';
 import 'doctor_session.dart';
+import 'login_error_policy.dart';
 
 class ApiAuthService {
   final ApiClient _api = ApiClient();
@@ -84,7 +88,7 @@ class ApiAuthService {
           'slmc_reg_no': slmcRegNo,
           'affiliation': affiliation,
           'signature_path': signaturePath,
-          'password': password,
+          'password': '',
           'biometric_enabled': biometricEnabled,
           'sync_status': online ? 'synced' : 'pending',
           'updated_at': DateTime.now().toIso8601String(),
@@ -162,26 +166,46 @@ class ApiAuthService {
     required String password,
   }) async {
     try {
+      final deviceId = await TokenStorage.getOrCreateDeviceId();
       final response = await _api.post(
         '/Auth/login',
         {
           'email': email,
           'password': password,
+          'deviceId': deviceId,
         },
         auth: false,
       );
 
-      final token = response['token']?.toString() ?? '';
-      final doctor = response['doctor'] as Map<String, dynamic>;
-
-      if (token.isEmpty) {
-        return {
-          'success': false,
-          'message': 'Token not received from server',
-        };
+      if (response is! Map<String, dynamic>) {
+        throw ApiErrorClassifier.invalidResponse(
+          operation: 'POST /Auth/login',
+        );
       }
 
-      await TokenStorage.saveToken(token);
+      final token = response['token']?.toString() ?? '';
+      final refreshToken = response['refreshToken']?.toString() ?? '';
+      final doctorValue = response['doctor'];
+
+      if (doctorValue is! Map) {
+        throw ApiErrorClassifier.invalidResponse(
+          operation: 'POST /Auth/login',
+        );
+      }
+
+      final doctor = Map<String, dynamic>.from(doctorValue);
+
+      if (token.isEmpty || refreshToken.isEmpty) {
+        throw ApiErrorClassifier.invalidResponse(
+          operation: 'POST /Auth/login',
+        );
+      }
+
+      await TokenStorage.saveTokenPair(
+        accessToken: token,
+        refreshToken: refreshToken,
+      );
+      await CredentialStorage.savePassword(email, password);
 
       final existing = await DatabaseHelper.instance.getDoctorByEmail(email);
 
@@ -203,7 +227,7 @@ class ApiAuthService {
           'slmc_reg_no': doctor['slmcRegNo'] ?? '',
           'affiliation': doctor['affiliation'] ?? '',
           'signature_path': doctor['signaturePath'] ?? '',
-          'password': password,
+          'password': '',
           'biometric_enabled': 0,
           'sync_status': 'synced',
           'updated_at': DateTime.now().toIso8601String(),
@@ -212,6 +236,14 @@ class ApiAuthService {
       } else {
         localDoctorId = existing['id'] as int;
       }
+
+      final localDb = await DatabaseHelper.instance.database;
+      await localDb.update(
+        'doctors',
+        {'password': ''},
+        where: 'id = ?',
+        whereArgs: [localDoctorId],
+      );
 
       await DoctorSession.saveDoctorSession({
         'id': localDoctorId,
@@ -249,18 +281,35 @@ class ApiAuthService {
         'token': token,
         'mode': 'online',
       };
-    } catch (_) {
-      final localDoctor = await DatabaseHelper.instance.loginDoctor(
-        email: email,
-        password: password,
-      );
+    } on AppException catch (error) {
+      if (!LoginErrorPolicy.canAttemptOffline(error)) {
+        return LoginErrorPolicy.failureResult(error);
+      }
 
-      if (localDoctor != null) {
+      final localDoctor = await DatabaseHelper.instance.getDoctorByEmail(email);
+      var credentialMatches = await CredentialStorage.matches(email, password);
+      final legacyPassword = localDoctor?['password']?.toString() ?? '';
+
+      if (!credentialMatches &&
+          legacyPassword.isNotEmpty &&
+          legacyPassword == password) {
+        await CredentialStorage.savePassword(email, password);
+        credentialMatches = true;
+      }
+
+      if (localDoctor != null && credentialMatches) {
+        final localDb = await DatabaseHelper.instance.database;
+        await localDb.update(
+          'doctors',
+          {'password': ''},
+          where: 'id = ?',
+          whereArgs: [localDoctor['id']],
+        );
         await DoctorSession.saveDoctorSession({
           'id': localDoctor['id'],
           'doctor_name': localDoctor['doctor_name'] ?? '',
           'email': localDoctor['email'] ?? '',
-          'password': localDoctor['password'] ?? '',
+          'password': password,
           'contact_number': localDoctor['contact_number'] ?? '',
           'specialization': localDoctor['specialization'] ?? '',
           'role': localDoctor['role'] ?? 'Doctor',
@@ -292,7 +341,16 @@ class ApiAuthService {
 
       return {
         'success': false,
-        'message': 'Login failed (offline mode)',
+        'message':
+            'Cannot connect to the server and no matching offline login was found.',
+        'code': 'OFFLINE_LOGIN_UNAVAILABLE',
+        'mode': 'offline',
+      };
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Login could not be completed. Please try again.',
+        'code': 'UNEXPECTED_LOGIN_ERROR',
       };
     }
   }
@@ -302,6 +360,23 @@ class ApiAuthService {
   }
 
   Future<void> logout() async {
+    final refreshToken = await TokenStorage.getRefreshToken();
+
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      try {
+        await _api.post(
+          '/Auth/logout',
+          {
+            'refreshToken': refreshToken,
+            'deviceId': await TokenStorage.getOrCreateDeviceId(),
+          },
+          auth: false,
+        );
+      } catch (_) {
+        // Local logout must still work when the server is unavailable.
+      }
+    }
+
     await TokenStorage.clearToken();
     await DoctorSession.clearSession();
   }

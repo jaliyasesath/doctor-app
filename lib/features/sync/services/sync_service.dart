@@ -1,12 +1,15 @@
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/api_auth_service.dart';
+import '../../auth/data/credential_storage.dart';
 import '../../auth/data/doctor_session.dart';
+import '../../net_service/token_storage.dart';
 import '../../patient/data/api_patient_service.dart';
 import '../../prescription/data/api_prescription_service.dart';
 import 'network_service.dart';
 import '../../medicines/data/api_medicine_service.dart';
 import '../../prescription/data/api_instruction_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'sync_error_policy.dart';
 
 class SyncResult {
   int doctorSuccess = 0;
@@ -31,6 +34,8 @@ class SyncResult {
 }
 
 class SyncService {
+  static bool _syncInProgress = false;
+
   final ApiInstructionService _instructionApi = ApiInstructionService();
   final ApiMedicineService _medicineApi = ApiMedicineService();
   final DatabaseHelper _db = DatabaseHelper.instance;
@@ -38,16 +43,38 @@ class SyncService {
   final ApiPatientService _patientApi = ApiPatientService();
   final ApiPrescriptionService _prescriptionApi = ApiPrescriptionService();
 
-
   Future<void> resetSyncTimestamps() async {
-  final prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
+    final doctorId = await DoctorSession.getActiveDoctorIdForData();
 
-  await prefs.remove('last_patients_sync_at');
-  await prefs.remove('last_prescriptions_sync_at');
-  await prefs.remove('last_medicines_sync_at');
-}
+    await prefs.remove('last_patients_sync_at');
+    await prefs.remove('last_prescriptions_sync_at');
+    await prefs.remove('last_medicines_sync_at');
+
+    if (doctorId != null) {
+      await prefs.remove('last_patients_sync_at_$doctorId');
+      await prefs.remove('last_prescriptions_sync_at_$doctorId');
+      await prefs.remove('last_medicines_sync_at_$doctorId');
+    }
+  }
 
   Future<SyncResult> syncAll() async {
+    if (_syncInProgress) {
+      final result = SyncResult();
+      result.lastError = 'Sync already in progress';
+      return result;
+    }
+
+    _syncInProgress = true;
+
+    try {
+      return await _performSync();
+    } finally {
+      _syncInProgress = false;
+    }
+  }
+
+  Future<SyncResult> _performSync() async {
     final result = SyncResult();
 
     final online = await NetworkService.isOnline();
@@ -64,16 +91,9 @@ class SyncService {
 
     await syncDoctors(result);
 
-    final email = doctor['email']?.toString() ?? '';
-    final password = doctor['password']?.toString() ?? '';
-
-    final loginResult = await _authApi.login(
-      email: email,
-      password: password,
-    );
-
-    if (loginResult['success'] != true) {
-      result.lastError = 'Online login failed before sync';
+    final token = await TokenStorage.getToken();
+    if (token == null || token.isEmpty) {
+      result.lastError = 'Online session not found. Please login again.';
       return result;
     }
 
@@ -109,146 +129,148 @@ class SyncService {
         }
       } catch (e) {
         await _db.markCustomInstructionSyncFailed(item['id'] as int);
-        print('Custom instruction sync error: $e');
       }
     }
   }
 
   Future<void> pullPatients(SyncResult result) async {
-  final doctorId = await DoctorSession.getActiveDoctorIdForData();
+    final doctorId = await DoctorSession.getActiveDoctorIdForData();
 
-  if (doctorId == null) {
-    result.lastError = 'Doctor session not found';
-    return;
-  }
-
-  try {
-    final prefs = await SharedPreferences.getInstance();
-
-    final String? lastSyncAt = null;
-
-    int page = 1;
-    const pageSize = 100;
-
-    final syncStartedAt = DateTime.now().toUtc().toIso8601String();
-
-    while (true) {
-      final patients = await _patientApi.getPatients(
-        page: page,
-        pageSize: pageSize,
-        updatedAfter: lastSyncAt,
-      );
-
-      if (patients.isEmpty) {
-        break;
-      }
-
-      await _db.bulkUpsertPatientsFromServer(
-        doctorId: doctorId,
-        patients: patients,
-      );
-
-      result.pulledPatients += patients.length;
-
-      page++;
-
-      await Future.delayed(
-        const Duration(milliseconds: 1),
-      );
+    if (doctorId == null) {
+      result.lastError = 'Doctor session not found';
+      return;
     }
 
-    await prefs.setString(
-      'last_patients_sync_at',
-      syncStartedAt,
-    );
-  } catch (e) {
-    result.lastError = 'Pull patients error: $e';
-  }
-}
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final syncKey = 'last_patients_sync_at_$doctorId';
+      final lastSyncAt = _withSyncOverlap(prefs.getString(syncKey));
 
-  
+      int page = 1;
+      const pageSize = 500;
 
-  Future<void> pullPrescriptions(SyncResult result) async {
-  final doctorId = await DoctorSession.getActiveDoctorIdForData();
+      final syncStartedAt = DateTime.now().toUtc().toIso8601String();
 
-  if (doctorId == null) {
-    result.lastError = 'Doctor session not found';
-    return;
-  }
-
-  try {
-    final prefs = await SharedPreferences.getInstance();
-
-    final String? lastSyncAt = null;
-
-    int page = 1;
-    const pageSize = 100;
-
-    final syncStartedAt =
-        DateTime.now().toUtc().toIso8601String();
-
-    while (true) {
-      final prescriptions =
-          await _prescriptionApi.getPrescriptions(
-        page: page,
-        pageSize: pageSize,
-        updatedAfter: lastSyncAt,
-      );
-
-      if (prescriptions.isEmpty) {
-        break;
-      }
-
-      for (final rx in prescriptions) {
-        final items = rx['items'] as List<dynamic>? ?? [];
-
-        final itemsText = items.map((item) {
-          final m = Map<String, dynamic>.from(item);
-
-          return '${m['medicineName'] ?? ''} | '
-              '${m['dosage'] ?? ''} | '
-              '${m['frequency'] ?? ''} | '
-              '${m['duration'] ?? ''} | '
-              '${m['instructions'] ?? ''}';
-        }).join('\n');
-
-        await _db.upsertPrescriptionFromServer(
-          doctorId: doctorId,
-          serverId: rx['id'] as int,
-          serverPatientId: rx['patientId'] as int,
-          patientName: (rx['patientName'] ?? '').toString(),
-          patientAge: (rx['patientAge'] ?? '').toString(),
-          patientGender: (rx['patientGender'] ?? '').toString(),
-          prescriptionNo: (rx['prescriptionNo'] ?? '').toString(),
-          prescriptionDate:
-              (rx['prescriptionDate'] ?? '').toString(),
-          itemsText: itemsText,
-          complaint: rx['complaint']?.toString(),
-          diagnosis: rx['diagnosis']?.toString(),
-          visitNotes: rx['visitNotes']?.toString(),
-          updatedAt: rx['updatedAt']?.toString(),
+      while (true) {
+        final patients = await _patientApi.getPatients(
+          page: page,
+          pageSize: pageSize,
+          updatedAfter: lastSyncAt,
         );
 
-        result.pulledPrescriptions++;
-
-        if (result.pulledPrescriptions % 100 == 0) {
-          await Future.delayed(
-            const Duration(milliseconds: 1),
-          );
+        if (patients.isEmpty) {
+          break;
         }
+
+        await _db.bulkUpsertPatientsFromServer(
+          doctorId: doctorId,
+          patients: patients,
+        );
+
+        result.pulledPatients += patients.length;
+
+        if (patients.length < pageSize) {
+          break;
+        }
+
+        page++;
+
+        await Future.delayed(
+          const Duration(milliseconds: 1),
+        );
       }
 
-      page++;
+      await prefs.setString(
+        syncKey,
+        syncStartedAt,
+      );
+    } catch (e) {
+      result.lastError = SyncErrorPolicy.message('Pull patients', e);
+    }
+  }
+
+  Future<void> pullPrescriptions(SyncResult result) async {
+    final doctorId = await DoctorSession.getActiveDoctorIdForData();
+
+    if (doctorId == null) {
+      result.lastError = 'Doctor session not found';
+      return;
     }
 
-    await prefs.setString(
-      'last_prescriptions_sync_at',
-      syncStartedAt,
-    );
-  } catch (e) {
-    result.lastError = 'Pull prescriptions error: $e';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final syncKey = 'last_prescriptions_sync_at_$doctorId';
+      final lastSyncAt = _withSyncOverlap(prefs.getString(syncKey));
+
+      int page = 1;
+      const pageSize = 500;
+
+      final syncStartedAt = DateTime.now().toUtc().toIso8601String();
+
+      while (true) {
+        final prescriptions = await _prescriptionApi.getPrescriptions(
+          page: page,
+          pageSize: pageSize,
+          updatedAfter: lastSyncAt,
+        );
+
+        if (prescriptions.isEmpty) {
+          break;
+        }
+
+        for (final rx in prescriptions) {
+          final items = rx['items'] as List<dynamic>? ?? [];
+
+          final itemsText = items.map((item) {
+            final m = Map<String, dynamic>.from(item);
+
+            return '${m['medicineName'] ?? ''} | '
+                '${m['dosage'] ?? ''} | '
+                '${m['frequency'] ?? ''} | '
+                '${m['duration'] ?? ''} | '
+                '${m['instructions'] ?? ''}';
+          }).join('\n');
+
+          await _db.upsertPrescriptionFromServer(
+            doctorId: doctorId,
+            serverId: rx['id'] as int,
+            serverPatientId: rx['patientId'] as int,
+            patientName: (rx['patientName'] ?? '').toString(),
+            patientAge: (rx['patientAge'] ?? '').toString(),
+            patientGender: (rx['patientGender'] ?? '').toString(),
+            prescriptionNo: (rx['prescriptionNo'] ?? '').toString(),
+            prescriptionDate: (rx['prescriptionDate'] ?? '').toString(),
+            itemsText: itemsText,
+            complaint: rx['complaint']?.toString(),
+            diagnosis: rx['diagnosis']?.toString(),
+            visitNotes: rx['visitNotes']?.toString(),
+            updatedAt: rx['updatedAt']?.toString(),
+          );
+
+          result.pulledPrescriptions++;
+
+          if (result.pulledPrescriptions % 100 == 0) {
+            await Future.delayed(
+              const Duration(milliseconds: 1),
+            );
+          }
+        }
+
+        if (prescriptions.length < pageSize) {
+          break;
+        }
+
+        page++;
+      }
+
+      await prefs.setString(
+        syncKey,
+        syncStartedAt,
+      );
+    } catch (e) {
+      result.lastError = SyncErrorPolicy.message('Pull prescriptions', e);
+    }
   }
-}
 
   Future<void> pullMedicines(SyncResult result) async {
     final doctorId = await DoctorSession.getActiveDoctorIdForData();
@@ -259,7 +281,8 @@ class SyncService {
     }
 
     final prefs = await SharedPreferences.getInstance();
-    final lastSyncAt = prefs.getString('last_medicines_sync_at');
+    final syncKey = 'last_medicines_sync_at_$doctorId';
+    final lastSyncAt = _withSyncOverlap(prefs.getString(syncKey));
     final syncStartedAt = DateTime.now().toUtc().toIso8601String();
 
     try {
@@ -336,15 +359,26 @@ class SyncService {
 
       // Advance only after every page and local write succeeds.
       await prefs.setString(
-        'last_medicines_sync_at',
+        syncKey,
         syncStartedAt,
       );
     } catch (e) {
       // Keep old timestamp so the next auto-sync retries all failed changes.
       result.medicineFailed++;
-      result.lastError = 'Pull medicines error: $e';
-      print('Pull medicines error: $e');
+      result.lastError = SyncErrorPolicy.message('Pull medicines', e);
     }
+  }
+
+  String? _withSyncOverlap(String? value) {
+    if (value == null || value.isEmpty) return null;
+
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return null;
+
+    return parsed
+        .subtract(const Duration(minutes: 2))
+        .toUtc()
+        .toIso8601String();
   }
 
   Future<void> syncDoctors(SyncResult result) async {
@@ -353,7 +387,16 @@ class SyncService {
     for (final doctor in pendingDoctors) {
       final localId = doctor['id'] as int;
       final email = doctor['email']?.toString() ?? '';
-      final password = doctor['password']?.toString() ?? '';
+      final password = await CredentialStorage.getPassword(email) ??
+          doctor['password']?.toString() ??
+          '';
+
+      if (password.isEmpty) {
+        await _db.markDoctorSyncFailed(localId);
+        result.doctorFailed++;
+        result.lastError = 'Doctor sync requires the user to log in again.';
+        continue;
+      }
 
       try {
         final apiResult = await _authApi.register(
@@ -409,7 +452,7 @@ class SyncService {
       } catch (e) {
         await _db.markDoctorSyncFailed(localId);
         result.doctorFailed++;
-        result.lastError = 'Doctor sync error: $e';
+        result.lastError = SyncErrorPolicy.message('Doctor sync', e);
       }
     }
   }
@@ -422,20 +465,17 @@ class SyncService {
 
       try {
         final apiResult = await _patientApi.upsertPatient(
-  serverId: patient['server_id'] as int?,
-  name: patient['patient_name']?.toString() ?? '',
-  age: patient['patient_age']?.toString() ?? '',
-  gender: patient['patient_gender']?.toString() ?? '',
-  phone: patient['phone_number']?.toString() ?? '',
-  address: patient['address']?.toString() ?? '',
-  notes: patient['notes']?.toString() ?? '',
-
-  allergies: patient['allergies']?.toString() ?? '',
-  chronicDiseases:
-      patient['chronic_diseases']?.toString() ?? '',
-  importantAlerts:
-      patient['important_alerts']?.toString() ?? '',
-);
+          serverId: patient['server_id'] as int?,
+          name: patient['patient_name']?.toString() ?? '',
+          age: patient['patient_age']?.toString() ?? '',
+          gender: patient['patient_gender']?.toString() ?? '',
+          phone: patient['phone_number']?.toString() ?? '',
+          address: patient['address']?.toString() ?? '',
+          notes: patient['notes']?.toString() ?? '',
+          allergies: patient['allergies']?.toString() ?? '',
+          chronicDiseases: patient['chronic_diseases']?.toString() ?? '',
+          importantAlerts: patient['important_alerts']?.toString() ?? '',
+        );
 
         if (apiResult['success'] == true && apiResult['serverId'] != null) {
           await _db.markPatientSynced(localId, apiResult['serverId'] as int);
@@ -448,7 +488,7 @@ class SyncService {
       } catch (e) {
         await _db.markPatientSyncFailed(localId);
         result.patientFailed++;
-        result.lastError = 'Patient sync error: $e';
+        result.lastError = SyncErrorPolicy.message('Patient sync', e);
       }
     }
   }
@@ -506,7 +546,7 @@ class SyncService {
       } catch (e) {
         await _db.markPrescriptionSyncFailed(localRxId);
         result.prescriptionFailed++;
-        result.lastError = 'Prescription sync error: $e';
+        result.lastError = SyncErrorPolicy.message('Prescription sync', e);
       }
     }
   }
@@ -538,96 +578,88 @@ class SyncService {
         final serverId = med['server_id'];
         final isDeleted = (med['is_deleted'] ?? 0) == 1;
 
-if (isDeleted) {
-  if (serverId != null && serverId != 0) {
-    final deleteResult = await _medicineApi.deleteMedicine(
-      serverId: serverId as int,
-    );
+        if (isDeleted) {
+          if (serverId != null && serverId != 0) {
+            final deleteResult = await _medicineApi.deleteMedicine(
+              serverId: serverId as int,
+            );
 
-    if (deleteResult['success'] == true) {
-      await _db.permanentlyDeleteMedicine(med['id'] as int);
-      result.medicineSuccess++;
-    } else {
-      await _db.markMedicineSyncFailed(med['id'] as int);
-      result.medicineFailed++;
-      result.lastError = 'Medicine delete failed: $deleteResult';
-    }
-  } else {
-    await _db.permanentlyDeleteMedicine(med['id'] as int);
-    result.medicineSuccess++;
-  }
+            if (deleteResult['success'] == true) {
+              await _db.permanentlyDeleteMedicine(med['id'] as int);
+              result.medicineSuccess++;
+            } else {
+              await _db.markMedicineSyncFailed(med['id'] as int);
+              result.medicineFailed++;
+              result.lastError = 'Medicine delete failed: $deleteResult';
+            }
+          } else {
+            await _db.permanentlyDeleteMedicine(med['id'] as int);
+            result.medicineSuccess++;
+          }
 
-  continue;
-}
+          continue;
+        }
 
         Map<String, dynamic> apiResult;
 
         if (serverId != null && serverId != 0) {
           apiResult = await _medicineApi.updateMedicine(
-  serverId: serverId as int,
-  name: med['medicine_name']?.toString() ?? '',
-  generic: med['generic_name']?.toString(),
-  brand: med['brand_name']?.toString(),
-  group: med['drug_group']?.toString(),
-  doseForm: med['dose_form']?.toString(),
-  strength: med['strength']?.toString(),
-  customMedicineName: med['custom_medicine_name']?.toString(),
-customGenericName: med['custom_generic_name']?.toString(),
-customBrandName: med['custom_brand_name']?.toString(),
-customDrugGroup: med['custom_drug_group']?.toString(),
-customMedicineType: med['custom_medicine_type']?.toString(),
-
-  customDosage: med['custom_dosage']?.toString(),
-  customFrequency: med['custom_frequency']?.toString(),
-  customDuration: med['custom_duration']?.toString(),
-  customInstructions: med['custom_instructions']?.toString(),
-
-  sellingPrice: double.tryParse(
-        med['selling_price']?.toString() ?? '0',
-      ) ??
-      0,
-  costPrice: double.tryParse(
-        med['cost_price']?.toString() ?? '0',
-      ) ??
-      0,
-
-  isFavorite: med['is_favorite'] == 1,
-);
+            serverId: serverId as int,
+            name: med['medicine_name']?.toString() ?? '',
+            generic: med['generic_name']?.toString(),
+            brand: med['brand_name']?.toString(),
+            group: med['drug_group']?.toString(),
+            doseForm: med['dose_form']?.toString(),
+            strength: med['strength']?.toString(),
+            customMedicineName: med['custom_medicine_name']?.toString(),
+            customGenericName: med['custom_generic_name']?.toString(),
+            customBrandName: med['custom_brand_name']?.toString(),
+            customDrugGroup: med['custom_drug_group']?.toString(),
+            customMedicineType: med['custom_medicine_type']?.toString(),
+            customDosage: med['custom_dosage']?.toString(),
+            customFrequency: med['custom_frequency']?.toString(),
+            customDuration: med['custom_duration']?.toString(),
+            customInstructions: med['custom_instructions']?.toString(),
+            sellingPrice: double.tryParse(
+                  med['selling_price']?.toString() ?? '0',
+                ) ??
+                0,
+            costPrice: double.tryParse(
+                  med['cost_price']?.toString() ?? '0',
+                ) ??
+                0,
+            isFavorite: med['is_favorite'] == 1,
+          );
         } else {
-         final activeDoctorId =
-    await DoctorSession.getActiveDoctorIdForData();
+          final activeDoctorId = await DoctorSession.getActiveDoctorIdForData();
 
-apiResult = await _medicineApi.createMedicine(
-  doctorId: activeDoctorId ??
-    (med['doctor_id'] as int),
-  name: med['medicine_name']?.toString() ?? '',
-  generic: med['generic_name']?.toString(),
-  brand: med['brand_name']?.toString(),
-  group: med['drug_group']?.toString(),
-  doseForm: med['dose_form']?.toString(),
-  strength: med['strength']?.toString(),
-  customMedicineName: med['custom_medicine_name']?.toString(),
-customGenericName: med['custom_generic_name']?.toString(),
-customBrandName: med['custom_brand_name']?.toString(),
-customDrugGroup: med['custom_drug_group']?.toString(),
-customMedicineType: med['custom_medicine_type']?.toString(),
-
-  customDosage: med['custom_dosage']?.toString(),
-  customFrequency: med['custom_frequency']?.toString(),
-  customDuration: med['custom_duration']?.toString(),
-  customInstructions: med['custom_instructions']?.toString(),
-
-  sellingPrice: double.tryParse(
-        med['selling_price']?.toString() ?? '0',
-      ) ??
-      0,
-  costPrice: double.tryParse(
-        med['cost_price']?.toString() ?? '0',
-      ) ??
-      0,
-
-  isFavorite: med['is_favorite'] == 1,
-);
+          apiResult = await _medicineApi.createMedicine(
+            doctorId: activeDoctorId ?? (med['doctor_id'] as int),
+            name: med['medicine_name']?.toString() ?? '',
+            generic: med['generic_name']?.toString(),
+            brand: med['brand_name']?.toString(),
+            group: med['drug_group']?.toString(),
+            doseForm: med['dose_form']?.toString(),
+            strength: med['strength']?.toString(),
+            customMedicineName: med['custom_medicine_name']?.toString(),
+            customGenericName: med['custom_generic_name']?.toString(),
+            customBrandName: med['custom_brand_name']?.toString(),
+            customDrugGroup: med['custom_drug_group']?.toString(),
+            customMedicineType: med['custom_medicine_type']?.toString(),
+            customDosage: med['custom_dosage']?.toString(),
+            customFrequency: med['custom_frequency']?.toString(),
+            customDuration: med['custom_duration']?.toString(),
+            customInstructions: med['custom_instructions']?.toString(),
+            sellingPrice: double.tryParse(
+                  med['selling_price']?.toString() ?? '0',
+                ) ??
+                0,
+            costPrice: double.tryParse(
+                  med['cost_price']?.toString() ?? '0',
+                ) ??
+                0,
+            isFavorite: med['is_favorite'] == 1,
+          );
         }
 
         if (apiResult['success'] == true && apiResult['serverId'] != null) {
@@ -637,26 +669,25 @@ customMedicineType: med['custom_medicine_type']?.toString(),
           );
           result.medicineSuccess++;
         } else {
-  final errorText = apiResult['error']?.toString().toLowerCase() ?? '';
+          final errorText = apiResult['error']?.toString().toLowerCase() ?? '';
 
-  if (errorText.contains('already exists')) {
-    await _db.markMedicineSynced(
-      med['id'] as int,
-      serverId is int ? serverId : 0,
-    );
+          if (errorText.contains('already exists')) {
+            await _db.markMedicineSynced(
+              med['id'] as int,
+              serverId is int ? serverId : 0,
+            );
 
-    result.medicineSuccess++;
-  } else {
-    await _db.markMedicineSyncFailed(med['id'] as int);
-    result.medicineFailed++;
-    result.lastError = 'Medicine API invalid response: $apiResult';
-  }
-}
+            result.medicineSuccess++;
+          } else {
+            await _db.markMedicineSyncFailed(med['id'] as int);
+            result.medicineFailed++;
+            result.lastError = 'Medicine API invalid response: $apiResult';
+          }
+        }
       } catch (e) {
         await _db.markMedicineSyncFailed(med['id'] as int);
         result.medicineFailed++;
-        result.lastError = 'Medicine sync error: $e';
-        print('Medicine sync error: $e');
+        result.lastError = SyncErrorPolicy.message('Medicine sync', e);
       }
     }
   }

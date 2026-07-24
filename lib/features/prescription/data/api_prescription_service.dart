@@ -42,7 +42,7 @@ class ApiPrescriptionService {
 }) async {
   final query =
       '/Prescriptions?page=$page&pageSize=$pageSize'
-      '${updatedAfter != null ? '&updatedAfter=$updatedAfter' : ''}';
+      '${updatedAfter != null ? '&updatedAfter=${Uri.encodeQueryComponent(updatedAfter)}' : ''}';
 
   final response = await _api.get(query);
 

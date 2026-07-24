@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'credential_storage.dart';
+
 class DoctorSession {
   static const String _doctorIdKey = 'logged_in_doctor_id';
   static const String _doctorNameKey = 'logged_in_doctor_name';
@@ -66,6 +68,24 @@ class DoctorSession {
       }
     }
     return '';
+  }
+
+  static Future<String?> _readSecurePassword(
+    SharedPreferences prefs,
+    String email,
+  ) async {
+    var password = await CredentialStorage.getPassword(email);
+    if (password != null && password.isNotEmpty) return password;
+
+    final legacyPassword = prefs.getString(_passwordKey) ??
+        prefs.getString(_lastPasswordKey);
+    if (legacyPassword != null && legacyPassword.isNotEmpty) {
+      await CredentialStorage.savePassword(email, legacyPassword);
+      await prefs.remove(_passwordKey);
+      await prefs.remove(_lastPasswordKey);
+      password = legacyPassword;
+    }
+    return password;
   }
 
   static Future<void> saveDoctorSession(
@@ -197,10 +217,10 @@ class DoctorSession {
       email,
     );
 
-    await prefs.setString(
-      _passwordKey,
-      password,
-    );
+    if (email.isNotEmpty && password.isNotEmpty) {
+      await CredentialStorage.savePassword(email, password);
+    }
+    await prefs.remove(_passwordKey);
 
     await prefs.setBool(
       _biometricEnabledKey,
@@ -272,10 +292,7 @@ class DoctorSession {
       email,
     );
 
-    await prefs.setString(
-      _lastPasswordKey,
-      password,
-    );
+    await prefs.remove(_lastPasswordKey);
 
     await prefs.setBool(
       _lastBiometricEnabledKey,
@@ -321,7 +338,9 @@ class DoctorSession {
 
     final id = prefs.getInt(_doctorIdKey);
     final email = prefs.getString(_emailKey);
-    final password = prefs.getString(_passwordKey);
+    final password = email == null
+        ? null
+        : await _readSecurePassword(prefs, email);
 
     if (id == null || email == null || password == null) {
       return null;
@@ -524,8 +543,11 @@ class DoctorSession {
           prefs.getString(_lastClinicAddressKey) ?? '',
       'email':
           prefs.getString(_lastEmailKey) ?? '',
-      'password':
-          prefs.getString(_lastPasswordKey) ?? '',
+      'password': await _readSecurePassword(
+            prefs,
+            prefs.getString(_lastEmailKey) ?? '',
+          ) ??
+          '',
       'role':
           prefs.getString(_lastRoleKey) ?? 'Doctor',
       'biometric_enabled':

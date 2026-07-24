@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 
+import '../../../core/widgets/app_error_ui.dart';
 import '../../dashboard/screens/home_screen.dart';
 import '../../license/data/license_api_service.dart';
 import '../../license/data/license_cache_service.dart';
@@ -14,7 +15,6 @@ import '../../net_service/connection_mode_service.dart';
 import '../../notifications/services/local_notification_service.dart';
 import '../../followup/screens/follow_up_screen.dart';
 import '../../sync/services/sync_service.dart';
-
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -38,21 +38,21 @@ class _LoginScreenState extends State<LoginScreen> {
   String _lastDoctorName = '';
 
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  _loadBiometricState().then((_) async {
-    if (!mounted) return;
-
-    if (_biometricEnabledForLastDoctor &&
-        _deviceSupportsBiometric &&
-        _lastDoctorName.isNotEmpty) {
-      await Future.delayed(const Duration(milliseconds: 500));
+    _loadBiometricState().then((_) async {
       if (!mounted) return;
-      await _loginWithBiometric();
-    }
-  });
-}
+
+      if (_biometricEnabledForLastDoctor &&
+          _deviceSupportsBiometric &&
+          _lastDoctorName.isNotEmpty) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (!mounted) return;
+        await _loginWithBiometric();
+      }
+    });
+  }
 
   Future<void> _loadBiometricState() async {
     final lastDoctor = await DoctorSession.getLastDoctorForBiometric();
@@ -76,44 +76,38 @@ void initState() {
     });
   }
 
-  
-
   Future<void> _navigateByRole(String role) async {
-  final shouldOpenFollowUps =
-      await LocalNotificationService
-          .consumePendingFollowUpOpen();
+    final shouldOpenFollowUps =
+        await LocalNotificationService.consumePendingFollowUpOpen();
 
-  if (!mounted) return;
+    if (!mounted) return;
 
-  if (shouldOpenFollowUps) {
-  final targetId =
-      await LocalNotificationService
-          .consumePendingFollowUpId();
+    if (shouldOpenFollowUps) {
+      final targetId =
+          await LocalNotificationService.consumePendingFollowUpId();
 
-  if (!mounted) return;
+      if (!mounted) return;
 
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (_) => FollowUpScreen(
-        targetPrescriptionId: targetId,
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => FollowUpScreen(
+            targetPrescriptionId: targetId,
+          ),
+        ),
+      );
+      return;
+    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => role.toLowerCase() == 'reception'
+            ? const ReceptionDashboardScreen()
+            : const HomeScreen(),
       ),
-    ),
-  );
-  return;
-}
-
-  Navigator.pushReplacement(
-    context,
-    MaterialPageRoute(
-      builder: (context) =>
-          role.toLowerCase() == 'reception'
-              ? const ReceptionDashboardScreen()
-              : const HomeScreen(),
-    ),
-  );
-}
-
+    );
+  }
 
   Future<bool> _checkOnlineLicense() async {
     final licenseResult = await _licenseApiService.getStatus();
@@ -201,7 +195,8 @@ void initState() {
 
     setState(() => _isLoading = true);
 
-    await ConnectionModeService.setCloudMode();
+    //await ConnectionModeService.setCloudMode();
+    await ConnectionModeService.setLocalWifiMode(); //local testing
 
     try {
       final result = await _apiAuthService.login(
@@ -255,19 +250,18 @@ void initState() {
 
       await DoctorSession.enableBiometric();
 
-final doctorId = await DoctorSession.getDoctorId();
+      final doctorId = await DoctorSession.getDoctorId();
 
-if (doctorId != null) {
-  await DatabaseHelper.instance.updateDoctor(
-    doctorId,
-    {
-      'biometric_enabled': 1,
-    },
-  );
-}
+      if (doctorId != null) {
+        await DatabaseHelper.instance.updateDoctor(
+          doctorId,
+          {
+            'biometric_enabled': 1,
+          },
+        );
+      }
 
-await SyncService().resetSyncTimestamps();
-await SyncService().syncAll();
+      await SyncService().syncAll();
 
       if (!mounted) return;
 
@@ -285,8 +279,10 @@ await SyncService().syncAll();
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Login failed: $e')),
+      AppErrorUi.show(
+        context,
+        e,
+        onRetry: _login,
       );
     } finally {
       if (mounted) {
@@ -331,11 +327,12 @@ await SyncService().syncAll();
         return;
       }
 
-     final authenticated = await _localAuth.authenticate(
-  localizedReason: 'Use device authentication to access PP Private Practice',
-  biometricOnly: false,
-  persistAcrossBackgrounding: true,
-);
+      final authenticated = await _localAuth.authenticate(
+        localizedReason:
+            'Use device authentication to access PP Private Practice',
+        biometricOnly: false,
+        persistAcrossBackgrounding: true,
+      );
 
       if (!authenticated) {
         if (!mounted) return;
@@ -363,18 +360,18 @@ await SyncService().syncAll();
       });
 
       try {
-  final email = lastDoctor['email']?.toString() ?? '';
-  final password = lastDoctor['password']?.toString() ?? '';
+        final email = lastDoctor['email']?.toString() ?? '';
+        final password = lastDoctor['password']?.toString() ?? '';
 
-  if (email.isNotEmpty && password.isNotEmpty) {
-    await _apiAuthService.login(
-      email: email,
-      password: password,
-    );
-  }
-} catch (_) {
-  // Ignore. Biometric login can still continue offline.
-}
+        if (email.isNotEmpty && password.isNotEmpty) {
+          await _apiAuthService.login(
+            email: email,
+            password: password,
+          );
+        }
+      } catch (_) {
+        // Ignore. Biometric login can still continue offline.
+      }
 
       final doctorId = await DoctorSession.getDoctorId();
 
@@ -393,20 +390,22 @@ await SyncService().syncAll();
       final role = lastDoctor['role']?.toString() ?? 'Doctor';
       _navigateByRole(role);
     } on LocalAuthException catch (e) {
-  if (!mounted) return;
+      if (!mounted) return;
 
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text('Authentication failed: ${e.toString()}'),
-    ),
-  );
-} catch (e) {
-  if (!mounted) return;
+      AppErrorUi.show(
+        context,
+        e,
+        onRetry: _loginWithBiometric,
+      );
+    } catch (e) {
+      if (!mounted) return;
 
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('Biometric login error: $e')),
-  );
-}
+      AppErrorUi.show(
+        context,
+        e,
+        onRetry: _loginWithBiometric,
+      );
+    }
   }
 
   void _openRegistration() {
@@ -427,8 +426,7 @@ await SyncService().syncAll();
 
   @override
   Widget build(BuildContext context) {
-    final showBiometricButton =
-        _biometricEnabledForLastDoctor &&
+    final showBiometricButton = _biometricEnabledForLastDoctor &&
         _deviceSupportsBiometric &&
         _lastDoctorName.isNotEmpty;
 
@@ -565,7 +563,8 @@ await SyncService().syncAll();
                             const SizedBox(height: 20),
                             Container(
                               width: double.infinity,
-                              padding: const EdgeInsets.fromLTRB(24, 26, 24, 22),
+                              padding:
+                                  const EdgeInsets.fromLTRB(24, 26, 24, 22),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(28),
@@ -617,7 +616,9 @@ await SyncService().syncAll();
                                       enabled: !_isLoading,
                                       keyboardType: TextInputType.emailAddress,
                                       textInputAction: TextInputAction.next,
-                                      autofillHints: const [AutofillHints.email],
+                                      autofillHints: const [
+                                        AutofillHints.email
+                                      ],
                                       decoration: InputDecoration(
                                         hintText: 'doctor@clinic.com',
                                         prefixIcon: const Icon(
@@ -626,17 +627,20 @@ await SyncService().syncAll();
                                         filled: true,
                                         fillColor: const Color(0xFFF8FAFC),
                                         border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(15),
+                                          borderRadius:
+                                              BorderRadius.circular(15),
                                           borderSide: BorderSide.none,
                                         ),
                                         enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(15),
+                                          borderRadius:
+                                              BorderRadius.circular(15),
                                           borderSide: const BorderSide(
                                             color: Color(0xFFE2E8F0),
                                           ),
                                         ),
                                         focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(15),
+                                          borderRadius:
+                                              BorderRadius.circular(15),
                                           borderSide: const BorderSide(
                                             color: Color(0xFF0F766E),
                                             width: 1.6,
@@ -659,7 +663,9 @@ await SyncService().syncAll();
                                       enabled: !_isLoading,
                                       obscureText: _obscurePassword,
                                       textInputAction: TextInputAction.done,
-                                      autofillHints: const [AutofillHints.password],
+                                      autofillHints: const [
+                                        AutofillHints.password
+                                      ],
                                       onSubmitted: (_) {
                                         if (!_isLoading) _login();
                                       },
@@ -687,17 +693,20 @@ await SyncService().syncAll();
                                         filled: true,
                                         fillColor: const Color(0xFFF8FAFC),
                                         border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(15),
+                                          borderRadius:
+                                              BorderRadius.circular(15),
                                           borderSide: BorderSide.none,
                                         ),
                                         enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(15),
+                                          borderRadius:
+                                              BorderRadius.circular(15),
                                           borderSide: const BorderSide(
                                             color: Color(0xFFE2E8F0),
                                           ),
                                         ),
                                         focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(15),
+                                          borderRadius:
+                                              BorderRadius.circular(15),
                                           borderSide: const BorderSide(
                                             color: Color(0xFF0F766E),
                                             width: 1.6,
@@ -825,8 +834,9 @@ await SyncService().syncAll();
                                     SizedBox(
                                       width: double.infinity,
                                       child: TextButton.icon(
-                                        onPressed:
-                                            _isLoading ? null : _openRegistration,
+                                        onPressed: _isLoading
+                                            ? null
+                                            : _openRegistration,
                                         icon: const Icon(
                                           Icons.person_add_alt_1_rounded,
                                           size: 19,

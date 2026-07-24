@@ -29,7 +29,7 @@ void initState() {
  _loadBills(showLoader: true);
 
   _refreshTimer = Timer.periodic(
-    const Duration(seconds: 5),
+    const Duration(seconds: 30),
     (_) {
       _loadBills();
     },

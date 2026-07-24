@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/app_error_ui.dart';
 import '../../../data/local/database_helper.dart';
 
 import '../../auth/data/doctor_session.dart';
@@ -91,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     _summaryTimer = Timer.periodic(
-      const Duration(seconds: 5),
+      const Duration(seconds: 15),
       (_) {
         if (!mounted) return;
         _loadQueueSummary();
@@ -228,8 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         setState(() {
           _licenseValid = false;
-          _licenseMessage =
-              result['message']?.toString() ?? 'License expired';
+          _licenseMessage = result['message']?.toString() ?? 'License expired';
           _isCheckingLicense = false;
         });
 
@@ -240,12 +240,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final isActive = data['isActive'] == true;
       final isExpired = data['isExpired'] == true;
-      final days =
-          int.tryParse(data['daysRemaining']?.toString() ?? '0') ?? 0;
+      final days = int.tryParse(data['daysRemaining']?.toString() ?? '0') ?? 0;
 
       final endDateRaw = data['endDate']?.toString();
-      final endDate =
-          endDateRaw == null ? null : DateTime.tryParse(endDateRaw);
+      final endDate = endDateRaw == null ? null : DateTime.tryParse(endDateRaw);
 
       if (isActive && !isExpired && endDate != null) {
         await LicenseService.saveSubscriptionCache(
@@ -372,8 +370,10 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sync failed ❌ $e')),
+      AppErrorUi.show(
+        context,
+        e,
+        onRetry: _syncNow,
       );
     } finally {
       if (mounted) {
@@ -595,8 +595,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final pendingPrescriptions =
           await DatabaseHelper.instance.getPendingPrescriptions();
 
-      final pendingBills =
-          await DatabaseHelper.instance.getPendingBills();
+      final pendingBills = await DatabaseHelper.instance.getPendingBills();
 
       if (!mounted) return;
 
@@ -828,60 +827,60 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
- Widget _primaryPrescriptionButton() {
-  return InkWell(
-    onTap: () => _navigate('Today Queue'),
-    borderRadius: BorderRadius.circular(24),
-    child: Container(
-      margin: const EdgeInsets.fromLTRB(16, 18, 16, 8),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFF6D00), Color(0xFFFF9800)],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.orange.withOpacity(0.25),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+  Widget _primaryPrescriptionButton() {
+    return InkWell(
+      onTap: () => _navigate('Today Queue'),
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFF6D00), Color(0xFFFF9800)],
           ),
-        ],
-      ),
-      child: const Row(
-        children: [
-          CircleAvatar(
-            radius: 31,
-            backgroundColor: Colors.white,
-            child: Icon(Icons.groups, color: Color(0xFFFF6D00), size: 34),
-          ),
-          SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Today Queue',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 21,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'View and manage today’s patients',
-                  style: TextStyle(color: Colors.white70),
-                ),
-              ],
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.orange.withOpacity(0.25),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
-          ),
-          Icon(Icons.arrow_forward_ios, color: Colors.white),
-        ],
+          ],
+        ),
+        child: const Row(
+          children: [
+            CircleAvatar(
+              radius: 31,
+              backgroundColor: Colors.white,
+              child: Icon(Icons.groups, color: Color(0xFFFF6D00), size: 34),
+            ),
+            SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Today Queue',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 21,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'View and manage today’s patients',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, color: Colors.white),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _queueSummaryCard() {
     return Container(
@@ -1079,7 +1078,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
   String _formatRecentDate(dynamic value) {
     if (value == null) return '';
 
@@ -1091,9 +1089,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final now = DateTime.now();
 
     final isToday =
-        date.year == now.year &&
-        date.month == now.month &&
-        date.day == now.day;
+        date.year == now.year && date.month == now.month && date.day == now.day;
 
     final hour = date.hour.toString().padLeft(2, '0');
     final minute = date.minute.toString().padLeft(2, '0');
@@ -1308,7 +1304,6 @@ class _HomeScreenState extends State<HomeScreen> {
             _primaryPrescriptionButton(),
             const SizedBox(height: 8),
             _queueSummaryCard(),
-
             _sectionCard(
               title: "Today's Operations",
               icon: Icons.star,
@@ -1317,12 +1312,12 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _featureScroll([
                   _featureCard(
-  title: 'Create Prescription',
-  subtitle: 'Start a new prescription',
-  icon: Icons.note_add,
-  color: Colors.blue,
-  onTap: () => _navigate('Create Prescription'),
-),
+                    title: 'Create Prescription',
+                    subtitle: 'Start a new prescription',
+                    icon: Icons.note_add,
+                    color: Colors.blue,
+                    onTap: () => _navigate('Create Prescription'),
+                  ),
                   _featureCard(
                     title: 'Follow-Ups',
                     subtitle: '$_todayFollowUpCount due today',
@@ -1349,7 +1344,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ]),
               ],
             ),
-
             _sectionCard(
               title: 'Patient Management',
               icon: Icons.people_alt,
@@ -1374,7 +1368,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ]),
               ],
             ),
-
             _sectionCard(
               title: 'Clinical',
               icon: Icons.assignment,
@@ -1399,9 +1392,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ]),
               ],
             ),
-
             _recentActivitySection(),
-
             _sectionCard(
               title: 'Tools',
               icon: Icons.construction,
@@ -1440,7 +1431,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ]),
               ],
             ),
-
             const SizedBox(height: 95),
           ],
         ),

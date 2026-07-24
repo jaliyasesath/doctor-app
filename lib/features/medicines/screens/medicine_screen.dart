@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/app_error_ui.dart';
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 
@@ -43,13 +44,13 @@ class _MedicineScreenState extends State<MedicineScreen> {
     super.dispose();
   }
 
- Future<void> _init() async {
-  final role = await DoctorSession.getRole();
-  doctorId = await DoctorSession.getActiveDoctorIdForData();
-  isReception = role.toLowerCase() == 'reception';
+  Future<void> _init() async {
+    final role = await DoctorSession.getRole();
+    doctorId = await DoctorSession.getActiveDoctorIdForData();
+    isReception = role.toLowerCase() == 'reception';
 
-  await _loadMedicines();
-}
+    await _loadMedicines();
+  }
 
   Future<void> _loadMedicines() async {
     if (doctorId == null) return;
@@ -79,8 +80,10 @@ class _MedicineScreenState extends State<MedicineScreen> {
       if (!mounted) return;
       setState(() => loading = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Load medicines failed: $e')),
+      AppErrorUi.show(
+        context,
+        e,
+        onRetry: _loadMedicines,
       );
     }
   }
@@ -105,7 +108,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
               limit: _limit,
               offset: _offset,
             );
-            debugPrint('Loaded more medicines: ${data.length}, offset: $_offset');
+      debugPrint('Loaded more medicines: ${data.length}, offset: $_offset');
 
       if (!mounted) return;
 
@@ -116,14 +119,16 @@ class _MedicineScreenState extends State<MedicineScreen> {
         _isLoadingMore = false;
       });
     } catch (e) {
-  if (!mounted) return;
+      if (!mounted) return;
 
-  setState(() => _isLoadingMore = false);
+      setState(() => _isLoadingMore = false);
 
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('Load more failed: $e')),
-  );
-}
+      AppErrorUi.show(
+        context,
+        e,
+        onRetry: _loadMoreMedicines,
+      );
+    }
   }
 
   Future<void> _searchMedicine(String value) async {
@@ -162,6 +167,11 @@ class _MedicineScreenState extends State<MedicineScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => loading = false);
+      AppErrorUi.show(
+        context,
+        e,
+        onRetry: () => _searchMedicine(query),
+      );
     }
   }
 
@@ -179,26 +189,21 @@ class _MedicineScreenState extends State<MedicineScreen> {
   }
 
   Future<void> _deleteMedicine(int id) async {
-    final role =
-    await DoctorSession.getRole();
+    final role = await DoctorSession.getRole();
 
-if (role.toLowerCase() ==
-    'reception') {
+    if (role.toLowerCase() == 'reception') {
+      if (!mounted) return;
 
-  if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Reception cannot delete medicines',
+          ),
+        ),
+      );
 
-  ScaffoldMessenger.of(context)
-      .showSnackBar(
-
-    const SnackBar(
-      content: Text(
-        'Reception cannot delete medicines',
-      ),
-    ),
-  );
-
-  return;
-}
+      return;
+    }
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -249,22 +254,19 @@ if (role.toLowerCase() ==
     final isFavorite = (med['is_favorite'] ?? 0) == 1;
     final status = med['sync_status']?.toString() ?? 'pending';
     final medicineName =
-    (med['custom_medicine_name'] ?? '').toString().isNotEmpty
-        ? med['custom_medicine_name'].toString()
-        : med['medicine_name']?.toString() ?? '';
+        (med['custom_medicine_name'] ?? '').toString().isNotEmpty
+            ? med['custom_medicine_name'].toString()
+            : med['medicine_name']?.toString() ?? '';
 
-final genericName =
-    (med['custom_generic_name'] ?? '').toString().isNotEmpty
+    final genericName = (med['custom_generic_name'] ?? '').toString().isNotEmpty
         ? med['custom_generic_name'].toString()
         : med['generic_name']?.toString() ?? '';
 
-final drugGroup =
-    (med['custom_drug_group'] ?? '').toString().isNotEmpty
+    final drugGroup = (med['custom_drug_group'] ?? '').toString().isNotEmpty
         ? med['custom_drug_group'].toString()
         : med['drug_group']?.toString() ?? '';
 
-final strength =
-    (med['custom_dosage'] ?? '').toString().isNotEmpty
+    final strength = (med['custom_dosage'] ?? '').toString().isNotEmpty
         ? med['custom_dosage'].toString()
         : med['strength']?.toString() ?? '';
 
@@ -282,21 +284,19 @@ final strength =
           onPressed: () => _toggleFavorite(med),
         ),
         title: Text(
-  medicineName,
+          medicineName,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-           if (genericName.isNotEmpty)
-  Text('Generic: $genericName'),
-if (drugGroup.isNotEmpty)
-  Text(
-    'Group: $drugGroup',
+            if (genericName.isNotEmpty) Text('Generic: $genericName'),
+            if (drugGroup.isNotEmpty)
+              Text(
+                'Group: $drugGroup',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-            if (strength.isNotEmpty)
-  Text('Strength: $strength'),
+            if (strength.isNotEmpty) Text('Strength: $strength'),
             const SizedBox(height: 4),
             Row(
               children: [
@@ -331,10 +331,10 @@ if (drugGroup.isNotEmpty)
               child: Text(isReception ? 'Edit Price' : 'Edit'),
             ),
             if (!isReception)
-            const PopupMenuItem(
-              value: 'delete',
-              child: Text('Delete'),
-            ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Text('Delete'),
+              ),
           ],
         ),
       ),
@@ -398,10 +398,10 @@ if (drugGroup.isNotEmpty)
         title: Text('Medicines (${medicines.length})'),
         actions: [
           if (!isReception)
-          IconButton(
-            onPressed: () => _openMedicineForm(),
-            icon: const Icon(Icons.add),
-          ),
+            IconButton(
+              onPressed: () => _openMedicineForm(),
+              icon: const Icon(Icons.add),
+            ),
         ],
       ),
       floatingActionButton: isReception
@@ -470,19 +470,15 @@ class MedicineFormScreen extends StatefulWidget {
 class _MedicineFormScreenState extends State<MedicineFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final TextEditingController _medicineNameController =
-      TextEditingController();
-  final TextEditingController _genericNameController =
-      TextEditingController();
+  final TextEditingController _medicineNameController = TextEditingController();
+  final TextEditingController _genericNameController = TextEditingController();
   final TextEditingController _brandNameController = TextEditingController();
   final TextEditingController _drugGroupController = TextEditingController();
   final TextEditingController _doseFormController = TextEditingController();
   final TextEditingController _strengthController = TextEditingController();
-  final TextEditingController _sellingPriceController =
-    TextEditingController();
+  final TextEditingController _sellingPriceController = TextEditingController();
 
-final TextEditingController _costPriceController =
-    TextEditingController();
+  final TextEditingController _costPriceController = TextEditingController();
 
   bool isFavorite = false;
   bool saving = false;
@@ -501,8 +497,7 @@ final TextEditingController _costPriceController =
 
   Future<void> _loadDoctor() async {
     final role = await DoctorSession.getRole();
-    final activeDoctorId =
-        await DoctorSession.getActiveDoctorIdForData();
+    final activeDoctorId = await DoctorSession.getActiveDoctorIdForData();
 
     if (!mounted) return;
 
@@ -511,50 +506,48 @@ final TextEditingController _costPriceController =
       isReception = role.toLowerCase() == 'reception';
       roleLoaded = true;
     });
-}
+  }
 
   void _fillData() {
-  final med = widget.medicine;
-  if (med == null) return;
+    final med = widget.medicine;
+    if (med == null) return;
 
-  _medicineNameController.text =
-      (med['custom_medicine_name'] ?? '').toString().isNotEmpty
-          ? med['custom_medicine_name'].toString()
-          : med['medicine_name']?.toString() ?? '';
+    _medicineNameController.text =
+        (med['custom_medicine_name'] ?? '').toString().isNotEmpty
+            ? med['custom_medicine_name'].toString()
+            : med['medicine_name']?.toString() ?? '';
 
-  _genericNameController.text =
-      (med['custom_generic_name'] ?? '').toString().isNotEmpty
-          ? med['custom_generic_name'].toString()
-          : med['generic_name']?.toString() ?? '';
+    _genericNameController.text =
+        (med['custom_generic_name'] ?? '').toString().isNotEmpty
+            ? med['custom_generic_name'].toString()
+            : med['generic_name']?.toString() ?? '';
 
-  _brandNameController.text =
-      (med['custom_brand_name'] ?? '').toString().isNotEmpty
-          ? med['custom_brand_name'].toString()
-          : med['brand_name']?.toString() ?? '';
+    _brandNameController.text =
+        (med['custom_brand_name'] ?? '').toString().isNotEmpty
+            ? med['custom_brand_name'].toString()
+            : med['brand_name']?.toString() ?? '';
 
-  _drugGroupController.text =
-      (med['custom_drug_group'] ?? '').toString().isNotEmpty
-          ? med['custom_drug_group'].toString()
-          : med['drug_group']?.toString() ?? '';
+    _drugGroupController.text =
+        (med['custom_drug_group'] ?? '').toString().isNotEmpty
+            ? med['custom_drug_group'].toString()
+            : med['drug_group']?.toString() ?? '';
 
-  _doseFormController.text =
-      (med['custom_medicine_type'] ?? '').toString().isNotEmpty
-          ? med['custom_medicine_type'].toString()
-          : med['dose_form']?.toString() ?? '';
+    _doseFormController.text =
+        (med['custom_medicine_type'] ?? '').toString().isNotEmpty
+            ? med['custom_medicine_type'].toString()
+            : med['dose_form']?.toString() ?? '';
 
-  _strengthController.text =
-      (med['custom_dosage'] ?? '').toString().isNotEmpty
-          ? med['custom_dosage'].toString()
-          : med['strength']?.toString() ?? '';
+    _strengthController.text =
+        (med['custom_dosage'] ?? '').toString().isNotEmpty
+            ? med['custom_dosage'].toString()
+            : med['strength']?.toString() ?? '';
 
-  _sellingPriceController.text =
-      med['selling_price']?.toString() ?? '';
+    _sellingPriceController.text = med['selling_price']?.toString() ?? '';
 
-  _costPriceController.text =
-      med['cost_price']?.toString() ?? '';
+    _costPriceController.text = med['cost_price']?.toString() ?? '';
 
-  isFavorite = (med['is_favorite'] ?? 0) == 1;
-}
+    isFavorite = (med['is_favorite'] ?? 0) == 1;
+  }
 
   @override
   void dispose() {
@@ -565,7 +558,7 @@ final TextEditingController _costPriceController =
     _doseFormController.dispose();
     _strengthController.dispose();
     _sellingPriceController.dispose();
-_costPriceController.dispose();
+    _costPriceController.dispose();
     super.dispose();
   }
 
@@ -583,17 +576,17 @@ _costPriceController.dispose();
   }
 
   Widget _field({
-  required TextEditingController controller,
-  required String label,
-  required IconData icon,
-  bool requiredField = false,
-  String? hint,
-  TextInputType keyboardType = TextInputType.text,
-  bool enabled = true,
-}) {
-  return TextFormField(
-    controller: controller,
-    keyboardType: keyboardType,
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool requiredField = false,
+    String? hint,
+    TextInputType keyboardType = TextInputType.text,
+    bool enabled = true,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
       enabled: enabled,
       validator: requiredField ? (v) => _required(v, label) : null,
       decoration: InputDecoration(
@@ -629,59 +622,58 @@ _costPriceController.dispose();
     setState(() => saving = true);
 
     final data = {
-  'doctor_id': doctorId,
+      'doctor_id': doctorId,
 
-  // Master fields keep unchanged for existing assigned medicines
-  'medicine_name': isEdit
-      ? widget.medicine!['medicine_name']?.toString() ?? ''
-      : _medicineNameController.text.trim(),
+      // Master fields keep unchanged for existing assigned medicines
+      'medicine_name': isEdit
+          ? widget.medicine!['medicine_name']?.toString() ?? ''
+          : _medicineNameController.text.trim(),
 
-  'generic_name': isEdit
-      ? widget.medicine!['generic_name']?.toString() ?? ''
-      : _genericNameController.text.trim(),
+      'generic_name': isEdit
+          ? widget.medicine!['generic_name']?.toString() ?? ''
+          : _genericNameController.text.trim(),
 
-  'brand_name': isEdit
-      ? widget.medicine!['brand_name']?.toString() ?? ''
-      : _brandNameController.text.trim(),
+      'brand_name': isEdit
+          ? widget.medicine!['brand_name']?.toString() ?? ''
+          : _brandNameController.text.trim(),
 
-  'drug_group': isEdit
-      ? widget.medicine!['drug_group']?.toString() ?? ''
-      : _drugGroupController.text.trim(),
+      'drug_group': isEdit
+          ? widget.medicine!['drug_group']?.toString() ?? ''
+          : _drugGroupController.text.trim(),
 
-  'dose_form': isEdit
-      ? widget.medicine!['dose_form']?.toString() ?? ''
-      : _doseFormController.text.trim(),
+      'dose_form': isEdit
+          ? widget.medicine!['dose_form']?.toString() ?? ''
+          : _doseFormController.text.trim(),
 
-  'strength': isEdit
-      ? widget.medicine!['strength']?.toString() ?? ''
-      : _strengthController.text.trim(),
+      'strength': isEdit
+          ? widget.medicine!['strength']?.toString() ?? ''
+          : _strengthController.text.trim(),
 
-  // Doctor-specific editable fields
-  'custom_medicine_name': isReception
-      ? _existingMedicineValue('custom_medicine_name')
-      : _medicineNameController.text.trim(),
-  'custom_generic_name': isReception
-      ? _existingMedicineValue('custom_generic_name')
-      : _genericNameController.text.trim(),
-  'custom_brand_name': isReception
-      ? _existingMedicineValue('custom_brand_name')
-      : _brandNameController.text.trim(),
-  'custom_drug_group': isReception
-      ? _existingMedicineValue('custom_drug_group')
-      : _drugGroupController.text.trim(),
-  'custom_medicine_type': isReception
-      ? _existingMedicineValue('custom_medicine_type')
-      : _doseFormController.text.trim(),
-  'custom_dosage': isReception
-      ? _existingMedicineValue('custom_dosage')
-      : _strengthController.text.trim(),
+      // Doctor-specific editable fields
+      'custom_medicine_name': isReception
+          ? _existingMedicineValue('custom_medicine_name')
+          : _medicineNameController.text.trim(),
+      'custom_generic_name': isReception
+          ? _existingMedicineValue('custom_generic_name')
+          : _genericNameController.text.trim(),
+      'custom_brand_name': isReception
+          ? _existingMedicineValue('custom_brand_name')
+          : _brandNameController.text.trim(),
+      'custom_drug_group': isReception
+          ? _existingMedicineValue('custom_drug_group')
+          : _drugGroupController.text.trim(),
+      'custom_medicine_type': isReception
+          ? _existingMedicineValue('custom_medicine_type')
+          : _doseFormController.text.trim(),
+      'custom_dosage': isReception
+          ? _existingMedicineValue('custom_dosage')
+          : _strengthController.text.trim(),
 
-  'selling_price':
-      double.tryParse(_sellingPriceController.text.trim()) ?? 0,
-  'cost_price':
-      double.tryParse(_costPriceController.text.trim()) ?? 0,
-  'is_favorite': isFavorite ? 1 : 0,
-};
+      'selling_price':
+          double.tryParse(_sellingPriceController.text.trim()) ?? 0,
+      'cost_price': double.tryParse(_costPriceController.text.trim()) ?? 0,
+      'is_favorite': isFavorite ? 1 : 0,
+    };
 
     try {
       if (isEdit) {
@@ -707,8 +699,10 @@ _costPriceController.dispose();
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Save failed: $e')),
+      AppErrorUi.show(
+        context,
+        e,
+        onRetry: _saveMedicine,
       );
     } finally {
       if (mounted) {
@@ -793,22 +787,21 @@ _costPriceController.dispose();
                     hint: '500mg / 250mg / 5ml',
                   ),
                   const SizedBox(height: 14),
-_field(
-  controller: _sellingPriceController,
-  label: 'Selling Price',
-  icon: Icons.sell_outlined,
-  hint: 'Example: 25.00',
-  keyboardType: TextInputType.number,
-),
-
-const SizedBox(height: 14),
-_field(
-  controller: _costPriceController,
-  label: 'Cost Price',
-  icon: Icons.price_change_outlined,
-  hint: 'Example: 18.00',
-  keyboardType: TextInputType.number,
-),
+                  _field(
+                    controller: _sellingPriceController,
+                    label: 'Selling Price',
+                    icon: Icons.sell_outlined,
+                    hint: 'Example: 25.00',
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 14),
+                  _field(
+                    controller: _costPriceController,
+                    label: 'Cost Price',
+                    icon: Icons.price_change_outlined,
+                    hint: 'Example: 18.00',
+                    keyboardType: TextInputType.number,
+                  ),
                   const SizedBox(height: 14),
                   SwitchListTile(
                     value: isFavorite,

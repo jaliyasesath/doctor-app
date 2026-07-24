@@ -2061,6 +2061,17 @@ final existing = await txn.query(
   'chronic_diseases': p['chronicDiseases']?.toString() ?? '',
   'important_alerts': p['importantAlerts']?.toString() ?? '',
 
+  if (p['queueStatus'] != null || p['queue_status'] != null)
+    'queue_status':
+        (p['queueStatus'] ?? p['queue_status']).toString(),
+  if (p['queueNo'] != null || p['queue_no'] != null)
+    'queue_no': int.tryParse(
+      (p['queueNo'] ?? p['queue_no']).toString(),
+    ),
+  if (p['queueDate'] != null || p['queue_date'] != null)
+    'queue_date':
+        (p['queueDate'] ?? p['queue_date']).toString(),
+
   'sync_status': 'synced',
   'updated_at': p['updatedAt']?.toString() ?? DateTime.now().toIso8601String(),
   'created_at': p['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
@@ -2417,39 +2428,109 @@ Future<List<Map<String, dynamic>>> getTodayQueuePatients({
   String? status,
 }) async {
   final db = await database;
+  final doctorId = await DoctorSession.getActiveDoctorIdForData();
   final today = DateTime.now().toIso8601String().split('T').first;
+
+  if (doctorId == null) return [];
 
   if (status == null || status == 'waiting') {
     return db.query(
       'patients',
       where:
-          'date(queue_date) = date(?) AND '
+          'doctor_id = ? AND date(queue_date) = date(?) AND '
           '(queue_status = ? OR queue_status = ?)',
-      whereArgs: [today, 'Waiting', 'Serving'],
+      whereArgs: [doctorId, today, 'Waiting', 'Serving'],
       orderBy: 'queue_no ASC, id ASC',
     );
   }
 
   return db.query(
     'patients',
-    where: 'date(queue_date) = date(?) AND queue_status = ?',
-    whereArgs: [today, status],
+    where: 'doctor_id = ? AND date(queue_date) = date(?) AND queue_status = ?',
+    whereArgs: [doctorId, today, status],
     orderBy: 'queue_no ASC, id ASC',
   );
 }
 
 Future<List<Map<String, dynamic>>> getPreviousPendingQueuePatients() async {
   final db = await database;
+  final doctorId = await DoctorSession.getActiveDoctorIdForData();
   final today = DateTime.now().toIso8601String().split('T').first;
+
+  if (doctorId == null) return [];
 
   return db.query(
     'patients',
     where:
-        'date(queue_date) < date(?) AND '
+        'doctor_id = ? AND date(queue_date) < date(?) AND '
         '(queue_status = ? OR queue_status = ?)',
-    whereArgs: [today, 'Waiting', 'Serving'],
+    whereArgs: [doctorId, today, 'Waiting', 'Serving'],
     orderBy: 'queue_date ASC, queue_no ASC, id ASC',
   );
+}
+
+Future<void> cacheQueuePatientsFromServer({
+  required int doctorId,
+  required List<dynamic> patients,
+}) async {
+  final db = await database;
+  final now = DateTime.now().toIso8601String();
+
+  await db.transaction((txn) async {
+    for (final item in patients) {
+      final patient = Map<String, dynamic>.from(item as Map);
+      final serverId = int.tryParse(patient['id']?.toString() ?? '');
+
+      if (serverId == null) continue;
+
+      final existing = await txn.query(
+        'patients',
+        where: 'server_id = ? AND doctor_id = ?',
+        whereArgs: [serverId, doctorId],
+        limit: 1,
+      );
+
+      final data = <String, dynamic>{
+        'server_id': serverId,
+        'doctor_id': doctorId,
+        'patient_name': (patient['patientName'] ?? '').toString(),
+        'patient_age':
+            (patient['patientAge'] ?? patient['age'] ?? '').toString(),
+        'patient_gender':
+            (patient['patientGender'] ?? patient['gender'] ?? '').toString(),
+        'phone_number': patient['phoneNumber']?.toString(),
+        'address': patient['address']?.toString(),
+        'notes': patient['notes']?.toString(),
+        'allergies': patient['allergies']?.toString() ?? '',
+        'chronic_diseases': patient['chronicDiseases']?.toString() ?? '',
+        'important_alerts': patient['importantAlerts']?.toString() ?? '',
+        'queue_status':
+            (patient['queueStatus'] ?? patient['queue_status'] ?? 'Waiting')
+                .toString(),
+        'queue_no': int.tryParse(
+          (patient['queueNo'] ?? patient['queue_no'] ?? serverId).toString(),
+        ),
+        'queue_date':
+            (patient['queueDate'] ?? patient['queue_date'] ??
+                    patient['createdAt'] ?? now)
+                .toString(),
+        'sync_status': 'synced',
+        'updated_at': patient['updatedAt']?.toString() ?? now,
+        'created_at': patient['createdAt']?.toString() ?? now,
+      };
+
+      if (existing.isEmpty) {
+        await txn.insert('patients', data);
+      } else {
+        await txn.update(
+          'patients',
+          data,
+          where: 'id = ?',
+          whereArgs: [existing.first['id']],
+        );
+      }
+    }
+  });
 }
 
 Future<void> moveQueuePatientToToday(int patientId) async {

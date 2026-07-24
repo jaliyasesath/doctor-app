@@ -94,7 +94,8 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-    await ConnectionModeService.setCloudMode();
+    //await ConnectionModeService.setCloudMode();
+    await ConnectionModeService.setLocalWifiMode();// for local testing
 
     try {
       final result = await _apiAuthService.register(

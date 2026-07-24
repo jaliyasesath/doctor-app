@@ -41,7 +41,7 @@ class _ReceptionQueueScreenState extends State<ReceptionQueueScreen> {
     _loadData(showLoader: true);
 
     _autoRefreshTimer = Timer.periodic(
-      const Duration(seconds: 5),
+      const Duration(seconds: 15),
       (_) {
         if (!mounted || _refreshing) return;
         _loadData();
