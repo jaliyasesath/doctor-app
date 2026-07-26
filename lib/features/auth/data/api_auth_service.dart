@@ -1,10 +1,16 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
+
 import '../../../data/local/database_helper.dart';
 import '../../../core/errors/api_error_classifier.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../features/net_service/api_client.dart';
 import '../../../features/net_service/token_storage.dart';
-import '../../license/data/license_cache_service.dart';
 import '../../net_service/network_service.dart';
+import '../../net_service/api_config.dart';
 import 'credential_storage.dart';
 import 'doctor_session.dart';
 import 'login_error_policy.dart';
@@ -19,146 +25,125 @@ class ApiAuthService {
     required String contactNumber,
     required String specialization,
     required String role,
-
     String qualifications = '',
     String profession = '',
     String slmcRegNo = '',
     String affiliation = '',
     String linkedDoctorEmail = '',
     String signaturePath = '',
-
     String medicalCenterName = '',
     String city = '',
     String clinicAddress = '',
     int biometricEnabled = 0,
     bool saveLocal = true,
+    required File slmcIdFront,
+    required File slmcIdBack,
+    String verificationDocumentType = 'SLMCIdentityCard',
+    required bool doctorDeclarationAccepted,
+    required bool termsAccepted,
   }) async {
     try {
-      final existing = await DatabaseHelper.instance.getDoctorByEmail(email);
-
-      if (saveLocal && existing != null) {
+      final online = await NetworkService.isOnline();
+      if (!online) {
         return {
           'success': false,
-          'message': 'Email already registered locally',
+          'message':
+              'Internet connection is required for doctor identity verification.',
+          'code': 'ONLINE_REGISTRATION_REQUIRED',
         };
       }
 
-      final online = await NetworkService.isOnline();
-      int serverId = 0;
+      final baseUrl = ApiConfig.baseUrl.trim();
+      if (baseUrl.isEmpty) {
+        return {
+          'success': false,
+          'message': 'The API server address is not configured.',
+          'code': 'API_URL_REQUIRED',
+        };
+      }
 
-      if (online) {
-        final response = await _api.post(
-          '/Auth/register',
-          {
-            'doctorName': doctorName,
-            'email': email,
-            'password': password,
-            'contactNumber': contactNumber,
-            'specialization': specialization,
-            'medicalCenterName': medicalCenterName,
-            'role': role,
-            'qualifications': qualifications,
-            'profession': profession,
-            'slmcRegNo': slmcRegNo,
-            'affiliation': affiliation,
-            'linkedDoctorEmail': linkedDoctorEmail,
-            'signaturePath': signaturePath,
-          },
-          auth: false,
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/Auth/register'),
+      );
+
+      request.headers['Accept'] = 'application/json';
+      request.fields.addAll({
+        'doctorName': doctorName,
+        'email': email,
+        'password': password,
+        'contactNumber': contactNumber,
+        'specialization': specialization,
+        'medicalCenterName': medicalCenterName,
+        'qualifications': qualifications,
+        'profession': profession,
+        'slmcRegNo': slmcRegNo,
+        'affiliation': affiliation,
+        'verificationDocumentType': verificationDocumentType,
+        'doctorDeclarationAccepted': doctorDeclarationAccepted.toString(),
+        'termsAccepted': termsAccepted.toString(),
+      });
+
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'slmcIdFront',
+          slmcIdFront.path,
+        ),
+      );
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'slmcIdBack',
+          slmcIdBack.path,
+        ),
+      );
+
+      final streamed = await request.send().timeout(
+            const Duration(seconds: 30),
+          );
+      final response = await http.Response.fromStream(streamed);
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw ApiErrorClassifier.fromHttpResponse(
+          statusCode: response.statusCode,
+          responseBody: response.body,
+          headers: response.headers,
         );
-
-        serverId = _extractServerDoctorId(response);
       }
 
-      int localDoctorId = existing?['id'] as int? ?? 0;
-
-      if (saveLocal) {
-        localDoctorId = await DatabaseHelper.instance.insertDoctor({
-          'server_id': serverId == 0 ? null : serverId,
-          'doctor_name': doctorName,
-          'contact_number': contactNumber,
-          'email': email,
-          'city': city,
-          'specialization': specialization,
-          'role': role,
-          'medical_center_name': medicalCenterName,
-          'clinic_address': clinicAddress,
-          'qualifications': qualifications,
-          'profession': profession,
-          'slmc_reg_no': slmcRegNo,
-          'affiliation': affiliation,
-          'signature_path': signaturePath,
-          'password': '',
-          'biometric_enabled': biometricEnabled,
-          'sync_status': online ? 'synced' : 'pending',
-          'updated_at': DateTime.now().toIso8601String(),
-          'created_at': DateTime.now().toIso8601String(),
-        });
-
-        await DoctorSession.saveDoctorSession({
-          'id': localDoctorId,
-          'doctor_name': doctorName,
-          'email': email,
-          'password': password,
-          'contact_number': contactNumber,
-          'specialization': specialization,
-          'role': role,
-          'medical_center_name': medicalCenterName,
-          'clinic_address': clinicAddress,
-          'qualifications': qualifications,
-          'profession': profession,
-          'slmc_reg_no': slmcRegNo,
-          'affiliation': affiliation,
-          'signature_path': signaturePath,
-          'biometric_enabled': biometricEnabled,
-        });
-
-        final doctorId = await DoctorSession.getDoctorId();
-
-        if (doctorId != null) {
-          await DatabaseHelper.instance.assignOldLocalDataToDoctor(doctorId);
-        }
-
-        await LicenseCacheService.saveLicense({
-          'isActive': true,
-          'isExpired': false,
-          'planName': online ? 'Trial' : 'Offline Trial',
-          'startDate': DateTime.now().toIso8601String(),
-          'endDate': DateTime.now()
-              .add(const Duration(days: 30))
-              .toIso8601String(),
-          'daysRemaining': 30,
-        });
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) {
+        throw ApiErrorClassifier.invalidResponse(
+          operation: 'POST /Auth/register',
+        );
       }
 
+      return Map<String, dynamic>.from(decoded);
+    } on TimeoutException {
       return {
-        'success': true,
-        'mode': online ? 'online' : 'offline',
-        'serverId': serverId,
-        'doctorId': serverId,
-        'localDoctorId': localDoctorId,
+        'success': false,
+        'message':
+            'Registration timed out. Check the connection and try again.',
+        'code': 'REGISTRATION_TIMEOUT',
+      };
+    } on SocketException {
+      return {
+        'success': false,
+        'message': 'The verification server could not be reached.',
+        'code': 'REGISTRATION_NETWORK_ERROR',
+      };
+    } on AppException catch (error) {
+      return {
+        'success': false,
+        'message': error.userMessage,
+        'code': error.code,
       };
     } catch (e) {
       return {
         'success': false,
-        'message': e.toString(),
+        'message': 'Registration could not be completed. Please try again.',
+        'code': 'REGISTRATION_UNEXPECTED_ERROR',
       };
     }
-  }
-
-  int _extractServerDoctorId(dynamic response) {
-    if (response is Map<String, dynamic>) {
-      final value = response['serverId'] ??
-          response['doctorId'] ??
-          response['id'] ??
-          response['data']?['id'] ??
-          response['doctor']?['id'];
-
-      if (value is int) return value;
-      if (value is String) return int.tryParse(value) ?? 0;
-    }
-
-    return 0;
   }
 
   Future<Map<String, dynamic>> login({
@@ -252,7 +237,8 @@ class ApiAuthService {
         'password': password,
         'contact_number': doctor['contactNumber'] ?? '',
         'specialization': doctor['specialization'] ?? '',
-        'role': doctor['role'] ?? doctor['Role'] ?? existing?['role'] ?? 'Doctor',
+        'role':
+            doctor['role'] ?? doctor['Role'] ?? existing?['role'] ?? 'Doctor',
         'medical_center_name': doctor['medicalCenterName'] ?? '',
         'clinic_address': doctor['clinicAddress'] ?? '',
         'qualifications':
@@ -275,7 +261,8 @@ class ApiAuthService {
         'success': true,
         'doctor': {
           ...doctor,
-          'role': doctor['role'] ?? doctor['Role'] ?? existing?['role'] ?? 'Doctor',
+          'role':
+              doctor['role'] ?? doctor['Role'] ?? existing?['role'] ?? 'Doctor',
           'localDoctorId': localDoctorId,
         },
         'token': token,

@@ -14,6 +14,9 @@ class ApiConfig {
   static const String cloudBaseUrl =
       'http://169.58.40.160:5219/API';
 
+    //   static const String cloudBaseUrl =
+    // 'https://api.yourdomain.com/api';
+
   // =========================================
   // LOCAL WIFI API
   // Computer IPv4 address = 192.168.8.91

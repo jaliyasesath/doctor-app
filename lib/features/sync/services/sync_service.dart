@@ -399,56 +399,34 @@ class SyncService {
       }
 
       try {
-        final apiResult = await _authApi.register(
-          doctorName: doctor['doctor_name']?.toString() ?? '',
+        // Doctor registration now requires live identity verification,
+        // including the SLMC/NIC front and back images and explicit consent.
+        // Therefore an old offline doctor record must never be registered
+        // automatically in the background. If the account already exists and
+        // is approved, login can safely reconnect the legacy local record.
+        final loginResult = await _authApi.login(
           email: email,
           password: password,
-          contactNumber: doctor['contact_number']?.toString() ?? '',
-          specialization: doctor['specialization']?.toString() ?? '',
-          role: doctor['role']?.toString() ?? 'Doctor',
-          qualifications: doctor['qualifications']?.toString() ?? '',
-          profession: doctor['profession']?.toString() ?? '',
-          slmcRegNo: doctor['slmc_reg_no']?.toString() ?? '',
-          affiliation: doctor['affiliation']?.toString() ?? '',
-          medicalCenterName: doctor['medical_center_name']?.toString() ?? '',
-          city: doctor['city']?.toString() ?? '',
-          clinicAddress: doctor['clinic_address']?.toString() ?? '',
-          biometricEnabled: doctor['biometric_enabled'] == 1 ? 1 : 0,
-          saveLocal: false,
         );
 
-        if (apiResult['success'] == true) {
-          final serverId = apiResult['serverId'] ?? apiResult['doctorId'] ?? 0;
-          await _db.markDoctorSynced(localId, serverId is int ? serverId : 0);
+        if (loginResult['success'] == true) {
+          final doctorData = loginResult['doctor'] as Map<String, dynamic>;
+          final serverId = doctorData['id'] ?? doctorData['serverId'] ?? 0;
+
+          await _db.markDoctorSynced(
+            localId,
+            serverId is int ? serverId : 0,
+          );
+
           result.doctorSuccess++;
           continue;
         }
 
-        final message = apiResult['message']?.toString() ?? '';
-
-        if (message.toLowerCase().contains('email already registered')) {
-          final loginResult = await _authApi.login(
-            email: email,
-            password: password,
-          );
-
-          if (loginResult['success'] == true) {
-            final doctorData = loginResult['doctor'] as Map<String, dynamic>;
-            final serverId = doctorData['id'] ?? doctorData['serverId'] ?? 0;
-
-            await _db.markDoctorSynced(
-              localId,
-              serverId is int ? serverId : 0,
-            );
-
-            result.doctorSuccess++;
-            continue;
-          }
-        }
-
         await _db.markDoctorSyncFailed(localId);
         result.doctorFailed++;
-        result.lastError = 'Doctor sync failed: $message';
+        result.lastError =
+            'Doctor registration requires online identity verification. '
+            'Open the registration screen and upload both ID images.';
       } catch (e) {
         await _db.markDoctorSyncFailed(localId);
         result.doctorFailed++;

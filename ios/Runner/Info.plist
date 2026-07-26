@@ -45,7 +45,10 @@
 
     <!-- Camera / QR Scanner -->
     <key>NSCameraUsageDescription</key>
-    <string>Camera access is required to scan patient QR codes.</string>
+    <string>Camera access is required to scan QR codes and capture doctor verification documents.</string>
+
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Photo library access is required to select doctor verification documents and signature images.</string>
 
     <!-- Performance -->
     <key>CADisableMinimumFrameDurationOnPhone</key>

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 
@@ -5,7 +7,6 @@ import '../../../core/widgets/app_error_ui.dart';
 import '../../dashboard/screens/home_screen.dart';
 import '../../license/data/license_api_service.dart';
 import '../../license/data/license_cache_service.dart';
-import '../../net_service/token_storage.dart';
 import '../../reception/screens/reception_dashboard_screen.dart';
 import '../data/api_auth_service.dart';
 import '../data/doctor_session.dart';
@@ -182,6 +183,15 @@ class _LoginScreenState extends State<LoginScreen> {
     return true;
   }
 
+  Future<void> _syncAfterLogin() async {
+    try {
+      await SyncService().syncAll();
+    } catch (_) {
+      // Login must not be blocked when background synchronization fails.
+      // Existing sync/error handling will retry when the app syncs again.
+    }
+  }
+
   Future<void> _login() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -195,8 +205,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    //await ConnectionModeService.setCloudMode();
-    await ConnectionModeService.setLocalWifiMode(); //local testing
+    // Local testing only. Avoid stopping/re-saving the same connection mode
+    // on every login attempt.
+    if (ConnectionModeService.getCurrentMode() != 'wifi') {
+      await ConnectionModeService.setLocalWifiMode();
+    }
+
+//     if (ConnectionModeService.getCurrentMode() != 'cloud') {
+//   await ConnectionModeService.setCloudMode();
+// } VPS HOST EKEDI MEKA USE KARANNOOO
 
     try {
       final result = await _apiAuthService.login(
@@ -219,22 +236,6 @@ class _LoginScreenState extends State<LoginScreen> {
       final mode = result['mode']?.toString() ?? 'online';
 
       if (mode == 'online') {
-        final savedToken = await TokenStorage.getToken();
-
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              savedToken == null || savedToken.isEmpty
-                  ? 'Token NOT saved'
-                  : 'Token saved OK',
-            ),
-          ),
-        );
-
-        await Future.delayed(const Duration(milliseconds: 400));
-
         final licenseOk = await _checkOnlineLicense();
         if (!licenseOk) return;
       } else {
@@ -261,8 +262,6 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
 
-      await SyncService().syncAll();
-
       if (!mounted) return;
 
       final displayName =
@@ -275,7 +274,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final role =
           doctor['role']?.toString() ?? doctor['Role']?.toString() ?? 'Doctor';
 
-      _navigateByRole(role);
+      await _navigateByRole(role);
+      unawaited(_syncAfterLogin());
     } catch (e) {
       if (!mounted) return;
 
@@ -445,9 +445,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          Color(0xFF063B91),
-                          Color(0xFF075EA8),
-                          Color(0xFF0A969B),
+                          Color(0xFF075E54),
+                          Color(0xFF0F766E),
+                          Color(0xFF22A06B),
                         ],
                       ),
                     ),
@@ -514,7 +514,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                                 boxShadow: const [
                                   BoxShadow(
-                                    color: Color(0x3300206A),
+                                    color: Color(0x33064E3B),
                                     blurRadius: 28,
                                     offset: Offset(0, 12),
                                   ),
@@ -531,7 +531,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       child: Center(
                                         child: Icon(
                                           Icons.local_hospital_rounded,
-                                          color: Color(0xFF075EA8),
+                                          color: Color(0xFF0F766E),
                                           size: 68,
                                         ),
                                       ),
@@ -620,7 +620,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         AutofillHints.email
                                       ],
                                       decoration: InputDecoration(
-                                        hintText: 'doctor@clinic.com',
+                                        hintText: '',
                                         prefixIcon: const Icon(
                                           Icons.mail_outline_rounded,
                                         ),
@@ -670,7 +670,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         if (!_isLoading) _login();
                                       },
                                       decoration: InputDecoration(
-                                        hintText: 'Enter your password',
+                                        hintText: '',
                                         prefixIcon: const Icon(
                                           Icons.lock_outline_rounded,
                                         ),

@@ -7,7 +7,6 @@ import '../data/api_auth_service.dart';
 import 'login_screen.dart';
 import '../../net_service/connection_mode_service.dart';
 
-
 class DoctorRegistrationScreen extends StatefulWidget {
   const DoctorRegistrationScreen({super.key});
 
@@ -35,15 +34,24 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
   final TextEditingController _professionController = TextEditingController();
   final TextEditingController _slmcRegNoController = TextEditingController();
   final TextEditingController _affiliationController = TextEditingController();
-  final TextEditingController _linkedDoctorEmailController =
-      TextEditingController();
 
   File? _signatureImage;
+  File? _slmcIdFrontImage;
+  File? _slmcIdBackImage;
 
   bool _isLoading = false;
   bool _obscurePassword = true;
-  bool _biometricEnabled = false;
-  String _selectedRole = 'Doctor';
+  bool _doctorDeclarationAccepted = false;
+  bool _termsAccepted = false;
+  String _verificationDocumentType = 'SLMCIdentityCard';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showRegistrationConditions();
+    });
+  }
 
   @override
   void dispose() {
@@ -57,7 +65,6 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     _professionController.dispose();
     _slmcRegNoController.dispose();
     _affiliationController.dispose();
-    _linkedDoctorEmailController.dispose();
     super.dispose();
   }
 
@@ -90,12 +97,131 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     });
   }
 
+  Future<void> _showRegistrationConditions() async {
+    if (!mounted) return;
+
+    final accepted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          icon: const Icon(
+            Icons.verified_user_outlined,
+            color: Color(0xFF0F766E),
+            size: 42,
+          ),
+          title: const Text('Doctor Account Registration'),
+          content: const SingleChildScrollView(
+            child: Text(
+              'This application is intended only for appropriately qualified '
+              'and registered medical practitioners.\n\n'
+              'You must provide accurate personal and professional details, '
+              'a valid SLMC registration number, and clear images of your '
+              'verification document.\n\n'
+              'Your account will remain pending until an administrator '
+              'checks the submitted documents and the SLMC register. False '
+              'or altered information may result in rejection or suspension.',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF0F766E),
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('I Understand and Continue'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (accepted != true && mounted) {
+      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _pickVerificationImage({required bool front}) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined),
+                title: const Text('Take a clear photo'),
+                onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Choose from gallery'),
+                onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (source == null) return;
+
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 88,
+        maxWidth: 2200,
+        maxHeight: 2200,
+      );
+      if (picked == null || !mounted) return;
+
+      setState(() {
+        if (front) {
+          _slmcIdFrontImage = File(picked.path);
+        } else {
+          _slmcIdBackImage = File(picked.path);
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Document image could not be selected: $error')),
+      );
+    }
+  }
+
   Future<void> _registerDoctor() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_slmcIdFrontImage == null || _slmcIdBackImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Upload both the front and back ID images.'),
+        ),
+      );
+      return;
+    }
+
+    if (!_doctorDeclarationAccepted || !_termsAccepted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Accept the doctor declaration and privacy terms to continue.',
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
-    //await ConnectionModeService.setCloudMode();
-    await ConnectionModeService.setLocalWifiMode();// for local testing
+    if (ConnectionModeService.getCurrentMode() != 'wifi') {
+      await ConnectionModeService.setLocalWifiMode(); // Local testing.
+    }
 
     try {
       final result = await _apiAuthService.register(
@@ -105,14 +231,19 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
         contactNumber: _contactNumberController.text.trim(),
         specialization: _specializationController.text.trim(),
         medicalCenterName: _medicalCenterNameController.text.trim(),
-        role: _selectedRole,
+        role: 'Doctor',
         qualifications: _qualificationsController.text.trim(),
         profession: _professionController.text.trim(),
         slmcRegNo: _slmcRegNoController.text.trim(),
         affiliation: _affiliationController.text.trim(),
-        linkedDoctorEmail: _linkedDoctorEmailController.text.trim(),
+        linkedDoctorEmail: '',
         signaturePath: _signatureImage?.path ?? '',
-        biometricEnabled: _biometricEnabled ? 1 : 0,
+        biometricEnabled: 0,
+        slmcIdFront: _slmcIdFrontImage!,
+        slmcIdBack: _slmcIdBackImage!,
+        verificationDocumentType: _verificationDocumentType,
+        doctorDeclarationAccepted: _doctorDeclarationAccepted,
+        termsAccepted: _termsAccepted,
       );
 
       if (!mounted) return;
@@ -120,22 +251,34 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
       setState(() => _isLoading = false);
 
       if (result['success'] == true) {
-        final mode = result['mode']?.toString() ?? '';
-
-        final roleText = _selectedRole == 'Reception'
-            ? 'Reception'
-            : 'Doctor';
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              mode == 'offline'
-                  ? '$roleText registered offline ✅'
-                  : '$roleText registered online ✅',
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => AlertDialog(
+            icon: const Icon(
+              Icons.hourglass_top_rounded,
+              color: Color(0xFF0F766E),
+              size: 44,
             ),
+            title: const Text('Verification Pending'),
+            content: Text(
+              result['message']?.toString() ??
+                  'Your registration was submitted. You can log in after an '
+                      'administrator verifies your SLMC details and ID images.',
+            ),
+            actions: [
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F766E),
+                ),
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Back to Login'),
+              ),
+            ],
           ),
         );
 
+        if (!mounted) return;
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -197,8 +340,14 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
         if (value == null || value.trim().isEmpty) {
           return 'Password is required';
         }
-        if (value.trim().length < 6) {
-          return 'Password must be at least 6 characters';
+        if (value.trim().length < 8) {
+          return 'Password must be at least 8 characters';
+        }
+        final strong = RegExp(
+          r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$',
+        ).hasMatch(value);
+        if (!strong) {
+          return 'Use upper/lower-case, a number and a special character';
         }
         return null;
       },
@@ -288,6 +437,164 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     );
   }
 
+  Widget _verificationDocumentPicker({
+    required String title,
+    required bool front,
+  }) {
+    final image = front ? _slmcIdFrontImage : _slmcIdBackImage;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F766E).withOpacity(0.055),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: image == null
+              ? const Color(0xFF0F766E).withOpacity(0.20)
+              : const Color(0xFF22A06B),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                image == null
+                    ? Icons.badge_outlined
+                    : Icons.check_circle_rounded,
+                color: const Color(0xFF0F766E),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  '$title *',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+          if (image != null) ...[
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.file(
+                image,
+                width: double.infinity,
+                height: 150,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ],
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () => _pickVerificationImage(front: front),
+            icon: Icon(
+              image == null ? Icons.add_a_photo_outlined : Icons.refresh,
+            ),
+            label: Text(image == null ? 'Add Image' : 'Change Image'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _verificationSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFDDE9E5)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF064E3B).withOpacity(0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Professional Identity Verification',
+            style: TextStyle(
+              color: Color(0xFF14213D),
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'Your account remains pending until an administrator checks these '
+            'documents against the SLMC register.',
+            style: TextStyle(color: Color(0xFF64748B), height: 1.35),
+          ),
+          const SizedBox(height: 14),
+          DropdownButtonFormField<String>(
+            value: _verificationDocumentType,
+            decoration: const InputDecoration(
+              labelText: 'Verification Document Type *',
+              prefixIcon: Icon(Icons.credit_card_outlined),
+            ),
+            items: const [
+              DropdownMenuItem(
+                value: 'SLMCIdentityCard',
+                child: Text('SLMC Identity Card'),
+              ),
+              DropdownMenuItem(
+                value: 'NationalIdentityCard',
+                child: Text('National Identity Card'),
+              ),
+            ],
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _verificationDocumentType = value);
+            },
+          ),
+          const SizedBox(height: 14),
+          _verificationDocumentPicker(
+            title: 'ID Front Photo',
+            front: true,
+          ),
+          const SizedBox(height: 12),
+          _verificationDocumentPicker(
+            title: 'ID Back Photo',
+            front: false,
+          ),
+          const SizedBox(height: 12),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            value: _doctorDeclarationAccepted,
+            onChanged: (value) {
+              setState(() => _doctorDeclarationAccepted = value ?? false);
+            },
+            title: const Text(
+              'I confirm that I am an appropriately qualified and registered '
+              'medical practitioner.',
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            value: _termsAccepted,
+            onChanged: (value) {
+              setState(() => _termsAccepted = value ?? false);
+            },
+            title: const Text(
+              'I accept the Terms of Use and Privacy Notice and consent to '
+              'processing these documents for verification.',
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _stampPreview() {
     final name = _doctorNameController.text.trim();
     final qualifications = _qualificationsController.text.trim();
@@ -340,11 +647,9 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isReception = _selectedRole == 'Reception';
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(isReception ? 'Register Reception' : 'Register Doctor'),
+        title: const Text('Register Doctor'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -364,9 +669,7 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    isReception
-                        ? 'Create Reception Account'
-                        : 'Create Doctor Account',
+                    'Create Doctor Account',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 24,
@@ -376,7 +679,7 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
                   const SizedBox(height: 22),
                   _field(
                     controller: _doctorNameController,
-                    label: isReception ? 'Reception Name' : 'Doctor Name',
+                    label: 'Doctor Name',
                     icon: Icons.person_outline,
                   ),
                   const SizedBox(height: 14),
@@ -389,43 +692,6 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
                   const SizedBox(height: 14),
                   _passwordField(),
                   const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    value: _selectedRole,
-                    decoration: InputDecoration(
-                      labelText: 'Account Role',
-                      prefixIcon:
-                          const Icon(Icons.admin_panel_settings_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'Doctor',
-                        child: Text('Doctor'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Reception',
-                        child: Text('Reception'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() {
-                        _selectedRole = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  if (isReception) ...[
-                    _field(
-                      controller: _linkedDoctorEmailController,
-                      label: 'Linked Doctor Email',
-                      icon: Icons.local_hospital_outlined,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 14),
-                  ],
                   _field(
                     controller: _contactNumberController,
                     label: 'Contact Number',
@@ -433,78 +699,69 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
                     keyboardType: TextInputType.phone,
                   ),
                   const SizedBox(height: 14),
-                  if (!isReception) ...[
-                    _field(
-                      controller: _medicalCenterNameController,
-                      label: 'Channeling Center Name',
-                      icon: Icons.local_hospital_outlined,
-                    ),
-                    const SizedBox(height: 14),
-                    _field(
-                      controller: _specializationController,
-                      label: 'Specialization',
-                      icon: Icons.medical_information_outlined,
-                      requiredField: false,
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Doctor Stamp Details',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _field(
-                      controller: _qualificationsController,
-                      label: 'Qualifications',
-                      icon: Icons.school_outlined,
-                      requiredField: false,
-                    ),
-                    const SizedBox(height: 14),
-                    _field(
-                      controller: _professionController,
-                      label: 'Profession / Specialty',
-                      icon: Icons.badge_outlined,
-                      requiredField: false,
-                    ),
-                    const SizedBox(height: 14),
-                    _field(
-                      controller: _slmcRegNoController,
-                      label: 'SLMC Registration Number',
-                      icon: Icons.confirmation_number_outlined,
-                      requiredField: false,
-                    ),
-                    const SizedBox(height: 14),
-                    _field(
-                      controller: _affiliationController,
-                      label: 'Affiliation / Hospital / Clinic',
-                      icon: Icons.apartment_outlined,
-                      requiredField: false,
-                      maxLines: 2,
-                    ),
-                    const SizedBox(height: 16),
-                    _signaturePicker(),
-                    const SizedBox(height: 16),
-                  ],
-                  SwitchListTile(
-                    value: _biometricEnabled,
-                    onChanged: (value) {
-                      setState(() => _biometricEnabled = value);
-                    },
-                    title: const Text('Enable Biometric Login'),
-                    subtitle: const Text('Fingerprint / Face / PIN fallback'),
-                    secondary: const Icon(Icons.fingerprint),
+                  _field(
+                    controller: _medicalCenterNameController,
+                    label: 'Channeling Center Name',
+                    icon: Icons.local_hospital_outlined,
                   ),
-                  if (!isReception) ...[
-                    const SizedBox(height: 14),
-                    _stampPreview(),
-                  ],
+                  const SizedBox(height: 14),
+                  _field(
+                    controller: _specializationController,
+                    label: 'Specialization',
+                    icon: Icons.medical_information_outlined,
+                    requiredField: false,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Doctor Stamp Details',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _field(
+                    controller: _qualificationsController,
+                    label: 'Qualifications',
+                    icon: Icons.school_outlined,
+                    requiredField: false,
+                  ),
+                  const SizedBox(height: 14),
+                  _field(
+                    controller: _professionController,
+                    label: 'Profession / Specialty',
+                    icon: Icons.badge_outlined,
+                    requiredField: false,
+                  ),
+                  const SizedBox(height: 14),
+                  _field(
+                    controller: _slmcRegNoController,
+                    label: 'SLMC Registration Number',
+                    icon: Icons.confirmation_number_outlined,
+                  ),
+                  const SizedBox(height: 14),
+                  _field(
+                    controller: _affiliationController,
+                    label: 'Affiliation / Hospital / Clinic',
+                    icon: Icons.apartment_outlined,
+                    requiredField: false,
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 16),
+                  _signaturePicker(),
+                  const SizedBox(height: 18),
+                  _verificationSection(),
+                  const SizedBox(height: 16),
+                  _stampPreview(),
                   const SizedBox(height: 24),
                   SizedBox(
                     height: 52,
                     child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _registerDoctor,
+                      onPressed: _isLoading ||
+                              !_doctorDeclarationAccepted ||
+                              !_termsAccepted
+                          ? null
+                          : _registerDoctor,
                       icon: _isLoading
                           ? const SizedBox(
                               width: 18,
@@ -517,10 +774,8 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
                           : const Icon(Icons.app_registration),
                       label: Text(
                         _isLoading
-                            ? 'Registering...'
-                            : isReception
-                                ? 'Register Reception'
-                                : 'Register Doctor',
+                            ? 'Submitting...'
+                            : 'Submit for Verification',
                         style: const TextStyle(fontSize: 16),
                       ),
                     ),
@@ -539,4 +794,3 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     );
   }
 }
-

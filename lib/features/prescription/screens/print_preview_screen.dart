@@ -20,19 +20,18 @@ class PrintPreviewScreen extends StatefulWidget {
   final bool allowBillSave;
 
   const PrintPreviewScreen({
-  super.key,
-  this.passedRxNo,
-  this.passedDate,
-  this.allowBillSave = false,
-});
+    super.key,
+    this.passedRxNo,
+    this.passedDate,
+    this.allowBillSave = false,
+  });
 
   @override
   State<PrintPreviewScreen> createState() => _PrintPreviewScreenState();
 }
 
 class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
-  final WifiThermalPrinterService _wifiPrinter =
-      WifiThermalPrinterService();
+  final WifiThermalPrinterService _wifiPrinter = WifiThermalPrinterService();
   //final BlueThermalPrinter printer = BlueThermalPrinter.instance;
 
   bool _isLoadingRx = true;
@@ -115,24 +114,24 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
       _isLoadingRx = false;
     });
   }
+
   Future<void> _checkAlreadyBilled() async {
-  final prescription =
-      await DatabaseHelper.instance.getPrescriptionByNo(rxNo);
+    final prescription =
+        await DatabaseHelper.instance.getPrescriptionByNo(rxNo);
 
-  final prescriptionId = prescription?['id'] as int?;
+    final prescriptionId = prescription?['id'] as int?;
 
-  if (prescriptionId == null) return;
+    if (prescriptionId == null) return;
 
-  final bill =
-      await DatabaseHelper.instance.getBillByPrescription(prescriptionId);
+    final bill =
+        await DatabaseHelper.instance.getBillByPrescription(prescriptionId);
 
-  if (!mounted) return;
+    if (!mounted) return;
 
-  setState(() {
-    _alreadyBilled = bill != null;
-  });
-}
-
+    setState(() {
+      _alreadyBilled = bill != null;
+    });
+  }
 
   // Future<void> _autoConnectPrinter() async {
   //   if (!Platform.isAndroid) return;
@@ -287,25 +286,23 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
   // }
 
   Future<void> _printNow() async {
-  if (_isLoadingRx || _isLoadingDoctor || rxNo.isEmpty || qrValue.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please wait, document is loading')),
-    );
-    return;
-  }
+    if (_isLoadingRx || _isLoadingDoctor || rxNo.isEmpty || qrValue.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please wait, document is loading')),
+      );
+      return;
+    }
 
-  if (Platform.isIOS) {
-    await _printWifiIos();
-  } else if (Platform.isAndroid) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Android Bluetooth print disabled in iOS build mode'),
-      ),
-    );
+    if (Platform.isIOS) {
+      await _printWifiIos();
+    } else if (Platform.isAndroid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Android Bluetooth print disabled in iOS build mode'),
+        ),
+      );
+    }
   }
-}
-
- 
 
   // Future<void> _printNow() async {
   //   if (_isLoadingRx || _isLoadingDoctor || rxNo.isEmpty || qrValue.isEmpty) {
@@ -332,7 +329,8 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
 
     if (printerIp.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please set WiFi printer IP address first')),
+        const SnackBar(
+            content: Text('Please set WiFi printer IP address first')),
       );
       return;
     }
@@ -404,74 +402,61 @@ GET WELL SOON
 //     ),
 //   );
 // }
- 
 
   Future<void> _saveBillIfNeeded() async {
     if (!widget.allowBillSave) {
-  return;
-}
-  final billItems = PrescriptionStore.items
-      .where((e) => !e.prescriptionOnly)
-      .toList();
+      return;
+    }
+    final billItems =
+        PrescriptionStore.items.where((e) => !e.prescriptionOnly).toList();
 
-  final consultationFee = PrescriptionStore.consultationFee;
+    final consultationFee = PrescriptionStore.consultationFee;
 
-  final medicineTotal = billItems.fold<double>(
-    0,
-    (sum, item) => sum + item.lineTotal,
-  );
-
-  final grandTotal = consultationFee + medicineTotal;
-
-  final existingPrescription =
-      await DatabaseHelper.instance.getPrescriptionByNo(rxNo);
-
-  final existingPrescriptionId =
-      existingPrescription?['id'] as int?;
-
-  bool shouldSaveBill = true;
-
-  if (existingPrescriptionId != null) {
-    final existingBill =
-        await DatabaseHelper.instance.getBillByPrescription(
-      existingPrescriptionId,
+    final medicineTotal = billItems.fold<double>(
+      0,
+      (sum, item) => sum + item.lineTotal,
     );
 
-    if (existingBill != null) {
-      shouldSaveBill = false;
+    final grandTotal = consultationFee + medicineTotal;
+
+    final existingPrescription =
+        await DatabaseHelper.instance.getPrescriptionByNo(rxNo);
+
+    final existingPrescriptionId = existingPrescription?['id'] as int?;
+
+    bool shouldSaveBill = true;
+
+    if (existingPrescriptionId != null) {
+      final existingBill = await DatabaseHelper.instance.getBillByPrescription(
+        existingPrescriptionId,
+      );
+
+      if (existingBill != null) {
+        shouldSaveBill = false;
+      }
+    }
+
+    final currentDoctorId = await DoctorSession.getDoctorId();
+
+    if (shouldSaveBill) {
+      await DatabaseHelper.instance.insertPrescriptionBill({
+        'doctor_id': existingPrescription?['doctor_id'] ?? currentDoctorId,
+        'patient_id': existingPrescription?['patient_id'],
+        'prescription_id': existingPrescriptionId,
+        'prescription_no': rxNo,
+        'consultation_fee': consultationFee,
+        'medicine_charges': medicineTotal,
+        'other_charges': 0,
+        'discount_amount': 0,
+        'total_amount': grandTotal,
+        'paid_amount': grandTotal,
+        'balance_amount': 0,
+        'payment_method': 'Cash',
+        'payment_status': 'Paid',
+        'notes': 'Bill generated from preview',
+      });
     }
   }
-
-  final currentDoctorId = await DoctorSession.getDoctorId();
-
-  if (shouldSaveBill) {
-    await DatabaseHelper.instance.insertPrescriptionBill({
-      'doctor_id': existingPrescription?['doctor_id'] ?? currentDoctorId,
-      'patient_id': existingPrescription?['patient_id'],
-      'prescription_id': existingPrescriptionId,
-      'prescription_no': rxNo,
-
-      'consultation_fee': consultationFee,
-      'medicine_charges': medicineTotal,
-      'other_charges': 0,
-      'discount_amount': 0,
-
-      'total_amount': grandTotal,
-      'paid_amount': grandTotal,
-      'balance_amount': 0,
-
-      'payment_method': 'Cash',
-      'payment_status': 'Paid',
-
-      'notes': 'Bill generated from preview',
-    });
-  }
-  
-}
-
-
-
- 
 
   bool _hasValidSignature() {
     return signaturePath.isNotEmpty && File(signaturePath).existsSync();
@@ -585,10 +570,8 @@ GET WELL SOON
                             ),
                           ),
                           Text('Dr. $doctorName'),
-                          if (specialization.isNotEmpty)
-                            Text(specialization),
-                          if (clinicAddress.isNotEmpty)
-                            Text(clinicAddress),
+                          if (specialization.isNotEmpty) Text(specialization),
+                          if (clinicAddress.isNotEmpty) Text(clinicAddress),
                         ],
                       ),
                     ),
@@ -606,40 +589,37 @@ GET WELL SOON
                     Text('Gender: ${PrescriptionStore.patientGender}'),
                     const Divider(height: 30),
                     Row(
-  children: [
-    Text(
-      _isBillMode
-          ? 'Bill Receipt'
-          : 'Prescription',
-      style: const TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-
-    if (_isBillMode && _alreadyBilled) ...[
-      const SizedBox(width: 10),
-      Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 10,
-          vertical: 4,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.orange.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const Text(
-          'Already Billed ✅',
-          style: TextStyle(
-            color: Colors.orange,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    ],
-  ],
-),
+                      children: [
+                        Text(
+                          _isBillMode ? 'Bill Receipt' : 'Prescription',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (_isBillMode && _alreadyBilled) ...[
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text(
+                              'Already Billed ✅',
+                              style: TextStyle(
+                                color: Colors.orange,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                     const SizedBox(height: 10),
                     if (items.isEmpty)
                       const Text('No medicines added')
@@ -649,59 +629,47 @@ GET WELL SOON
                         final item = entry.value;
 
                         return Padding(
-  padding: const EdgeInsets.only(bottom: 12),
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-
-      Text(
-        '$index. ${item.medicineName}',
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-
-      Text(
-        '${item.dosage} • ${item.frequency} • ${item.duration}',
-      ),
-
-      if (item.instructions.isNotEmpty &&
-          !_isBillMode)
-        Text(
-          'Instructions: ${item.instructions}',
-        ),
-
-      if (_isBillMode &&
-          !item.prescriptionOnly) ...[
-
-        const SizedBox(height: 4),
-
-        Row(
-          mainAxisAlignment:
-              MainAxisAlignment.spaceBetween,
-          children: [
-
-            Text(
-              'Qty: ${item.quantity}',
-            ),
-
-            Text(
-              'Rs. ${item.lineTotal.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ],
-    ],
-  ),
-);
-                                           }),
-
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '$index. ${item.medicineName}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                '${item.dosage} • ${item.frequency} • ${item.duration}',
+                              ),
+                              if (item.instructions.isNotEmpty && !_isBillMode)
+                                Text(
+                                  'Instructions: ${item.instructions}',
+                                ),
+                              if (_isBillMode && !item.prescriptionOnly) ...[
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Qty: ${item.quantity}',
+                                    ),
+                                    Text(
+                                      'Rs. ${item.lineTotal.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      }),
                     if (_isBillMode) ...[
                       const Divider(height: 30),
-
                       Builder(
                         builder: (_) {
                           final medicineTotal = items
@@ -712,14 +680,12 @@ GET WELL SOON
                               );
 
                           final consultationFee =
-    PrescriptionStore.consultationFee;
+                              PrescriptionStore.consultationFee;
 
-                          final grandTotal =
-                              consultationFee + medicineTotal;
+                          final grandTotal = consultationFee + medicineTotal;
 
                           return Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
                                 mainAxisAlignment:
@@ -731,9 +697,7 @@ GET WELL SOON
                                   ),
                                 ],
                               ),
-
                               const SizedBox(height: 8),
-
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
@@ -744,9 +708,7 @@ GET WELL SOON
                                   ),
                                 ],
                               ),
-
                               const Divider(),
-
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
@@ -770,7 +732,6 @@ GET WELL SOON
                         },
                       ),
                     ],
-
                     const Divider(height: 30),
                     _doctorStampPreview(),
                     const SizedBox(height: 16),
@@ -790,103 +751,125 @@ GET WELL SOON
                 ),
               ),
             ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            Expanded(
-  child: SizedBox(
-    height: 50,
-    child: OutlinedButton.icon(
-      icon: Icon(
-        _isBillMode
-            ? Icons.receipt_long
-            : Icons.payments,
-      ),
-      label: Text(
-        _isBillMode
-            ? 'Prescription'
-            : 'Bill',
-      ),
-      onPressed: () async {
-  setState(() {
-    _isBillMode = !_isBillMode;
-  });
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: Color(0xFFDCE9E5))),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        icon: Icon(
+                          _isBillMode ? Icons.receipt_long : Icons.payments,
+                        ),
+                        label: Text(
+                          _isBillMode ? 'Prescription View' : 'Bill View',
+                          maxLines: 1,
+                        ),
+                        onPressed: () async {
+                          setState(() => _isBillMode = !_isBillMode);
 
-  if (_isBillMode) {
-    final wasAlreadyBilled = _alreadyBilled;
-
-    await _saveBillIfNeeded();
-    await _checkAlreadyBilled();
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          wasAlreadyBilled
-              ? 'Bill already saved ✅ Income report not updated again'
-              : 'Bill saved successfully ✅',
-        ),
-        backgroundColor:
-            wasAlreadyBilled ? Colors.orange : Colors.green,
-      ),
-    );
-  }
-},
-    ),
-  ),
-),
-
-const SizedBox(width: 8),
-            Expanded(
-              child: SizedBox(
-                height: 50,
-                child: OutlinedButton.icon(
-                  icon: _isSharingPdf
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.share),
-                  label: Text(_isSharingPdf ? 'PDF...' : 'PDF'),
-                  onPressed: _isSharingPdf ? null : _sharePdf,
-                ),
+                          if (_isBillMode) {
+                            final wasAlreadyBilled = _alreadyBilled;
+                            await _saveBillIfNeeded();
+                            await _checkAlreadyBilled();
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  wasAlreadyBilled
+                                      ? 'Bill already saved. Income report was not updated again.'
+                                      : 'Bill saved successfully.',
+                                ),
+                                backgroundColor: wasAlreadyBilled
+                                    ? Colors.orange
+                                    : const Color(0xFF0F766E),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        icon: _isSharingPdf
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.picture_as_pdf_outlined),
+                        label: Text(
+                          _isSharingPdf ? 'Preparing...' : 'Share PDF',
+                          maxLines: 1,
+                        ),
+                        onPressed: _isSharingPdf ? null : _sharePdf,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: SizedBox(
-                height: 50,
-                child: ElevatedButton.icon(
-                  icon: _isSharingWhatsApp
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.chat),
-                  label: Text(_isSharingWhatsApp ? 'Wait...' : 'WhatsApp'),
-                  onPressed: _isSharingWhatsApp ? null : _shareWhatsApp,
-                ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        icon: _isSharingWhatsApp
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.chat),
+                        label: Text(
+                          _isSharingWhatsApp ? 'Preparing...' : 'WhatsApp',
+                          maxLines: 1,
+                        ),
+                        onPressed: _isSharingWhatsApp ? null : _shareWhatsApp,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F766E),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.print),
+                        label: const Text('Print Now', maxLines: 1),
+                        onPressed: _printNow,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF064E3B),
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: SizedBox(
-                height: 50,
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.print),
-                  label: const Text('Print'),
-                  onPressed: _printNow,
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

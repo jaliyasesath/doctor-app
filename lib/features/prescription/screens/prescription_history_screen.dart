@@ -8,7 +8,6 @@ import 'print_preview_screen.dart';
 import '../../reception/screens/reception_prescription_edit_screen.dart';
 
 class PrescriptionHistoryScreen extends StatefulWidget {
-
   final bool receptionMode;
 
   const PrescriptionHistoryScreen({
@@ -21,44 +20,43 @@ class PrescriptionHistoryScreen extends StatefulWidget {
       _PrescriptionHistoryScreenState();
 }
 
-class _PrescriptionHistoryScreenState
-    extends State<PrescriptionHistoryScreen> {
+class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
   List<Map<String, dynamic>> _prescriptions = [];
 
-bool _isLoading = true;
-bool _isLoadingMore = false;
-bool _hasMore = true;
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
 
-int? _doctorId;
+  int? _doctorId;
 
-final ScrollController _scrollController = ScrollController();
-Timer? _refreshTimer;
+  final ScrollController _scrollController = ScrollController();
+  Timer? _refreshTimer;
 
-final int _limit = 30;
-int _offset = 0;
+  final int _limit = 30;
+  int _offset = 0;
 
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  _initAndLoad();
-  _refreshTimer = Timer.periodic(
-  const Duration(seconds: 5),
-  (_) {
-    _loadPrescriptions();
-  },
-);
+    _initAndLoad();
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) {
+        _loadPrescriptions();
+      },
+    );
 
-  _scrollController.addListener(() {
-    if (_scrollController.position.pixels >=
-            _scrollController.position.maxScrollExtent - 200 &&
-        !_isLoadingMore &&
-        !_isLoading &&
-        _hasMore) {
-      _loadMorePrescriptions();
-    }
-  });
-}
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 200 &&
+          !_isLoadingMore &&
+          !_isLoading &&
+          _hasMore) {
+        _loadMorePrescriptions();
+      }
+    });
+  }
 
   Future<void> _initAndLoad() async {
     final doctorId = await DoctorSession.getDoctorId();
@@ -80,75 +78,73 @@ void initState() {
     await _loadPrescriptions(showLoader: true);
   }
 
- Future<void> _loadPrescriptions({bool showLoader = false}) async {
-  if (_doctorId == null) return;
+  Future<void> _loadPrescriptions({bool showLoader = false}) async {
+    if (_doctorId == null) return;
 
-  if (showLoader && mounted) {
-    setState(() {
-      _isLoading = true;
-    });
+    if (showLoader && mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    try {
+      final data = widget.receptionMode
+          ? await DatabaseHelper.instance.getPrescriptions()
+          : await DatabaseHelper.instance.getPrescriptionsByDoctorPaged(
+              _doctorId!,
+              limit: _limit,
+              offset: 0,
+            );
+
+      if (!mounted) return;
+
+      setState(() {
+        _prescriptions = List<Map<String, dynamic>>.from(data);
+        _offset = data.length;
+        _hasMore = data.length == _limit;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _isLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Load failed: $e')),
+      );
+    }
   }
 
-  try {
-    final data = widget.receptionMode
-    ? await DatabaseHelper.instance.getPrescriptions()
-    : await DatabaseHelper.instance.getPrescriptionsByDoctorPaged(
+  Future<void> _loadMorePrescriptions() async {
+    if (_doctorId == null || !_hasMore) return;
+
+    setState(() => _isLoadingMore = true);
+
+    try {
+      final data = await DatabaseHelper.instance.getPrescriptionsByDoctorPaged(
         _doctorId!,
         limit: _limit,
-        offset: 0,
+        offset: _offset,
+      );
+      debugPrint(
+        'Loaded more prescriptions: ${data.length}, offset: $_offset',
       );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _prescriptions = List<Map<String, dynamic>>.from(data);
-      _offset = data.length;
-      _hasMore = data.length == _limit;
-      _isLoading = false;
-    });
-  } catch (e) {
-    if (!mounted) return;
+      setState(() {
+        _prescriptions = List<Map<String, dynamic>>.from(_prescriptions)
+          ..addAll(data);
+        _offset += data.length;
+        _hasMore = data.length == _limit;
+        _isLoadingMore = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
 
-    setState(() => _isLoading = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Load failed: $e')),
-    );
+      setState(() => _isLoadingMore = false);
+    }
   }
-}
-
-Future<void> _loadMorePrescriptions() async {
-  if (_doctorId == null || !_hasMore) return;
-
-  setState(() => _isLoadingMore = true);
-
-  try {
-    final data =
-        await DatabaseHelper.instance.getPrescriptionsByDoctorPaged(
-      _doctorId!,
-      limit: _limit,
-      offset: _offset,
-    );
-    debugPrint(
-  'Loaded more prescriptions: ${data.length}, offset: $_offset',
-);
-
-    if (!mounted) return;
-
-    setState(() {
-     _prescriptions =
-    List<Map<String, dynamic>>.from(_prescriptions)
-      ..addAll(data);
-      _offset += data.length;
-      _hasMore = data.length == _limit;
-      _isLoadingMore = false;
-    });
-  } catch (e) {
-    if (!mounted) return;
-
-    setState(() => _isLoadingMore = false);
-  }
-}
 
   Future<void> _delete(int id) async {
     try {
@@ -252,19 +248,19 @@ Future<void> _loadMorePrescriptions() async {
   }
 
   Future<void> _openReceptionEdit(int prescriptionId) async {
-  final updated = await Navigator.push<bool>(
-    context,
-    MaterialPageRoute(
-      builder: (_) => ReceptionPrescriptionEditScreen(
-        prescriptionId: prescriptionId,
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ReceptionPrescriptionEditScreen(
+          prescriptionId: prescriptionId,
+        ),
       ),
-    ),
-  );
+    );
 
-  if (updated == true) {
-    await _loadPrescriptions();
+    if (updated == true) {
+      await _loadPrescriptions();
+    }
   }
-}
 
   Widget _buildCard(Map<String, dynamic> item) {
     final patientName = (item['patient_name'] ?? '').toString();
@@ -277,9 +273,16 @@ Future<void> _loadMorePrescriptions() async {
     final syncStatus = (item['sync_status'] ?? '').toString();
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: Color(0xFFDCE9E5)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           children: [
             ListTile(
@@ -311,44 +314,58 @@ Future<void> _loadMorePrescriptions() async {
                 ],
               ),
             ),
-            Row(
+            Column(
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: FilledButton.icon(
                     icon: const Icon(Icons.visibility),
-                    label: const Text('Open'),
+                    label: const Text('Open Prescription'),
                     onPressed: () => _open(item),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F766E),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.edit),
-                    label: const Text('Edit'),
-                    onPressed: widget.receptionMode
-    ? () => _openReceptionEdit(id)
-    : () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Edit feature will be connected next'),
-          ),
-        );
-      },
-                  ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Edit'),
+                        onPressed: widget.receptionMode
+                            ? () => _openReceptionEdit(id)
+                            : () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Edit feature will be connected next',
+                                    ),
+                                  ),
+                                );
+                              },
+                      ),
+                    ),
+                    if (!widget.receptionMode) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Delete'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(
+                              color: Color(0xFFFCA5A5),
+                            ),
+                          ),
+                          onPressed: () => _confirmDelete(id),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(width: 8),
-                if (!widget.receptionMode)
-  Expanded(
-    child: ElevatedButton.icon(
-      icon: const Icon(Icons.delete),
-      label: const Text('Delete'),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.red,
-        foregroundColor: Colors.white,
-      ),
-      onPressed: () => _confirmDelete(id),
-    ),
-  ),
               ],
             ),
           ],
@@ -362,16 +379,30 @@ Future<void> _loadMorePrescriptions() async {
   }
 
   @override
-void dispose() {
-  _refreshTimer?.cancel();
-  _scrollController.dispose();
-  super.dispose();
-}
+  void dispose() {
+    _refreshTimer?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF3F7F6),
       appBar: AppBar(
+        foregroundColor: Colors.white,
+        backgroundColor: const Color(0xFF064E3B),
+        flexibleSpace: const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF064E3B),
+                Color(0xFF0F766E),
+                Color(0xFF22A06B),
+              ],
+            ),
+          ),
+        ),
         title: Text('Prescription History (${_prescriptions.length})'),
       ),
       body: _isLoading
@@ -389,23 +420,22 @@ void dispose() {
               : RefreshIndicator(
                   onRefresh: _refresh,
                   child: ListView.builder(
-  controller: _scrollController,
+                    controller: _scrollController,
                     padding: const EdgeInsets.all(12),
-                    itemCount:
-    _prescriptions.length + (_isLoadingMore ? 1 : 0),
+                    itemCount: _prescriptions.length + (_isLoadingMore ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (index >= _prescriptions.length) {
-  return const Padding(
-    padding: EdgeInsets.all(16),
-    child: Center(
-      child: CircularProgressIndicator(),
-    ),
-  );
-}
+                        return const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
 
-final item = _prescriptions[index];
+                      final item = _prescriptions[index];
 
-return _buildCard(item);
+                      return _buildCard(item);
                     },
                   ),
                 ),

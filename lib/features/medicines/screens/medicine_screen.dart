@@ -176,10 +176,17 @@ class _MedicineScreenState extends State<MedicineScreen> {
   }
 
   Future<void> _openMedicineForm({Map<String, dynamic>? medicine}) async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MedicineFormScreen(medicine: medicine),
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => FractionallySizedBox(
+        heightFactor: 0.94,
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: MedicineFormScreen(medicine: medicine),
+        ),
       ),
     );
 
@@ -188,12 +195,14 @@ class _MedicineScreenState extends State<MedicineScreen> {
     }
   }
 
-  Future<void> _deleteMedicine(int id) async {
+  Future<bool> _deleteMedicine(
+    int id, {
+    bool reloadAfterDelete = true,
+  }) async {
     final role = await DoctorSession.getRole();
+    if (!mounted) return false;
 
     if (role.toLowerCase() == 'reception') {
-      if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -202,7 +211,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
         ),
       );
 
-      return;
+      return false;
     }
     final confirm = await showDialog<bool>(
       context: context,
@@ -223,17 +232,32 @@ class _MedicineScreenState extends State<MedicineScreen> {
       ),
     );
 
-    if (confirm != true) return;
+    if (confirm != true) return false;
 
-    await DatabaseHelper.instance.deleteMedicine(id);
+    try {
+      await DatabaseHelper.instance.deleteMedicine(id);
 
-    if (!mounted) return;
+      if (!mounted) return true;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Medicine deleted')),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Medicine deleted')),
+      );
 
-    await _loadMedicines();
+      if (reloadAfterDelete) {
+        await _loadMedicines();
+      }
+
+      return true;
+    } catch (e) {
+      if (!mounted) return false;
+
+      AppErrorUi.show(
+        context,
+        e,
+        onRetry: () => _deleteMedicine(id),
+      );
+      return false;
+    }
   }
 
   Future<void> _toggleFavorite(Map<String, dynamic> medicine) async {
@@ -270,74 +294,164 @@ class _MedicineScreenState extends State<MedicineScreen> {
         ? med['custom_dosage'].toString()
         : med['strength']?.toString() ?? '';
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+    final card = Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 12),
+      color: Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: Color(0xFFD1E7DF)),
       ),
-      child: ListTile(
-        leading: IconButton(
-          icon: Icon(
-            isFavorite ? Icons.star : Icons.star_border,
-            color: isFavorite ? Colors.amber : Colors.grey,
-          ),
-          onPressed: () => _toggleFavorite(med),
-        ),
-        title: Text(
-          medicineName,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (genericName.isNotEmpty) Text('Generic: $genericName'),
-            if (drugGroup.isNotEmpty)
-              Text(
-                'Group: $drugGroup',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            if (strength.isNotEmpty) Text('Strength: $strength'),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Icon(
-                  Icons.sync,
-                  size: 14,
-                  color: _statusColor(status),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => _openMedicineForm(medicine: med),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: ListTile(
+            leading: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0F766E), Color(0xFF22A06B)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  status,
-                  style: TextStyle(
-                    color: _statusColor(status),
-                    fontSize: 12,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.medication_rounded,
+                color: Colors.white,
+              ),
+            ),
+            title: Text(
+              medicineName,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF16352D),
+              ),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (genericName.isNotEmpty) Text('Generic: $genericName'),
+                if (drugGroup.isNotEmpty)
+                  Text(
+                    'Group: $drugGroup',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
+                if (strength.isNotEmpty) Text('Strength: $strength'),
+                const SizedBox(height: 5),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.sync,
+                      size: 14,
+                      color: _statusColor(status),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      status,
+                      style: TextStyle(
+                        color: _statusColor(status),
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Icon(
+                      Icons.touch_app_outlined,
+                      size: 14,
+                      color: Color(0xFF0F766E),
+                    ),
+                    const SizedBox(width: 3),
+                    const Text(
+                      'Tap to edit',
+                      style: TextStyle(
+                        color: Color(0xFF0F766E),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            if (value == 'edit') {
-              _openMedicineForm(medicine: med);
-            } else if (value == 'delete') {
-              _deleteMedicine(med['id'] as int);
-            }
-          },
-          itemBuilder: (_) => [
-            PopupMenuItem(
-              value: 'edit',
-              child: Text(isReception ? 'Edit Price' : 'Edit'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: isFavorite
+                      ? 'Remove from favourites'
+                      : 'Add to favourites',
+                  icon: Icon(
+                    isFavorite ? Icons.star : Icons.star_border,
+                    color: isFavorite ? Colors.amber : Colors.grey,
+                  ),
+                  onPressed: () => _toggleFavorite(med),
+                ),
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _openMedicineForm(medicine: med);
+                    } else if (value == 'delete') {
+                      _deleteMedicine(med['id'] as int);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Text(isReception ? 'Edit Price' : 'Edit'),
+                    ),
+                    if (!isReception)
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Text('Delete'),
+                      ),
+                  ],
+                ),
+              ],
             ),
-            if (!isReception)
-              const PopupMenuItem(
-                value: 'delete',
-                child: Text('Delete'),
+          ),
+        ),
+      ),
+    );
+
+    return Dismissible(
+      key: ValueKey('medicine-${med['id']}'),
+      direction:
+          isReception ? DismissDirection.none : DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        alignment: Alignment.centerRight,
+        decoration: BoxDecoration(
+          color: const Color(0xFFDC2626),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.delete_outline_rounded, color: Colors.white),
+            SizedBox(height: 3),
+            Text(
+              'Delete',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
               ),
+            ),
           ],
         ),
       ),
+      confirmDismiss: (_) => _deleteMedicine(
+        med['id'] as int,
+        reloadAfterDelete: false,
+      ),
+      onDismissed: (_) {
+        setState(() {
+          medicines.removeWhere((item) => item['id'] == med['id']);
+        });
+      },
+      child: card,
     );
   }
 
@@ -394,19 +508,33 @@ class _MedicineScreenState extends State<MedicineScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF3F7F6),
       appBar: AppBar(
-        title: Text('Medicines (${medicines.length})'),
-        actions: [
-          if (!isReception)
-            IconButton(
-              onPressed: () => _openMedicineForm(),
-              icon: const Icon(Icons.add),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Text(
+          'Medicines (${medicines.length})',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        flexibleSpace: const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF064E3B),
+                Color(0xFF0F766E),
+                Color(0xFF22A06B),
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
             ),
-        ],
+          ),
+        ),
       ),
       floatingActionButton: isReception
           ? null
           : FloatingActionButton.extended(
+              backgroundColor: const Color(0xFF0F766E),
+              foregroundColor: Colors.white,
               onPressed: () => _openMedicineForm(),
               icon: const Icon(Icons.add),
               label: const Text('Add Medicine'),
@@ -414,14 +542,30 @@ class _MedicineScreenState extends State<MedicineScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
+            Container(
+              margin: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFD1E7DF)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x12064E3B),
+                    blurRadius: 14,
+                    offset: Offset(0, 5),
+                  ),
+                ],
+              ),
               padding: const EdgeInsets.all(14),
               child: TextField(
                 controller: _searchController,
                 onChanged: _onSearchChanged,
                 decoration: InputDecoration(
                   hintText: 'Search medicine / group / brand',
-                  prefixIcon: const Icon(Icons.search),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: Color(0xFF0F766E),
+                  ),
                   suffixIcon: _searchController.text.isEmpty
                       ? null
                       : IconButton(
@@ -430,7 +574,10 @@ class _MedicineScreenState extends State<MedicineScreen> {
                         ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
                   ),
+                  filled: true,
+                  fillColor: const Color(0xFFF3F7F6),
                 ),
               ),
             ),
@@ -592,7 +739,20 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
       decoration: InputDecoration(
         labelText: requiredField ? '$label *' : label,
         hintText: hint,
-        prefixIcon: Icon(icon),
+        prefixIcon: Icon(icon, color: const Color(0xFF0F766E)),
+        filled: true,
+        fillColor: enabled ? Colors.white : const Color(0xFFE8F1EE),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFFD1E7DF)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: Color(0xFF0F766E),
+            width: 1.6,
+          ),
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
         ),
@@ -726,8 +886,27 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
             : 'Add Medicine';
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF3F7F6),
       appBar: AppBar(
-        title: Text(title),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        flexibleSpace: const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF064E3B),
+                Color(0xFF0F766E),
+                Color(0xFF22A06B),
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+          ),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -804,6 +983,12 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
                   ),
                   const SizedBox(height: 14),
                   SwitchListTile(
+                    activeThumbColor: const Color(0xFF0F766E),
+                    tileColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: const BorderSide(color: Color(0xFFD1E7DF)),
+                    ),
                     value: isFavorite,
                     onChanged: (value) {
                       setState(() => isFavorite = value);
@@ -819,6 +1004,13 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F766E),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
                       onPressed: saving ? null : _saveMedicine,
                       icon: saving
                           ? const SizedBox(

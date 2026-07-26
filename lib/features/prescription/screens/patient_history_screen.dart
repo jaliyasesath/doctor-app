@@ -128,9 +128,9 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFFCFFFE),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: const Color(0xFFDCE9E5)),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0A0F172A),
@@ -283,10 +283,22 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+      backgroundColor: const Color(0xFFF3F7F6),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF4F7FB),
+        foregroundColor: Colors.white,
+        backgroundColor: const Color(0xFF064E3B),
         surfaceTintColor: Colors.transparent,
+        flexibleSpace: const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF064E3B),
+                Color(0xFF0F766E),
+                Color(0xFF22A06B),
+              ],
+            ),
+          ),
+        ),
         title: const Text(
           'Patient History',
           style: TextStyle(fontWeight: FontWeight.w800),

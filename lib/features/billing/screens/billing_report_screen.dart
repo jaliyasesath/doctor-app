@@ -7,11 +7,13 @@ class BillingReportScreen extends StatefulWidget {
   const BillingReportScreen({super.key});
 
   @override
-  State<BillingReportScreen> createState() =>
-      _BillingReportScreenState();
+  State<BillingReportScreen> createState() => _BillingReportScreenState();
 }
 
 class _BillingReportScreenState extends State<BillingReportScreen> {
+  static const _green = Color(0xFF0F766E);
+  static const _deepGreen = Color(0xFF064E3B);
+  static const _surface = Color(0xFFF3F7F6);
   bool _isLoading = true;
 
   Map<String, dynamic> _summary = {};
@@ -40,11 +42,10 @@ class _BillingReportScreenState extends State<BillingReportScreen> {
       return;
     }
 
-    final summary = await DatabaseHelper.instance
-        .getTodayIncomeSummaryByDoctor(doctorId);
+    final summary =
+        await DatabaseHelper.instance.getTodayIncomeSummaryByDoctor(doctorId);
 
-    final bills =
-        await DatabaseHelper.instance.getTodayBillsByDoctor(doctorId);
+    final bills = await DatabaseHelper.instance.getTodayBillsByDoctor(doctorId);
 
     if (!mounted) return;
 
@@ -64,8 +65,9 @@ class _BillingReportScreenState extends State<BillingReportScreen> {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          color: const Color(0xFFFCFFFE),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFDCE9E5)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -76,7 +78,7 @@ class _BillingReportScreenState extends State<BillingReportScreen> {
         ),
         child: Column(
           children: [
-            Icon(icon, color: Colors.green),
+            Icon(icon, color: _green),
             const SizedBox(height: 8),
             Text(
               value,
@@ -105,13 +107,22 @@ class _BillingReportScreenState extends State<BillingReportScreen> {
     final billCount = _summary['bill_count'] ?? 0;
 
     final totalIncome = _toDouble(_summary['total_income']);
-    final consultationIncome =
-        _toDouble(_summary['consultation_income']);
+    final consultationIncome = _toDouble(_summary['consultation_income']);
     final medicineIncome = _toDouble(_summary['medicine_income']);
     final paidTotal = _toDouble(_summary['paid_total']);
 
     return Scaffold(
+      backgroundColor: _surface,
       appBar: AppBar(
+        foregroundColor: Colors.white,
+        backgroundColor: _deepGreen,
+        flexibleSpace: const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [_deepGreen, _green, Color(0xFF22A06B)],
+            ),
+          ),
+        ),
         title: const Text('Daily Income Report'),
         actions: [
           IconButton(
@@ -134,13 +145,11 @@ class _BillingReportScreenState extends State<BillingReportScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-
                   Row(
                     children: [
                       _summaryCard(
                         title: 'Total Income',
-                        value:
-                            'Rs. ${totalIncome.toStringAsFixed(2)}',
+                        value: 'Rs. ${totalIncome.toStringAsFixed(2)}',
                         icon: Icons.account_balance_wallet,
                       ),
                       const SizedBox(width: 10),
@@ -151,29 +160,23 @@ class _BillingReportScreenState extends State<BillingReportScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 10),
-
                   Row(
                     children: [
                       _summaryCard(
                         title: 'Channeling',
-                        value:
-                            'Rs. ${consultationIncome.toStringAsFixed(2)}',
+                        value: 'Rs. ${consultationIncome.toStringAsFixed(2)}',
                         icon: Icons.person,
                       ),
                       const SizedBox(width: 10),
                       _summaryCard(
                         title: 'Medicine',
-                        value:
-                            'Rs. ${medicineIncome.toStringAsFixed(2)}',
+                        value: 'Rs. ${medicineIncome.toStringAsFixed(2)}',
                         icon: Icons.medication,
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 18),
-
                   const Text(
                     'Today Bills',
                     style: TextStyle(
@@ -181,9 +184,7 @@ class _BillingReportScreenState extends State<BillingReportScreen> {
                       fontSize: 18,
                     ),
                   ),
-
                   const SizedBox(height: 10),
-
                   if (_bills.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(24),
@@ -193,18 +194,18 @@ class _BillingReportScreenState extends State<BillingReportScreen> {
                     )
                   else
                     ..._bills.map((bill) {
-                      final total =
-                          _toDouble(bill['total_amount']);
-                      final paid =
-                          _toDouble(bill['paid_amount']);
+                      final total = _toDouble(bill['total_amount']);
+                      final paid = _toDouble(bill['paid_amount']);
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 10),
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius:
-                              BorderRadius.circular(14),
+                          color: const Color(0xFFFCFFFE),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(
+                            color: const Color(0xFFDCE9E5),
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(
@@ -219,13 +220,12 @@ class _BillingReportScreenState extends State<BillingReportScreen> {
                           children: [
                             const Icon(
                               Icons.receipt_long,
-                              color: Colors.green,
+                              color: _green,
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     'Rx: ${bill['prescription_no'] ?? '-'}',
@@ -244,8 +244,7 @@ class _BillingReportScreenState extends State<BillingReportScreen> {
                               ),
                             ),
                             Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.end,
+                              crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Text(
                                   'Rs. ${total.toStringAsFixed(2)}',

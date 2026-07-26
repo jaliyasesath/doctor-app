@@ -317,6 +317,34 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
     }
   }
 
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'serving':
+        return const Color(0xFF0F766E);
+      case 'completed':
+        return const Color(0xFF16A34A);
+      case 'skipped':
+        return const Color(0xFFDC2626);
+      case 'waiting':
+      default:
+        return const Color(0xFFD97706);
+    }
+  }
+
+  Color _statusCardColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'serving':
+        return const Color(0xFFECFDF5);
+      case 'completed':
+        return const Color(0xFFF0FDF4);
+      case 'skipped':
+        return const Color(0xFFFEF2F2);
+      case 'waiting':
+      default:
+        return Colors.white;
+    }
+  }
+
   Widget _patientCard(
     Map<String, dynamic> p, {
     bool isPreviousPending = false,
@@ -331,95 +359,178 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
     final status = p['queueStatus']?.toString() ?? '';
     final queueDate = p['queueDate']?.toString() ?? '';
 
-    final isServing = status == 'Serving';
     final isCompleted = status == 'Completed';
     final isSkipped = status == 'Skipped';
 
+    final statusColor = _statusColor(status);
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      color: isServing
-          ? Colors.green.shade50
-          : isCompleted
-              ? Colors.blue.shade50
-              : isSkipped
-                  ? Colors.orange.shade50
-                  : Colors.white,
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 13),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isPreviousPending
+              ? const Color(0xFFFED7AA)
+              : statusColor.withOpacity(0.16),
+        ),
+      ),
+      color: isPreviousPending
+          ? const Color(0xFFFFFBEB)
+          : _statusCardColor(status),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                CircleAvatar(child: Text(queueNo)),
-                const SizedBox(width: 12),
-                Expanded(
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: statusColor,
                   child: Text(
-                    name.isEmpty ? 'Unnamed Patient' : name,
+                    queueNo,
                     style: const TextStyle(
-                        fontSize: 17, fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name.isEmpty ? 'Unnamed Patient' : name,
+                        style: const TextStyle(
+                          color: Color(0xFF14213D),
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Patient ID: $code',
+                        style: const TextStyle(
+                          color: Color(0xFF718096),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Chip(
-                  backgroundColor: isServing
-                      ? Colors.green
-                      : isCompleted
-                          ? Colors.blue
-                          : isSkipped
-                              ? Colors.orange
-                              : Colors.blueGrey,
+                  side: BorderSide.none,
+                  backgroundColor: statusColor,
                   label: Text(
                     status,
                     style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Text('Patient ID: $code'),
-            Text('Age/Gender: $age / $gender'),
-            if (phone.isNotEmpty) Text('Phone: $phone'),
-            if (queueDate.isNotEmpty)
-              Text(
-                'Queue Date: ${queueDate.split('T').first}',
-                style: TextStyle(
-                  color: isPreviousPending ? Colors.deepOrange : Colors.black54,
-                  fontWeight:
-                      isPreviousPending ? FontWeight.w600 : FontWeight.normal,
-                ),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.72),
+                borderRadius: BorderRadius.circular(14),
               ),
-            const SizedBox(height: 12),
-            if (isPreviousPending)
-              Wrap(
-                spacing: 8,
+              child: Wrap(
+                spacing: 16,
                 runSpacing: 8,
                 children: [
-                  ElevatedButton.icon(
-                    onPressed: () => _movePatientToToday(id),
-                    icon: const Icon(Icons.today),
-                    label: const Text('Move to Today'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => _completePatient(id),
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Complete'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: () => _skipPatient(id),
-                    icon: const Icon(Icons.remove_circle_outline),
-                    label: const Text('Remove'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
+                  _detailItem(Icons.cake_outlined, '$age years'),
+                  _detailItem(Icons.person_outline, gender),
+                  if (phone.isNotEmpty)
+                    _detailItem(Icons.phone_outlined, phone),
+                ],
+              ),
+            ),
+            if (queueDate.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 9),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.event_outlined,
+                      size: 16,
+                      color: isPreviousPending
+                          ? const Color(0xFFEA580C)
+                          : const Color(0xFF718096),
                     ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Queue Date: ${queueDate.split('T').first}',
+                      style: TextStyle(
+                        color: isPreviousPending
+                            ? const Color(0xFFEA580C)
+                            : const Color(0xFF718096),
+                        fontSize: 12,
+                        fontWeight: isPreviousPending
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 14),
+            if (isPreviousPending)
+              Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _movePatientToToday(id),
+                      icon: const Icon(Icons.today),
+                      label: const Text('Move to Today'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F766E),
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 9),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _completePatient(id),
+                          icon: const Icon(Icons.check_circle_outline),
+                          label: const Text('Complete'),
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _skipPatient(id),
+                          icon: const Icon(Icons.remove_circle_outline),
+                          label: const Text('Remove'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               )
             else
-              Row(
+              Column(
                 children: [
-                  Expanded(
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
                     child: ElevatedButton.icon(
                       onPressed: () async {
                         if (!isCompleted && !isSkipped) {
@@ -448,20 +559,42 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
                       },
                       icon: const Icon(Icons.open_in_new),
                       label: Text(isCompleted ? 'View' : 'Open'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F766E),
+                        foregroundColor: Colors.white,
+                      ),
                     ),
                   ),
                   if (_selectedTab == 'waiting') ...[
-                    const SizedBox(width: 10),
-                    OutlinedButton.icon(
-                      onPressed: () => _skipPatient(id),
-                      icon: const Icon(Icons.skip_next),
-                      label: const Text('Skip'),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton.icon(
-                      onPressed: () => _completePatient(id),
-                      icon: const Icon(Icons.check),
-                      label: const Text('Complete'),
+                    const SizedBox(height: 9),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _skipPatient(id),
+                            icon: const Icon(Icons.skip_next),
+                            label: const Text('Skip'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFDC2626),
+                              side: const BorderSide(
+                                color: Color(0xFFFCA5A5),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _completePatient(id),
+                            icon: const Icon(Icons.check),
+                            label: const Text('Complete'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF16A34A),
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ],
@@ -469,6 +602,24 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _detailItem(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: const Color(0xFF0F766E)),
+        const SizedBox(width: 5),
+        Text(
+          text,
+          style: const TextStyle(
+            color: Color(0xFF475569),
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 
@@ -504,6 +655,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
     }
 
     return RefreshIndicator(
+      color: const Color(0xFF0F766E),
       onRefresh: () => _reloadCurrentTab(silent: false),
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -513,7 +665,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
               icon: Icons.today,
               title: "Today's Patients",
               count: _patients.length,
-              color: Colors.blue,
+              color: const Color(0xFF0F766E),
             ),
             const SizedBox(height: 10),
           ],
@@ -558,32 +710,47 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
     required int count,
     required Color color,
   }) {
-    return Row(
-      children: [
-        Icon(icon, color: color),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 21),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: Color(0xFF14213D),
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-        ),
-        CircleAvatar(
-          radius: 14,
-          backgroundColor: color.withOpacity(0.12),
-          child: Text(
-            '$count',
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '$count',
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -594,7 +761,8 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Text(
         message,
@@ -612,56 +780,118 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen> {
             ? 'Skipped Patients'
             : 'Today Queue';
 
-    return Scaffold(
-      backgroundColor: const Color(0xfff6f8fb),
-      appBar: AppBar(
-        title: Text(title),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: () => _reloadCurrentTab(silent: false),
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(
-                  value: 'waiting',
-                  label: Text('Waiting'),
-                  icon: Icon(Icons.queue),
-                ),
-                ButtonSegment(
-                  value: 'completed',
-                  label: Text('Completed'),
-                  icon: Icon(Icons.check_circle_outline),
-                ),
-                ButtonSegment(
-                  value: 'skipped',
-                  label: Text('Skipped'),
-                  icon: Icon(Icons.skip_next),
-                ),
-              ],
-              selected: {_selectedTab},
-              onSelectionChanged: (value) {
-                final selected = value.first;
+    final greenScheme = ColorScheme.fromSeed(
+      seedColor: const Color(0xFF0F766E),
+      brightness: Theme.of(context).brightness,
+    );
 
-                if (selected == 'completed') {
-                  _loadCompleted(silent: false);
-                } else if (selected == 'skipped') {
-                  _loadSkipped(silent: false);
-                } else {
-                  _loadWaiting(silent: false);
-                }
-              },
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: greenScheme,
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
-          Expanded(child: _body()),
-        ],
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF3F7F6),
+        appBar: AppBar(
+          elevation: 0,
+          foregroundColor: Colors.white,
+          backgroundColor: const Color(0xFF075E54),
+          surfaceTintColor: Colors.transparent,
+          flexibleSpace: const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF075E54),
+                  Color(0xFF0F766E),
+                  Color(0xFF22A06B),
+                ],
+              ),
+            ),
+          ),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          actions: [
+            IconButton(
+              tooltip: 'Refresh',
+              onPressed: () => _reloadCurrentTab(silent: false),
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(12, 14, 12, 4),
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFDCE9E5)),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF0F766E).withOpacity(0.08),
+                    blurRadius: 18,
+                    offset: const Offset(0, 7),
+                  ),
+                ],
+              ),
+              child: SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(
+                    value: 'waiting',
+                    label: Text('Waiting'),
+                    icon: Icon(Icons.queue),
+                  ),
+                  ButtonSegment(
+                    value: 'completed',
+                    label: Text('Completed'),
+                    icon: Icon(Icons.check_circle_outline),
+                  ),
+                  ButtonSegment(
+                    value: 'skipped',
+                    label: Text('Skipped'),
+                    icon: Icon(Icons.skip_next),
+                  ),
+                ],
+                selected: {_selectedTab},
+                showSelectedIcon: false,
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  side: WidgetStateProperty.all(BorderSide.none),
+                  shape: WidgetStateProperty.all(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                  ),
+                ),
+                onSelectionChanged: (value) {
+                  final selected = value.first;
+
+                  if (selected == 'completed') {
+                    _loadCompleted(silent: false);
+                  } else if (selected == 'skipped') {
+                    _loadSkipped(silent: false);
+                  } else {
+                    _loadWaiting(silent: false);
+                  }
+                },
+              ),
+            ),
+            Expanded(child: _body()),
+          ],
+        ),
       ),
     );
   }

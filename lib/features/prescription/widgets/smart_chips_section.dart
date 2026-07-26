@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 
@@ -40,68 +41,62 @@ class _SmartChipsSectionState extends State<SmartChipsSection> {
   late List<String> selectedAllergies;
   late List<String> selectedDiseases;
 
- @override
-void initState() {
-  super.initState();
+  @override
+  void initState() {
+    super.initState();
 
-  selectedAllergies = List.from(widget.initialAllergies);
-  selectedDiseases = List.from(widget.initialDiseases);
+    selectedAllergies = List<String>.from(widget.initialAllergies);
+    selectedDiseases = List<String>.from(widget.initialDiseases);
 
-  for (final item in selectedAllergies) {
-    if (!allergyOptions.contains(item)) {
-      allergyOptions.add(item);
+    for (final item in selectedAllergies) {
+      if (!allergyOptions.contains(item)) {
+        allergyOptions.add(item);
+      }
     }
-  }
 
-  for (final item in selectedDiseases) {
-    if (!diseaseOptions.contains(item)) {
-      diseaseOptions.add(item);
+    for (final item in selectedDiseases) {
+      if (!diseaseOptions.contains(item)) {
+        diseaseOptions.add(item);
+      }
     }
+
+    _loadSavedClinicalChips();
   }
-
-  _loadSavedClinicalChips();
-}
-
-  
 
   void _notifyParent() {
     widget.onChanged(selectedAllergies, selectedDiseases);
   }
 
   Future<void> _loadSavedClinicalChips() async {
-  final doctorId = await DoctorSession.getDoctorId();
-  if (doctorId == null) return;
+    final doctorId = await DoctorSession.getDoctorId();
+    if (doctorId == null) return;
 
-  final allergies =
-      await DatabaseHelper.instance.getClinicalChips(
-    doctorId: doctorId,
-    category: 'allergies',
-  );
+    final allergies = await DatabaseHelper.instance.getClinicalChips(
+      doctorId: doctorId,
+      category: 'allergies',
+    );
 
-  final diseases =
-      await DatabaseHelper.instance.getClinicalChips(
-    doctorId: doctorId,
-    category: 'chronic diseases',
-  );
+    final diseases = await DatabaseHelper.instance.getClinicalChips(
+      doctorId: doctorId,
+      category: 'chronic diseases',
+    );
 
-  if (!mounted) return;
+    if (!mounted) return;
 
-  setState(() {
-    for (final item in allergies) {
-      if (!allergyOptions.contains(item)) {
-        allergyOptions.add(item);
+    setState(() {
+      for (final item in allergies) {
+        if (!allergyOptions.contains(item)) {
+          allergyOptions.add(item);
+        }
       }
-    }
 
-    for (final item in diseases) {
-      if (!diseaseOptions.contains(item)) {
-        diseaseOptions.add(item);
+      for (final item in diseases) {
+        if (!diseaseOptions.contains(item)) {
+          diseaseOptions.add(item);
+        }
       }
-    }
-  });
-}
-
-  
+    });
+  }
 
   Future<void> _addCustomChip({
     required String title,
@@ -144,14 +139,16 @@ void initState() {
     if (value == null || value.trim().isEmpty) return;
 
     final cleanValue = value.trim();
-   final doctorId = await DoctorSession.getDoctorId();
-if (doctorId == null) return;
+    final doctorId = await DoctorSession.getDoctorId();
+    if (doctorId == null) return;
 
-await DatabaseHelper.instance.insertClinicalChip(
-  doctorId: doctorId,
-  category: title.toLowerCase(),
-  value: cleanValue,
-);
+    await DatabaseHelper.instance.insertClinicalChip(
+      doctorId: doctorId,
+      category: title.toLowerCase(),
+      value: cleanValue,
+    );
+
+    if (!mounted) return;
 
     setState(() {
       if (!options.contains(cleanValue)) {
@@ -167,103 +164,100 @@ await DatabaseHelper.instance.insertClinicalChip(
   }
 
   Future<void> _deleteCustomChip({
-  required String title,
-  required String value,
-  required List<String> options,
-  required List<String> selectedList,
-}) async {
-  final doctorId = await DoctorSession.getDoctorId();
-  if (doctorId == null) return;
+    required String title,
+    required String value,
+    required List<String> options,
+    required List<String> selectedList,
+  }) async {
+    final doctorId = await DoctorSession.getDoctorId();
+    if (doctorId == null) return;
 
-  final confirm = await showDialog<bool>(
-    context: context,
-    builder: (_) {
-      return AlertDialog(
-        title: const Text('Delete Chip'),
-        content: Text(
-          'Delete "$value" from $title?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text('Delete Chip'),
+          content: Text('Delete "$value" from $title?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
             ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      );
-    },
-  );
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
 
-  if (confirm != true) return;
+    if (confirm != true) return;
 
-  await DatabaseHelper.instance.deleteClinicalChip(
-    doctorId: doctorId,
-    category: title.toLowerCase(),
-    value: value,
-  );
+    await DatabaseHelper.instance.deleteClinicalChip(
+      doctorId: doctorId,
+      category: title.toLowerCase(),
+      value: value,
+    );
 
-  setState(() {
-    options.remove(value);
-    selectedList.remove(value);
-  });
+    if (!mounted) return;
 
-  _notifyParent();
-}
+    setState(() {
+      options.remove(value);
+      selectedList.remove(value);
+    });
+
+    _notifyParent();
+  }
 
   Widget _chip({
-  required String title,
-  required String label,
-  required bool selected,
-  required VoidCallback onTap,
-  required List<String> options,
-  required List<String> selectedList,
-}) {
-  final isDefault =
-      title == 'Allergies'
-          ? [
-              'Penicillin',
-              'NSAIDs',
-              'Sulfa',
-              'Dust',
-              'Food',
-              'Seafood',
-            ].contains(label)
-          : [
-              'Diabetes',
-              'Hypertension',
-              'Asthma',
-              'CKD',
-              'Heart Disease',
-              'Gastritis',
-            ].contains(label);
+    required String title,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+    required List<String> options,
+    required List<String> selectedList,
+  }) {
+    final isDefault = title == 'Allergies'
+        ? [
+            'Penicillin',
+            'NSAIDs',
+            'Sulfa',
+            'Dust',
+            'Food',
+            'Seafood',
+          ].contains(label)
+        : [
+            'Diabetes',
+            'Hypertension',
+            'Asthma',
+            'CKD',
+            'Heart Disease',
+            'Gastritis',
+          ].contains(label);
 
-  return GestureDetector(
-    onLongPress: isDefault
-        ? null
-        : () {
-            _deleteCustomChip(
-              title: title,
-              value: label,
-              options: options,
-              selectedList: selectedList,
-            );
-          },
-    child: FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => onTap(),
-      avatar: selected
-          ? const Icon(Icons.check, size: 16)
-          : null,
-    ),
-  );
-}
+    return GestureDetector(
+      onLongPress: isDefault
+          ? null
+          : () {
+              _deleteCustomChip(
+                title: title,
+                value: label,
+                options: options,
+                selectedList: selectedList,
+              );
+            },
+      child: FilterChip(
+        label: Text(label),
+        selected: selected,
+        onSelected: (_) => onTap(),
+        avatar: selected ? const Icon(Icons.check, size: 16) : null,
+      ),
+    );
+  }
 
   Widget _buildChips({
     required String title,
@@ -276,7 +270,7 @@ await DatabaseHelper.instance.insertClinicalChip(
       children: [
         Row(
           children: [
-            Icon(icon, size: 18, color: Colors.blue),
+            Icon(icon, size: 18, color: const Color(0xFF0F766E)),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
@@ -301,31 +295,36 @@ await DatabaseHelper.instance.insertClinicalChip(
           ],
         ),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          children: options.map((item) {
-            final selected = selectedList.contains(item);
+        SizedBox(
+          height: 42,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: options.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final item = options[index];
+              final selected = selectedList.contains(item);
 
-           return _chip(
-  title: title,
-  label: item,
-  selected: selected,
-  onTap: () {
-    setState(() {
-      if (selected) {
-        selectedList.remove(item);
-      } else {
-        selectedList.add(item);
-      }
-    });
+              return _chip(
+                title: title,
+                label: item,
+                selected: selected,
+                onTap: () {
+                  setState(() {
+                    if (selected) {
+                      selectedList.remove(item);
+                    } else {
+                      selectedList.add(item);
+                    }
+                  });
 
-    _notifyParent();
-  },
-  options: options,
-  selectedList: selectedList,
-);
-          }).toList(),
+                  _notifyParent();
+                },
+                options: options,
+                selectedList: selectedList,
+              );
+            },
+          ),
         ),
       ],
     );
@@ -334,7 +333,7 @@ await DatabaseHelper.instance.insertClinicalChip(
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: Colors.blue.withOpacity(0.04),
+      color: const Color(0xFF0F766E).withOpacity(0.04),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
       ),
@@ -345,7 +344,7 @@ await DatabaseHelper.instance.insertClinicalChip(
           children: [
             const Row(
               children: [
-                Icon(Icons.auto_awesome, color: Colors.blue),
+                Icon(Icons.auto_awesome, color: Color(0xFF0F766E)),
                 SizedBox(width: 8),
                 Text(
                   'Smart Medical Assist',

@@ -26,6 +26,7 @@ import '../../followup/screens/follow_up_screen.dart';
 import '../../billing/screens/billing_report_screen.dart';
 import '../../license/screens/license_gate_screen.dart';
 import '../../license/data/license_service.dart';
+import '../../reception/screens/manage_reception_accounts_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,6 +36,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const Color _primaryGreen = Color(0xFF0F766E);
+  static const Color _deepGreen = Color(0xFF064E3B);
+  static const Color _freshGreen = Color(0xFF22A06B);
+  static const Color _ink = Color(0xFF14213D);
+  static const Color _mutedText = Color(0xFF64748B);
+  static const Color _surface = Color(0xFFF4F8F7);
+
   final LicenseApiService _licenseApiService = LicenseApiService();
 
   bool _isSyncing = false;
@@ -429,6 +437,9 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'Hotspot QR':
         screen = const DoctorHotspotQrScreen();
         break;
+      case 'Reception Accounts':
+        screen = const ManageReceptionAccountsScreen();
+        break;
     }
 
     if (screen != null) {
@@ -621,12 +632,13 @@ class _HomeScreenState extends State<HomeScreen> {
   BoxDecoration _cardDecoration() {
     return BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(color: const Color(0xFFE4ECE9)),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.045),
-          blurRadius: 16,
-          offset: const Offset(0, 6),
+          color: _deepGreen.withOpacity(0.055),
+          blurRadius: 24,
+          offset: const Offset(0, 10),
         ),
       ],
     );
@@ -672,124 +684,203 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _headerCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
+      clipBehavior: Clip.antiAlias,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            Color(0xFF0F4CBF),
-            Color(0xFF1769E0),
-            Color(0xFF0F766E),
-          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF064E3B),
+            Color(0xFF0B6B61),
+            Color(0xFF22A06B),
+          ],
         ),
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(32),
           bottomRight: Radius.circular(32),
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      child: Stack(
+        clipBehavior: Clip.antiAlias,
+        children: [
+          Positioned(
+            top: -80,
+            right: -65,
+            child: Container(
+              width: 210,
+              height: 210,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.06),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.10),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 120,
+            left: -75,
+            child: Container(
+              width: 165,
+              height: 165,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.05),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.08),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            bottom: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const CircleAvatar(
-                  radius: 28,
-                  backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.local_hospital,
-                    color: Color(0xFF1769E0),
-                    size: 32,
+                Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.10),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.local_hospital_rounded,
+                        color: _primaryGreen,
+                        size: 31,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${_getGreeting()},',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                          Text(
+                            'Dr. $_doctorName',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 25,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _headerActionButton(
+                      icon: Icons.settings_outlined,
+                      tooltip: 'Connection settings',
+                      onTap: _showConnectionModeDialog,
+                    ),
+                    const SizedBox(width: 8),
+                    _headerActionButton(
+                      icon: Icons.logout_rounded,
+                      tooltip: 'Logout',
+                      onTap: _logout,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  _getFormattedToday(),
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${_getGreeting()},',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        'Dr. $_doctorName',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 25,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 6),
+                Text(
+                  _getHeaderMessage(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                IconButton(
-                  onPressed: _showConnectionModeDialog,
-                  icon: const Icon(Icons.settings, color: Colors.white),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _statusPill(
+                        icon: _connectionOnline
+                            ? Icons.cloud_done
+                            : Icons.cloud_off,
+                        text: _connectionOnline
+                            ? 'Cloud Mode • Online'
+                            : 'Offline Mode Active',
+                        color: _connectionOnline
+                            ? Colors.greenAccent
+                            : Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _statusPill(
+                        icon: Icons.verified_user,
+                        text: '$_planName • $_daysRemaining days',
+                        color:
+                            _daysRemaining <= 7 ? Colors.orange : Colors.white,
+                      ),
+                    ),
+                  ],
                 ),
-                IconButton(
-                  onPressed: _logout,
-                  icon: const Icon(Icons.logout, color: Colors.white),
+                const SizedBox(height: 10),
+                _statusPill(
+                  icon: Icons.sync,
+                  text: _pendingSyncCount == 0
+                      ? 'All data synced'
+                      : '$_pendingSyncCount record(s) pending sync',
+                  color: _pendingSyncCount == 0
+                      ? Colors.greenAccent
+                      : Colors.amber,
                 ),
               ],
             ),
-            const SizedBox(height: 18),
-            Text(
-              _getFormattedToday(),
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              _getHeaderMessage(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: _statusPill(
-                    icon:
-                        _connectionOnline ? Icons.cloud_done : Icons.cloud_off,
-                    text: _connectionOnline
-                        ? 'Cloud Mode • Online'
-                        : 'Offline Mode Active',
-                    color:
-                        _connectionOnline ? Colors.greenAccent : Colors.orange,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _statusPill(
-                    icon: Icons.verified_user,
-                    text: '$_planName • $_daysRemaining days',
-                    color: _daysRemaining <= 7 ? Colors.orange : Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            _statusPill(
-              icon: Icons.sync,
-              text: _pendingSyncCount == 0
-                  ? 'All data synced'
-                  : '$_pendingSyncCount record(s) pending sync',
-              color: _pendingSyncCount == 0 ? Colors.greenAccent : Colors.amber,
-            ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _headerActionButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.13),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withOpacity(0.16)),
+          ),
+          child: Icon(icon, color: Colors.white, size: 21),
         ),
       ),
     );
@@ -803,9 +894,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.white.withOpacity(0.18)),
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.16)),
       ),
       child: Row(
         children: [
@@ -832,30 +923,45 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () => _navigate('Today Queue'),
       borderRadius: BorderRadius.circular(24),
       child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 18, 16, 8),
-        padding: const EdgeInsets.all(20),
+        margin: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFFFF6D00), Color(0xFFFF9800)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0F766E),
+              Color(0xFF168A70),
+              Color(0xFF22A06B),
+            ],
           ),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: Colors.white.withOpacity(0.14)),
           boxShadow: [
             BoxShadow(
-              color: Colors.orange.withOpacity(0.25),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
+              color: const Color(0xFF0F766E).withOpacity(0.25),
+              blurRadius: 22,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
-        child: const Row(
+        child: Row(
           children: [
-            CircleAvatar(
-              radius: 31,
-              backgroundColor: Colors.white,
-              child: Icon(Icons.groups, color: Color(0xFFFF6D00), size: 34),
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.all(Radius.circular(18)),
+              ),
+              child: Icon(
+                Icons.groups_rounded,
+                color: _primaryGreen,
+                size: 31,
+              ),
             ),
-            SizedBox(width: 16),
-            Expanded(
+            const SizedBox(width: 16),
+            const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -875,7 +981,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios, color: Colors.white),
+            const Icon(Icons.arrow_forward_rounded, color: Colors.white),
           ],
         ),
       ),
@@ -885,7 +991,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _queueSummaryCard() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
       decoration: _cardDecoration(),
       child: Column(
         children: [
@@ -894,7 +1000,11 @@ class _HomeScreenState extends State<HomeScreen> {
               const Expanded(
                 child: Text(
                   "Today's Queue Summary",
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: _ink,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
               TextButton(
@@ -910,25 +1020,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 'Waiting',
                 _queueSummary['waiting'].toString(),
                 Icons.groups,
-                Colors.deepOrange,
+                Color(0xFFD97706),
               ),
               _queueMini(
                 'Serving',
                 _queueSummary['serving'].toString(),
                 Icons.person,
-                Colors.green,
+                _freshGreen,
               ),
               _queueMini(
                 'Completed',
                 _queueSummary['completed'].toString(),
                 Icons.check_circle,
-                Colors.blue,
+                _primaryGreen,
               ),
               _queueMini(
                 'Skipped',
                 _queueSummary['skipped'].toString(),
                 Icons.close,
-                Colors.red,
+                Color(0xFFDC5A5A),
               ),
             ],
           ),
@@ -939,22 +1049,31 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _queueMini(String title, String value, IconData icon, Color color) {
     return Expanded(
-      child: Column(
-        children: [
-          CircleAvatar(
-            backgroundColor: color.withOpacity(0.13),
-            child: Icon(icon, color: color, size: 21),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          Text(
-            title,
-            style: const TextStyle(fontSize: 11, color: Colors.black54),
-          ),
-        ],
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.075),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(
+                color: _ink,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 11, color: _mutedText),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -968,27 +1087,36 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: _cardDecoration(),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(icon, color: color, size: 22),
-              const SizedBox(width: 8),
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 11),
               Expanded(
                 child: Text(
                   title,
                   style: const TextStyle(
                     fontSize: 17,
-                    fontWeight: FontWeight.bold,
+                    color: _ink,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
               if (subtitle != null)
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 12, color: Colors.black45),
+                  style: const TextStyle(fontSize: 12, color: _mutedText),
                 ),
             ],
           ),
@@ -1031,15 +1159,22 @@ class _HomeScreenState extends State<HomeScreen> {
         height: 125,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: color.withOpacity(0.10)),
+          border: Border.all(color: color.withOpacity(0.18)),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.055),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Row(
           children: [
             CircleAvatar(
               radius: 30,
-              backgroundColor: color.withOpacity(0.18),
+              backgroundColor: color.withOpacity(0.11),
               child: Icon(icon, color: color, size: 30),
             ),
             const SizedBox(width: 16),
@@ -1053,7 +1188,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontWeight: FontWeight.bold,
+                      color: _ink,
+                      fontWeight: FontWeight.w800,
                       fontSize: 18,
                     ),
                   ),
@@ -1063,7 +1199,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Colors.black54,
+                      color: _mutedText,
                       fontSize: 14,
                       height: 1.3,
                     ),
@@ -1117,8 +1253,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             children: [
               const CircleAvatar(
-                backgroundColor: Color(0xFFEFF6FF),
-                child: Icon(Icons.trending_up, color: Colors.blue),
+                backgroundColor: Color(0xFFE8F5F1),
+                child: Icon(Icons.trending_up, color: _primaryGreen),
               ),
               const SizedBox(width: 12),
               const Expanded(
@@ -1196,7 +1332,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: Colors.blue.withOpacity(0.08),
+                      color: _primaryGreen.withOpacity(0.09),
                     ),
                   ),
                   child: Row(
@@ -1205,12 +1341,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.10),
+                          color: _primaryGreen.withOpacity(0.10),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: const Icon(
                           Icons.receipt_long,
-                          color: Colors.blue,
+                          color: _primaryGreen,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1236,7 +1372,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
-                                      color: Colors.blue,
+                                      color: _primaryGreen,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -1307,7 +1443,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _sectionCard(
               title: "Today's Operations",
               icon: Icons.star,
-              color: Colors.orange,
+              color: _primaryGreen,
               subtitle: 'Top priority',
               children: [
                 _featureScroll([
@@ -1315,21 +1451,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Create Prescription',
                     subtitle: 'Start a new prescription',
                     icon: Icons.note_add,
-                    color: Colors.blue,
+                    color: _primaryGreen,
                     onTap: () => _navigate('Create Prescription'),
                   ),
                   _featureCard(
                     title: 'Follow-Ups',
                     subtitle: '$_todayFollowUpCount due today',
                     icon: Icons.notifications_active,
-                    color: Colors.amber,
+                    color: const Color(0xFFD69E2E),
                     onTap: () => _navigate('Follow-Ups'),
                   ),
                   _featureCard(
                     title: 'Billing / Income',
                     subtitle: 'Rs. ${totalIncome.toStringAsFixed(2)} today',
                     icon: Icons.account_balance_wallet,
-                    color: Colors.green,
+                    color: _freshGreen,
                     onTap: () => _navigate('Income Report'),
                   ),
                   _featureCard(
@@ -1338,7 +1474,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? 'All data synced'
                         : '$_pendingSyncCount pending',
                     icon: Icons.sync,
-                    color: Colors.blue,
+                    color: _primaryGreen,
                     onTap: _syncNow,
                   ),
                 ]),
@@ -1347,7 +1483,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _sectionCard(
               title: 'Patient Management',
               icon: Icons.people_alt,
-              color: Colors.blue,
+              color: _primaryGreen,
               subtitle: 'Patients',
               children: [
                 _featureScroll([
@@ -1355,14 +1491,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Patients',
                     subtitle: 'Add, edit and manage patient records',
                     icon: Icons.groups,
-                    color: Colors.blue,
+                    color: _primaryGreen,
                     onTap: () => _navigate('Patient Master'),
                   ),
                   _featureCard(
                     title: 'Patient History',
                     subtitle: 'View patient treatment and visit history',
                     icon: Icons.person_search,
-                    color: Colors.teal,
+                    color: _freshGreen,
                     onTap: () => _navigate('Patient History'),
                   ),
                 ]),
@@ -1371,7 +1507,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _sectionCard(
               title: 'Clinical',
               icon: Icons.assignment,
-              color: Colors.deepPurple,
+              color: _primaryGreen,
               subtitle: 'Records',
               children: [
                 _featureScroll([
@@ -1379,14 +1515,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Medicines',
                     subtitle: 'Manage medicine master data',
                     icon: Icons.medication,
-                    color: Colors.deepPurple,
+                    color: _primaryGreen,
                     onTap: () => _navigate('Medicines'),
                   ),
                   _featureCard(
                     title: 'Prescription History',
                     subtitle: 'View all prescription records',
                     icon: Icons.history,
-                    color: Colors.blue,
+                    color: _freshGreen,
                     onTap: () => _navigate('Prescription History'),
                   ),
                 ]),
@@ -1396,7 +1532,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _sectionCard(
               title: 'Tools',
               icon: Icons.construction,
-              color: Colors.blueGrey,
+              color: _primaryGreen,
               subtitle: 'Utilities',
               children: [
                 _featureScroll([
@@ -1404,28 +1540,28 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'QR Scan',
                     subtitle: 'Scan prescription QR code',
                     icon: Icons.qr_code_scanner,
-                    color: Colors.blue,
+                    color: _primaryGreen,
                     onTap: () => _navigate('Scan Prescription'),
                   ),
                   _featureCard(
                     title: 'OPD Fast Mode',
                     subtitle: 'Quick OPD consultation mode',
                     icon: Icons.flash_on,
-                    color: Colors.red,
+                    color: const Color(0xFFE05D5D),
                     onTap: () => _navigate('OPD Fast Mode'),
                   ),
                   _featureCard(
                     title: 'Hotspot QR',
                     subtitle: 'Share hotspot connection QR',
                     icon: Icons.qr_code_2,
-                    color: Colors.blueGrey,
+                    color: const Color(0xFF4F7C74),
                     onTap: () => _navigate('Hotspot QR'),
                   ),
                   _featureCard(
                     title: 'Analytics',
                     subtitle: 'Reports and clinic insights',
                     icon: Icons.bar_chart,
-                    color: Colors.deepPurple,
+                    color: _freshGreen,
                     onTap: () => _navigate('Analytics'),
                   ),
                 ]),
@@ -1516,6 +1652,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               ListTile(
+                leading: const Icon(Icons.support_agent),
+                title: const Text('Reception Accounts'),
+                subtitle: const Text('Add and manage linked reception users'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigate('Reception Accounts');
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.settings_ethernet),
                 title: const Text('Connection Mode'),
                 onTap: () {
@@ -1546,18 +1691,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
+      backgroundColor: _surface,
       body: _licenseValid ? _buildDashboard() : _buildLicenseBlock(),
       floatingActionButton: _licenseValid
           ? FloatingActionButton(
-              backgroundColor: const Color(0xFF2563EB),
+              backgroundColor: _primaryGreen,
               onPressed: () => _navigate('Create Prescription'),
-              child: const Icon(Icons.add, color: Colors.white),
+              child: const Icon(Icons.add_rounded, color: Colors.white),
             )
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: _licenseValid
           ? BottomAppBar(
+              color: Colors.white,
+              surfaceTintColor: Colors.white,
+              elevation: 12,
               shape: const CircularNotchedRectangle(),
               notchMargin: 8,
               child: SizedBox(
@@ -1588,14 +1736,14 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Icon(
             icon,
-            color: selected ? const Color(0xFF2563EB) : Colors.black45,
+            color: selected ? _primaryGreen : _mutedText,
           ),
           const SizedBox(height: 3),
           Text(
             label,
             style: TextStyle(
               fontSize: 11,
-              color: selected ? const Color(0xFF2563EB) : Colors.black45,
+              color: selected ? _primaryGreen : _mutedText,
               fontWeight: selected ? FontWeight.bold : FontWeight.normal,
             ),
           ),
