@@ -207,13 +207,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
     // Local testing only. Avoid stopping/re-saving the same connection mode
     // on every login attempt.
-    if (ConnectionModeService.getCurrentMode() != 'wifi') {
-      await ConnectionModeService.setLocalWifiMode();
-    }
+    // if (ConnectionModeService.getCurrentMode() != 'wifi') {
+    //   await ConnectionModeService.setLocalWifiMode();
+    // }
 
-//     if (ConnectionModeService.getCurrentMode() != 'cloud') {
-//   await ConnectionModeService.setCloudMode();
-// } VPS HOST EKEDI MEKA USE KARANNOOO
+    if (ConnectionModeService.getCurrentMode() != 'cloud') {
+  await ConnectionModeService.setCloudMode();
+} //VPS HOST EKEDI MEKA USE KARANNOOO
 
     try {
       final result = await _apiAuthService.login(

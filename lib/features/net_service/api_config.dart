@@ -1,48 +1,22 @@
 class ApiConfig {
-  // =========================================
-  // CONNECTION MODES
-  // =========================================
+  // VPS API භාවිතා කිරීම
+  static String mode = 'cloud';
 
-  // Local API එක force කිරීමට wifi දාන්න.
-  static String mode = 'wifi';
-
-  // =========================================
-  // CLOUD API - VPS
-  // Local testing වෙලාවේ භාවිතා නොවේ.
-  // =========================================
-
+  // Temporary HTTP VPS address
   static const String cloudBaseUrl =
-      'http://169.58.40.160:5219/API';
+      'http://169.58.40.160/api';
 
-    //   static const String cloudBaseUrl =
-    // 'https://api.yourdomain.com/api';
-
-  // =========================================
-  // LOCAL WIFI API
-  // Computer IPv4 address = 192.168.8.91
-  // =========================================
-
+  // Local computer API
   static const String localWifiBaseUrl =
       'http://192.168.8.91:5219/api';
 
-  // =========================================
-  // DOCTOR PHONE HOTSPOT SERVER
-  // =========================================
-
+  // Doctor phone hotspot server
   static const String hotspotBaseUrl =
       'http://192.168.43.1:8080/api';
 
   static String customHotspotBaseUrl = hotspotBaseUrl;
 
-  // =========================================
-  // AUTO MODE URL
-  // =========================================
-
   static String _resolvedAutoBaseUrl = cloudBaseUrl;
-
-  // =========================================
-  // CURRENT ACTIVE BASE URL
-  // =========================================
 
   static String get baseUrl {
     switch (mode) {
@@ -64,33 +38,17 @@ class ApiConfig {
     }
   }
 
-  // =========================================
-  // SET CONNECTION MODE
-  // =========================================
-
   static void setMode(String newMode) {
     mode = newMode;
   }
-
-  // =========================================
-  // AUTO MODE URL UPDATE
-  // =========================================
 
   static void setResolvedAutoBaseUrl(String url) {
     _resolvedAutoBaseUrl = url;
   }
 
-  // =========================================
-  // HOTSPOT URL UPDATE
-  // =========================================
-
   static void setHotspotBaseUrl(String url) {
     customHotspotBaseUrl = url;
   }
-
-  // =========================================
-  // HELPERS
-  // =========================================
 
   static bool get isOffline => mode == 'offline';
   static bool get isCloud => mode == 'cloud';
