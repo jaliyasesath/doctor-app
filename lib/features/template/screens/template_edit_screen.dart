@@ -27,8 +27,10 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.template.name);
-    _complaintController = TextEditingController(text: widget.template.complaint);
-    _diagnosisController = TextEditingController(text: widget.template.diagnosis);
+    _complaintController =
+        TextEditingController(text: widget.template.complaint);
+    _diagnosisController =
+        TextEditingController(text: widget.template.diagnosis);
     _items = TemplateService.decodeItems(widget.template.itemsJson);
     _isFavorite = widget.template.isFavorite;
   }
@@ -94,7 +96,8 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
     }
   }
 
-  Future<void> _openMedicineDialog({Map<String, dynamic>? existing, int? index}) async {
+  Future<void> _openMedicineDialog(
+      {Map<String, dynamic>? existing, int? index}) async {
     final nameController =
         TextEditingController(text: existing?['name']?.toString() ?? '');
     final dosageController =
@@ -103,8 +106,8 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
         TextEditingController(text: existing?['frequency']?.toString() ?? '');
     final durationController =
         TextEditingController(text: existing?['duration']?.toString() ?? '');
-    final instructionsController =
-        TextEditingController(text: existing?['instructions']?.toString() ?? '');
+    final instructionsController = TextEditingController(
+        text: existing?['instructions']?.toString() ?? '');
 
     final result = await showDialog<bool>(
       context: context,
@@ -238,7 +241,8 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _openMedicineDialog(existing: item, index: index),
+                    onPressed: () =>
+                        _openMedicineDialog(existing: item, index: index),
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Edit'),
                   ),
@@ -336,14 +340,16 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
                 const Spacer(),
                 if (_isFavorite)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.amber.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Text(
                       'Favorite',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      style:
+                          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                     ),
                   ),
               ],

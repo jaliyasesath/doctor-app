@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../data/local/database_helper.dart';
@@ -9,6 +11,7 @@ import '../../prescription/screens/print_preview_screen.dart';
 import '../../template/data/template_service.dart';
 import '../../template/models/template_model.dart';
 import '../../template/screens/template_list_screen.dart';
+import '../../sync/services/auto_sync_service.dart';
 
 class OPDFastModeScreen extends StatefulWidget {
   const OPDFastModeScreen({super.key});
@@ -351,16 +354,20 @@ class _OPDFastModeScreenState extends State<OPDFastModeScreen> {
         'prescription_no': rxNo,
         'prescription_date': savedDate,
         'items_text': itemsText,
-        'complaint':
-            PrescriptionStore.complaint.isEmpty ? null : PrescriptionStore.complaint,
-        'diagnosis':
-            PrescriptionStore.diagnosis.isEmpty ? null : PrescriptionStore.diagnosis,
-        'visit_notes':
-            PrescriptionStore.visitNotes.isEmpty ? null : PrescriptionStore.visitNotes,
+        'complaint': PrescriptionStore.complaint.isEmpty
+            ? null
+            : PrescriptionStore.complaint,
+        'diagnosis': PrescriptionStore.diagnosis.isEmpty
+            ? null
+            : PrescriptionStore.diagnosis,
+        'visit_notes': PrescriptionStore.visitNotes.isEmpty
+            ? null
+            : PrescriptionStore.visitNotes,
         'server_patient_id': null,
       };
 
       await DatabaseHelper.instance.insertPrescription(data);
+      unawaited(AutoSyncService.syncPendingChanges());
 
       if (!mounted) return;
 
@@ -751,8 +758,10 @@ class _OPDFastModeScreenState extends State<OPDFastModeScreen> {
                         decoration: _input('Gender'),
                         items: const [
                           DropdownMenuItem(value: 'Male', child: Text('Male')),
-                          DropdownMenuItem(value: 'Female', child: Text('Female')),
-                          DropdownMenuItem(value: 'Other', child: Text('Other')),
+                          DropdownMenuItem(
+                              value: 'Female', child: Text('Female')),
+                          DropdownMenuItem(
+                              value: 'Other', child: Text('Other')),
                         ],
                         onChanged: (value) {
                           if (value == null) return;

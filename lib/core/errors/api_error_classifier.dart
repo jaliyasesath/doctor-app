@@ -82,8 +82,7 @@ class ApiErrorClassifier {
   }) {
     return AppException(
       message: '$operation returned an invalid response.',
-      userMessage:
-          'The server returned an invalid response. Please try again.',
+      userMessage: 'The server returned an invalid response. Please try again.',
       code: 'INVALID_RESPONSE',
       kind: AppErrorKind.invalidResponse,
       cause: cause,
@@ -115,9 +114,7 @@ class ApiErrorClassifier {
   }
 
   static AppErrorKind _kindFor(int statusCode, String code) {
-    if (code == 'REQUEST_TIMEOUT' ||
-        statusCode == 408 ||
-        statusCode == 504) {
+    if (code == 'REQUEST_TIMEOUT' || statusCode == 408 || statusCode == 504) {
       return AppErrorKind.timeout;
     }
 
@@ -136,9 +133,7 @@ class ApiErrorClassifier {
       case 429:
         return AppErrorKind.rateLimited;
       default:
-        return statusCode >= 500
-            ? AppErrorKind.server
-            : AppErrorKind.unknown;
+        return statusCode >= 500 ? AppErrorKind.server : AppErrorKind.unknown;
     }
   }
 
@@ -148,8 +143,7 @@ class ApiErrorClassifier {
     required String serverMessage,
     required Duration? retryAfter,
   }) {
-    if (code == 'INVALID_CREDENTIALS' ||
-        code == 'ADMIN_INVALID_CREDENTIALS') {
+    if (code == 'INVALID_CREDENTIALS' || code == 'ADMIN_INVALID_CREDENTIALS') {
       return 'The email or password is incorrect.';
     }
 
@@ -219,9 +213,7 @@ class ApiErrorClassifier {
   static Duration? _readRetryAfter(Map<String, String> headers) {
     final rawValue = _header(headers, 'retry-after');
     final seconds = int.tryParse(rawValue);
-    return seconds == null || seconds < 0
-        ? null
-        : Duration(seconds: seconds);
+    return seconds == null || seconds < 0 ? null : Duration(seconds: seconds);
   }
 
   static String _header(

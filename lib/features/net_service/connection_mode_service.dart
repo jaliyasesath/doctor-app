@@ -13,8 +13,7 @@ class ConnectionModeService {
   static Future<void> loadSavedMode() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final savedMode =
-        prefs.getString(_key) ?? 'auto';
+    final savedMode = prefs.getString(_key) ?? 'auto';
 
     ApiConfig.setMode(savedMode);
 

@@ -23,7 +23,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   Map<String, dynamic>? _patient;
   List<Map<String, dynamic>> _prescriptions = [];
   Map<String, dynamic>? _lastPrescription;
-List<Map<String, dynamic>> _lastMedicines = [];
+  List<Map<String, dynamic>> _lastMedicines = [];
 
   bool _isLoading = true;
   int? _doctorId;
@@ -85,27 +85,26 @@ List<Map<String, dynamic>> _lastMedicines = [];
         _doctorId!,
       );
       Map<String, dynamic>? lastPrescription;
-List<Map<String, dynamic>> lastMedicines = [];
+      List<Map<String, dynamic>> lastMedicines = [];
 
-if (prescriptions.isNotEmpty) {
-  lastPrescription = prescriptions.first;
+      if (prescriptions.isNotEmpty) {
+        lastPrescription = prescriptions.first;
 
-  final lastId = lastPrescription['id'] as int;
+        final lastId = lastPrescription['id'] as int;
 
-  lastMedicines =
-      await DatabaseHelper.instance
-          .getLastPrescriptionMedicines(lastId);
-}
+        lastMedicines =
+            await DatabaseHelper.instance.getLastPrescriptionMedicines(lastId);
+      }
 
       if (!mounted) return;
 
       setState(() {
-  _patient = patient;
-  _prescriptions = prescriptions;
-  _lastPrescription = lastPrescription;
-  _lastMedicines = lastMedicines;
-  _isLoading = false;
-});
+        _patient = patient;
+        _prescriptions = prescriptions;
+        _lastPrescription = lastPrescription;
+        _lastMedicines = lastMedicines;
+        _isLoading = false;
+      });
     } catch (e) {
       if (!mounted) return;
 
@@ -380,95 +379,80 @@ if (prescriptions.isNotEmpty) {
       ),
     );
   }
+
   Widget _buildPatientTimelineCard() {
-  if (_lastPrescription == null) {
-    return const SizedBox();
-  }
+    if (_lastPrescription == null) {
+      return const SizedBox();
+    }
 
-  final diagnosis =
-      (_lastPrescription!['diagnosis'] ?? '')
-          .toString();
+    final diagnosis = (_lastPrescription!['diagnosis'] ?? '').toString();
 
-  final bp =
-    (_lastPrescription!['bp'] ??
-            _lastPrescription!['blood_pressure'] ??
-            '')
-        .toString();
+    final bp =
+        (_lastPrescription!['bp'] ?? _lastPrescription!['blood_pressure'] ?? '')
+            .toString();
 
-  final date =
-      (_lastPrescription!['prescription_date'] ?? '')
-          .toString();
+    final date = (_lastPrescription!['prescription_date'] ?? '').toString();
 
-  final medicineNames =
-      _lastMedicines
-          .map(
-            (e) =>
-                e['medicine_name']
-                    ?.toString() ??
-                '',
-          )
-          .where((e) => e.isNotEmpty)
-          .take(3)
-          .join(', ');
+    final medicineNames = _lastMedicines
+        .map(
+          (e) => e['medicine_name']?.toString() ?? '',
+        )
+        .where((e) => e.isNotEmpty)
+        .take(3)
+        .join(', ');
 
-  return Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(
-        color: const Color(0xFFCCFBF1),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFCCFBF1),
+        ),
       ),
-    ),
-    child: Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
-      children: [
-        const Row(
-          children: [
-            Icon(
-              Icons.timeline,
-              color: Color(0xFF0F766E),
-            ),
-            SizedBox(width: 8),
-            Text(
-              'Patient Timeline',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.timeline,
+                color: Color(0xFF0F766E),
               ),
+              SizedBox(width: 8),
+              Text(
+                'Patient Timeline',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _chip('Last Visit', date),
+          if (diagnosis.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _chip(
+              'Previous Diagnosis',
+              diagnosis,
             ),
           ],
-        ),
-
-        const SizedBox(height: 14),
-
-        _chip('Last Visit', date),
-
-        if (diagnosis.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          _chip(
-            'Previous Diagnosis',
-            diagnosis,
-          ),
+          if (bp.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _chip('Last BP', bp),
+          ],
+          if (medicineNames.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _chip(
+              'Last Medicines',
+              medicineNames,
+            ),
+          ],
         ],
-
-        if (bp.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          _chip('Last BP', bp),
-        ],
-
-        if (medicineNames.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          _chip(
-            'Last Medicines',
-            medicineNames,
-          ),
-        ],
-      ],
-    ),
-  );
-}
+      ),
+    );
+  }
 
   Widget _buildPrescriptionCard(Map<String, dynamic> item) {
     final id = item['id'] as int;
@@ -621,7 +605,7 @@ if (prescriptions.isNotEmpty) {
                   const SizedBox(height: 12),
                   _buildCompactMedicalAlerts(),
                   const SizedBox(height: 12),
-_buildPatientTimelineCard(),
+                  _buildPatientTimelineCard(),
                   const SizedBox(height: 16),
                   const Text(
                     'Previous Visits',
@@ -639,11 +623,11 @@ _buildPatientTimelineCard(),
                       child: const Text('No previous visits found'),
                     )
                   else
-  Column(
-    children: _prescriptions
-        .map((item) => _buildPrescriptionCard(item))
-        .toList(),
-  ),
+                    Column(
+                      children: _prescriptions
+                          .map((item) => _buildPrescriptionCard(item))
+                          .toList(),
+                    ),
                 ],
               ),
             ),

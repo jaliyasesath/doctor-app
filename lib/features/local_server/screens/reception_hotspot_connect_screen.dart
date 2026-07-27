@@ -20,75 +20,72 @@ class _ReceptionHotspotConnectScreenState
   String _message = 'Scan Doctor Hotspot QR';
 
   Future<void> _handleQr(String value) async {
-  if (_scanned) return;
+    if (_scanned) return;
 
-  setState(() {
-    _scanned = true;
-    _message = 'Searching Doctor local server...';
-  });
+    setState(() {
+      _scanned = true;
+      _message = 'Searching Doctor local server...';
+    });
 
-  final possibleUrls = [
-    value,
-    'http://192.168.43.1:8080/api',
-    'http://192.168.232.1:8080/api',
-    'http://192.168.137.1:8080/api',
-  ];
+    final possibleUrls = [
+      value,
+      'http://192.168.43.1:8080/api',
+      'http://192.168.232.1:8080/api',
+      'http://192.168.137.1:8080/api',
+    ];
 
-  for (final url in possibleUrls) {
-    try {
-      final alive = await _isServerAlive(url);
+    for (final url in possibleUrls) {
+      try {
+        final alive = await _isServerAlive(url);
 
-if (!alive) {
-  continue;
-}
+        if (!alive) {
+          continue;
+        }
 
-ApiConfig.setHotspotBaseUrl(url);
-await ConnectionModeService.setHotspotMode();
+        ApiConfig.setHotspotBaseUrl(url);
+        await ConnectionModeService.setHotspotMode();
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      setState(() {
-        _message = 'Connected:\n$url';
-      });
+        setState(() {
+          _message = 'Connected:\n$url';
+        });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Connected to Doctor Server ✅',
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Connected to Doctor Server ✅',
+            ),
           ),
-        ),
-      );
+        );
 
-      Navigator.pop(context, true);
+        Navigator.pop(context, true);
 
-      return;
-    } catch (_) {}
+        return;
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _scanned = false;
+      _message = 'Unable to find Doctor local server';
+    });
   }
 
-  if (!mounted) return;
+  Future<bool> _isServerAlive(String url) async {
+    try {
+      final root = url.replaceAll('/api', '');
 
-  setState(() {
-    _scanned = false;
-    _message =
-        'Unable to find Doctor local server';
-  });
-}
+      final response = await http
+          .get(Uri.parse('$root/api/Health'))
+          .timeout(const Duration(seconds: 2));
 
-Future<bool> _isServerAlive(String url) async {
-  try {
-    final root = url.replaceAll('/api', '');
-
-    final response = await http
-        .get(Uri.parse('$root/api/Health'))
-        .timeout(const Duration(seconds: 2));
-
-    return response.statusCode == 200;
-  } catch (_) {
-    return false;
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
-}
-
-  
 
   @override
   Widget build(BuildContext context) {

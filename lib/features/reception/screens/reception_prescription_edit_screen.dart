@@ -88,17 +88,13 @@ class _ReceptionPrescriptionEditScreenState
                   itemBuilder: (_, index) {
                     final item = _items[index];
 
-                    final name =
-                        item['medicine_name']?.toString() ?? '';
+                    final name = item['medicine_name']?.toString() ?? '';
 
-                    final dosage =
-                        item['dosage']?.toString() ?? '';
+                    final dosage = item['dosage']?.toString() ?? '';
 
-                    final frequency =
-                        item['frequency']?.toString() ?? '';
+                    final frequency = item['frequency']?.toString() ?? '';
 
-                    final duration =
-                        item['duration']?.toString() ?? '';
+                    final duration = item['duration']?.toString() ?? '';
 
                     final isPrescriptionOnly =
                         (item['prescription_only'] ?? 0) == 1;
@@ -120,8 +116,7 @@ class _ReceptionPrescriptionEditScreenState
                           '$dosage • $frequency • $duration',
                         ),
                         secondary: const Icon(Icons.medication),
-                        controlAffinity:
-                            ListTileControlAffinity.trailing,
+                        controlAffinity: ListTileControlAffinity.trailing,
                       ),
                     );
                   },

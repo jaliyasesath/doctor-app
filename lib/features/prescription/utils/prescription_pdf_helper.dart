@@ -140,31 +140,24 @@ class PrescriptionPdfHelper {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 signatureWidget(),
-
                 pw.Text(
                   'Dr. $doctorName',
                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                 ),
-
                 if (qualifications.isNotEmpty) pw.Text(qualifications),
-
                 if (profession.isNotEmpty) ...[
                   pw.SizedBox(height: 8),
                   pw.Text(profession),
                 ],
-
                 if (slmcRegNo.isNotEmpty) ...[
                   pw.SizedBox(height: 8),
                   pw.Text('SLMC Reg. No: $slmcRegNo'),
                 ],
-
                 if (affiliation.isNotEmpty) ...[
                   pw.SizedBox(height: 8),
                   pw.Text(affiliation),
                 ],
-
-                if (contactNumber.isNotEmpty)
-                  pw.Text('Tel: $contactNumber'),
+                if (contactNumber.isNotEmpty) pw.Text('Tel: $contactNumber'),
               ],
             ),
           ),

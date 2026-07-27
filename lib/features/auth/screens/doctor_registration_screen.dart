@@ -220,7 +220,7 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
 
     setState(() => _isLoading = true);
     if (ConnectionModeService.getCurrentMode() != 'wifi') {
-     // await ConnectionModeService.setLocalWifiMode(); // Local testing.
+      // await ConnectionModeService.setLocalWifiMode(); // Local testing.
       await ConnectionModeService.setCloudMode();
     }
 

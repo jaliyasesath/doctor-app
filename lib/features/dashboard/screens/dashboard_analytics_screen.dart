@@ -9,8 +9,7 @@ class DashboardAnalyticsScreen extends StatefulWidget {
       _DashboardAnalyticsScreenState();
 }
 
-class _DashboardAnalyticsScreenState
-    extends State<DashboardAnalyticsScreen> {
+class _DashboardAnalyticsScreenState extends State<DashboardAnalyticsScreen> {
   int todayRx = 0;
   int todayPatients = 0;
   List<Map<String, dynamic>> topMedicines = [];
@@ -77,36 +76,29 @@ class _DashboardAnalyticsScreenState
                 Row(
                   children: [
                     Expanded(
-                        child: _card(
-                            "Today Rx", "$todayRx", Icons.receipt, Colors.blue)),
+                        child: _card("Today Rx", "$todayRx", Icons.receipt,
+                            Colors.blue)),
                     const SizedBox(width: 12),
                     Expanded(
-                        child: _card("Patients", "$todayPatients",
-                            Icons.people, Colors.green)),
+                        child: _card("Patients", "$todayPatients", Icons.people,
+                            Colors.green)),
                   ],
                 ),
                 const SizedBox(height: 20),
-
                 const Text("🔥 Top Medicines",
                     style:
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-
                 const SizedBox(height: 10),
-
                 ...topMedicines.map((e) => ListTile(
                       leading: const Icon(Icons.medication),
                       title: Text(e['name']),
                       trailing: Text("x${e['count']}"),
                     )),
-
                 const SizedBox(height: 20),
-
                 const Text("📈 Last 7 Days",
                     style:
                         TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-
                 const SizedBox(height: 10),
-
                 ...weeklyStats.map((e) => ListTile(
                       leading: const Icon(Icons.bar_chart),
                       title: Text(e['prescription_date']),

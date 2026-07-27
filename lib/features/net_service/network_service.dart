@@ -5,8 +5,7 @@ class NetworkService {
     try {
       final results = await Connectivity().checkConnectivity();
 
-      return results.isNotEmpty &&
-          !results.contains(ConnectivityResult.none);
+      return results.isNotEmpty && !results.contains(ConnectivityResult.none);
     } catch (_) {
       return false;
     }

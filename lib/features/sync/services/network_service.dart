@@ -24,9 +24,8 @@ class NetworkService {
       );
       final healthUri = Uri.parse('$normalizedBaseUrl/Health');
 
-      final response = await http
-          .get(healthUri)
-          .timeout(const Duration(seconds: 6));
+      final response =
+          await http.get(healthUri).timeout(const Duration(seconds: 6));
 
       return response.statusCode >= 200 && response.statusCode < 300;
     } catch (_) {

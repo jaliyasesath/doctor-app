@@ -4,11 +4,9 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalNotificationService {
-  static const String pendingFollowUpKey =
-      'pending_open_followups';
+  static const String pendingFollowUpKey = 'pending_open_followups';
 
-  static const String pendingFollowUpIdKey =
-      'pending_followup_id';
+  static const String pendingFollowUpIdKey = 'pending_followup_id';
 
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -42,8 +40,7 @@ class LocalNotificationService {
       },
     );
 
-    final launchDetails =
-        await _plugin.getNotificationAppLaunchDetails();
+    final launchDetails = await _plugin.getNotificationAppLaunchDetails();
 
     if (launchDetails?.didNotificationLaunchApp == true) {
       final prefs = await SharedPreferences.getInstance();
@@ -53,10 +50,7 @@ class LocalNotificationService {
         true,
       );
 
-      final payload =
-          launchDetails
-              ?.notificationResponse
-              ?.payload;
+      final payload = launchDetails?.notificationResponse?.payload;
 
       if (payload != null) {
         await prefs.setInt(
@@ -66,9 +60,8 @@ class LocalNotificationService {
       }
     }
 
-    final androidPlugin =
-        _plugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
 
     await androidPlugin?.requestNotificationsPermission();
   }
@@ -76,8 +69,7 @@ class LocalNotificationService {
   static Future<bool> consumePendingFollowUpOpen() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final value =
-        prefs.getBool(pendingFollowUpKey) ?? false;
+    final value = prefs.getBool(pendingFollowUpKey) ?? false;
 
     if (value) {
       await prefs.remove(pendingFollowUpKey);
@@ -89,8 +81,7 @@ class LocalNotificationService {
   static Future<int?> consumePendingFollowUpId() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final value =
-        prefs.getInt(pendingFollowUpIdKey);
+    final value = prefs.getInt(pendingFollowUpIdKey);
 
     await prefs.remove(pendingFollowUpIdKey);
 
@@ -139,22 +130,18 @@ class LocalNotificationService {
         android: AndroidNotificationDetails(
           'follow_up_channel',
           'Follow-Up Reminders',
-          channelDescription:
-              'Doctor follow-up reminders',
+          channelDescription: 'Doctor follow-up reminders',
           importance: Importance.max,
           priority: Priority.high,
-          category:
-              AndroidNotificationCategory.reminder,
+          category: AndroidNotificationCategory.reminder,
           playSound: true,
           enableVibration: true,
         ),
       ),
       payload: id.toString(),
-      androidScheduleMode:
-          AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation
-              .absoluteTime,
+          UILocalNotificationDateInterpretation.absoluteTime,
     );
   }
 

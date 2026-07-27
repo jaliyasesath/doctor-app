@@ -196,6 +196,24 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
     );
   }
 
+  Rect _sharePositionOrigin() {
+    final renderObject = context.findRenderObject();
+
+    if (renderObject is RenderBox &&
+        renderObject.hasSize &&
+        renderObject.size.width > 0 &&
+        renderObject.size.height > 0) {
+      return renderObject.localToGlobal(Offset.zero) & renderObject.size;
+    }
+
+    final screenSize = MediaQuery.sizeOf(context);
+    return Rect.fromCenter(
+      center: Offset(screenSize.width / 2, screenSize.height / 2),
+      width: 1,
+      height: 1,
+    );
+  }
+
   Future<void> _sharePdf() async {
     if (_isLoadingRx || _isLoadingDoctor || rxNo.isEmpty || qrValue.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -213,6 +231,7 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
         [XFile(pdfFile.path)],
         text: 'Prescription $rxNo',
         subject: 'Prescription $rxNo',
+        sharePositionOrigin: _sharePositionOrigin(),
       );
     } catch (e) {
       if (!mounted) return;
@@ -265,6 +284,7 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
         [XFile(pdfFile.path)],
         text: 'Prescription $rxNo',
         subject: 'Prescription $rxNo',
+        sharePositionOrigin: _sharePositionOrigin(),
       );
     } catch (e) {
       if (!mounted) return;

@@ -129,9 +129,8 @@ class _MedicineDashboardScreenState extends State<MedicineDashboardScreen> {
   Future<void> _saveUsageData() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final usageList = _usageCount.entries
-        .map((e) => '${e.key}|${e.value}')
-        .toList();
+    final usageList =
+        _usageCount.entries.map((e) => '${e.key}|${e.value}').toList();
 
     await prefs.setStringList(_usageKey, usageList);
     await prefs.setStringList(_recentKey, _recentList);
@@ -525,16 +524,13 @@ class _MedicineDashboardScreenState extends State<MedicineDashboardScreen> {
   Widget build(BuildContext context) {
     final filtered = medicines
         .where(
-          (m) => m["name"]
-              .toString()
-              .toLowerCase()
-              .contains(search.toLowerCase()),
+          (m) =>
+              m["name"].toString().toLowerCase().contains(search.toLowerCase()),
         )
         .toList();
 
-    final favorites = filtered
-        .where((m) => _isFavorite(m["name"].toString()))
-        .toList();
+    final favorites =
+        filtered.where((m) => _isFavorite(m["name"].toString())).toList();
 
     final mostUsed = _getMostUsed();
 
@@ -564,7 +560,6 @@ class _MedicineDashboardScreenState extends State<MedicineDashboardScreen> {
                     },
                   ),
                   const SizedBox(height: 12),
-
                   if (favorites.isNotEmpty) ...[
                     const Align(
                       alignment: Alignment.centerLeft,
@@ -601,7 +596,6 @@ class _MedicineDashboardScreenState extends State<MedicineDashboardScreen> {
                     ),
                     const SizedBox(height: 12),
                   ],
-
                   if (mostUsed.isNotEmpty) ...[
                     const Align(
                       alignment: Alignment.centerLeft,
@@ -626,7 +620,6 @@ class _MedicineDashboardScreenState extends State<MedicineDashboardScreen> {
                     ),
                     const SizedBox(height: 12),
                   ],
-
                   if (_recentList.isNotEmpty) ...[
                     const Align(
                       alignment: Alignment.centerLeft,
@@ -651,7 +644,6 @@ class _MedicineDashboardScreenState extends State<MedicineDashboardScreen> {
                     ),
                     const SizedBox(height: 12),
                   ],
-
                   Expanded(
                     child: GridView.builder(
                       itemCount: filtered.length,

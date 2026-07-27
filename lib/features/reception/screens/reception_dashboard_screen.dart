@@ -132,15 +132,13 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
               icon: Icons.person_add_alt_1,
               title: 'Register Patient',
               subtitle: 'Add name, age, gender, phone and address',
-              onTap: () =>
-                  _open(const patient_screen.AddPatientScreen()),
+              onTap: () => _open(const patient_screen.AddPatientScreen()),
             ),
             _menuCard(
               icon: Icons.qr_code_scanner,
               title: 'Connect Doctor Hotspot',
               subtitle: 'Scan Doctor QR and connect local server',
-              onTap: () =>
-                  _open(const ReceptionHotspotConnectScreen()),
+              onTap: () => _open(const ReceptionHotspotConnectScreen()),
             ),
             _menuCard(
               icon: Icons.queue,

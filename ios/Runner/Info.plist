@@ -50,6 +50,15 @@
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Photo library access is required to select doctor verification documents and signature images.</string>
 
+    <key>NSLocalNetworkUsageDescription</key>
+    <string>Local network access is required to connect the doctor and reception devices through the clinic hotspot.</string>
+
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+
     <!-- Performance -->
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>

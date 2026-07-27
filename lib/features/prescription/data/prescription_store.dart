@@ -94,9 +94,8 @@ class PrescriptionStore {
       year: year,
     );
 
-    final lastNumber = savedNumber > databaseNumber
-        ? savedNumber
-        : databaseNumber;
+    final lastNumber =
+        savedNumber > databaseNumber ? savedNumber : databaseNumber;
     final nextNumber = lastNumber + 1;
 
     await prefs.setInt(counterKey, nextNumber);

@@ -55,7 +55,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _connectionOnline = false;
   String _connectionMode = '';
-  String _activeBaseUrl = '';
 
   String _doctorName = 'Doctor';
 
@@ -508,8 +507,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Mode: ${currentMode.toUpperCase()}\n'
-                      'Active Base URL:\n${ApiConfig.baseUrl}',
+                      'Mode: ${currentMode.toUpperCase()}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 12),
                     ),
@@ -560,7 +558,6 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _connectionOnline = online;
       _connectionMode = ConnectionModeService.getCurrentMode();
-      _activeBaseUrl = ApiConfig.baseUrl;
     });
   }
 

@@ -47,9 +47,8 @@ class LicenseApiService {
         'success': validOffline,
         'mode': 'offline_fallback',
         'data': cached,
-        'message': validOffline
-            ? 'Using cached license'
-            : 'License check failed: $e',
+        'message':
+            validOffline ? 'Using cached license' : 'License check failed: $e',
       };
     }
   }

@@ -43,6 +43,18 @@ class SyncService {
   final ApiPatientService _patientApi = ApiPatientService();
   final ApiPrescriptionService _prescriptionApi = ApiPrescriptionService();
 
+  Future<bool> hasPendingLocalChanges() async {
+    final pending = await Future.wait([
+      _db.getPendingDoctors(),
+      _db.getPendingPatients(),
+      _db.getPendingMedicines(),
+      _db.getPendingPrescriptions(),
+      _db.getPendingCustomInstructions(),
+    ]);
+
+    return pending.any((items) => items.isNotEmpty);
+  }
+
   Future<void> resetSyncTimestamps() async {
     final prefs = await SharedPreferences.getInstance();
     final doctorId = await DoctorSession.getActiveDoctorIdForData();

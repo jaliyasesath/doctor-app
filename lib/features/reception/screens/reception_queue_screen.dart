@@ -15,8 +15,7 @@ class ReceptionQueueScreen extends StatefulWidget {
   });
 
   @override
-  State<ReceptionQueueScreen> createState() =>
-      _ReceptionQueueScreenState();
+  State<ReceptionQueueScreen> createState() => _ReceptionQueueScreenState();
 }
 
 class _ReceptionQueueScreenState extends State<ReceptionQueueScreen> {
@@ -84,20 +83,16 @@ class _ReceptionQueueScreenState extends State<ReceptionQueueScreen> {
         }
       } else {
         if (_selectedTab == 'waiting') {
-          final todayRows =
-              await _db.getTodayQueuePatients(status: 'waiting');
-          final previousRows =
-              await _db.getPreviousPendingQueuePatients();
+          final todayRows = await _db.getTodayQueuePatients(status: 'waiting');
+          final previousRows = await _db.getPreviousPendingQueuePatients();
 
           todayData = _mapLocalPatients(todayRows, 'Waiting');
           previousData = _mapLocalPatients(previousRows, 'Waiting');
         } else if (_selectedTab == 'skipped') {
-          final rows =
-              await _db.getTodayQueuePatients(status: 'Skipped');
+          final rows = await _db.getTodayQueuePatients(status: 'Skipped');
           todayData = _mapLocalPatients(rows, 'Skipped');
         } else {
-          final rows =
-              await _db.getTodayQueuePatients(status: 'Completed');
+          final rows = await _db.getTodayQueuePatients(status: 'Completed');
           todayData = _mapLocalPatients(rows, 'Completed');
         }
       }
@@ -357,9 +352,8 @@ class _ReceptionQueueScreenState extends State<ReceptionQueueScreen> {
                   color: isPreviousPending
                       ? Colors.deepOrange.shade700
                       : Colors.black54,
-                  fontWeight: isPreviousPending
-                      ? FontWeight.w600
-                      : FontWeight.normal,
+                  fontWeight:
+                      isPreviousPending ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
             ],

@@ -212,8 +212,8 @@ class _LoginScreenState extends State<LoginScreen> {
     // }
 
     if (ConnectionModeService.getCurrentMode() != 'cloud') {
-  await ConnectionModeService.setCloudMode();
-} //VPS HOST EKEDI MEKA USE KARANNOOO
+      await ConnectionModeService.setCloudMode();
+    } //VPS HOST EKEDI MEKA USE KARANNOOO
 
     try {
       final result = await _apiAuthService.login(

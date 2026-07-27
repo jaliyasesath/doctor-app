@@ -5,16 +5,15 @@ import 'package:device_info_plus/device_info_plus.dart';
 
 import 'api_subscription_service.dart';
 
-
 class LicenseService {
   static const String _installTimeKey = 'license_install_time';
   static const String _activatedKey = 'license_activated';
   static const String _licenseKeyKey = 'license_key';
   static const String _boundDeviceIdKey = 'bound_device_id';
   static const String _cachedPlanKey = 'cached_plan_name';
-static const String _cachedEndDateKey = 'cached_end_date';
-static const String _cachedDaysKey = 'cached_days_remaining';
-static const String _lastOnlineCheckKey = 'last_online_check';
+  static const String _cachedEndDateKey = 'cached_end_date';
+  static const String _cachedDaysKey = 'cached_days_remaining';
+  static const String _lastOnlineCheckKey = 'last_online_check';
 
   static const Duration trialDuration = Duration(days: 30);
   //static const Duration trialDuration = Duration(minutes: 1);
@@ -23,7 +22,7 @@ static const String _lastOnlineCheckKey = 'last_online_check';
   static const List<String> validLifetimeKeys = [
     'DOCAPP-LIFE-2026',
     'CLINIC-UNLOCK-999',
-    'DOCTOR-PRO-LIFETIME',  
+    'DOCTOR-PRO-LIFETIME',
   ];
 
   static Future<void> ensureInstallTime() async {
@@ -134,56 +133,55 @@ static const String _lastOnlineCheckKey = 'last_online_check';
   }
 
   static Future<void> saveSubscriptionCache({
-  required String planName,
-  required DateTime endDate,
-  required int daysRemaining,
-}) async {
-  final prefs = await SharedPreferences.getInstance();
+    required String planName,
+    required DateTime endDate,
+    required int daysRemaining,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
 
-  await prefs.setString(_cachedPlanKey, planName);
+    await prefs.setString(_cachedPlanKey, planName);
 
-  await prefs.setString(
-    _cachedEndDateKey,
-    endDate.toIso8601String(),
-  );
+    await prefs.setString(
+      _cachedEndDateKey,
+      endDate.toIso8601String(),
+    );
 
-  await prefs.setInt(_cachedDaysKey, daysRemaining);
+    await prefs.setInt(_cachedDaysKey, daysRemaining);
 
-  await prefs.setString(
-    _lastOnlineCheckKey,
-    DateTime.now().toIso8601String(),
-  );
-}
-
-static Future<Map<String, dynamic>> getCachedSubscription() async {
-  final prefs = await SharedPreferences.getInstance();
-
-  return {
-    'planName': prefs.getString(_cachedPlanKey) ?? '',
-    'endDate': prefs.getString(_cachedEndDateKey),
-    'daysRemaining': prefs.getInt(_cachedDaysKey) ?? 0,
-    'lastOnlineCheck': prefs.getString(_lastOnlineCheckKey),
-  };
-}
-
-static Future<bool> isCachedSubscriptionValid() async {
-  final prefs = await SharedPreferences.getInstance();
-
-  final rawEndDate =
-      prefs.getString(_cachedEndDateKey);
-
-  if (rawEndDate == null) {
-    return false;
+    await prefs.setString(
+      _lastOnlineCheckKey,
+      DateTime.now().toIso8601String(),
+    );
   }
 
-  final endDate = DateTime.tryParse(rawEndDate);
+  static Future<Map<String, dynamic>> getCachedSubscription() async {
+    final prefs = await SharedPreferences.getInstance();
 
-  if (endDate == null) {
-    return false;
+    return {
+      'planName': prefs.getString(_cachedPlanKey) ?? '',
+      'endDate': prefs.getString(_cachedEndDateKey),
+      'daysRemaining': prefs.getInt(_cachedDaysKey) ?? 0,
+      'lastOnlineCheck': prefs.getString(_lastOnlineCheckKey),
+    };
   }
 
-  return DateTime.now().isBefore(endDate);
-}
+  static Future<bool> isCachedSubscriptionValid() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final rawEndDate = prefs.getString(_cachedEndDateKey);
+
+    if (rawEndDate == null) {
+      return false;
+    }
+
+    final endDate = DateTime.tryParse(rawEndDate);
+
+    if (endDate == null) {
+      return false;
+    }
+
+    return DateTime.now().isBefore(endDate);
+  }
 
   static Future<String> activateLicense(String inputKey) async {
     final normalized = inputKey.trim();
@@ -197,8 +195,7 @@ static Future<bool> isCachedSubscriptionValid() async {
 
     final savedBoundDeviceId = prefs.getString(_boundDeviceIdKey);
 
-    if (savedBoundDeviceId != null &&
-        savedBoundDeviceId != currentDeviceId) {
+    if (savedBoundDeviceId != null && savedBoundDeviceId != currentDeviceId) {
       return 'already_bound';
     }
 
@@ -238,6 +235,4 @@ static Future<bool> isCachedSubscriptionValid() async {
 
     return '${duration.inMinutes}m ${seconds}s';
   }
-
-  
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/app_error_ui.dart';
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
+import '../../sync/services/auto_sync_service.dart';
 
 class MedicineScreen extends StatefulWidget {
   const MedicineScreen({super.key});
@@ -236,6 +237,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
 
     try {
       await DatabaseHelper.instance.deleteMedicine(id);
+      unawaited(AutoSyncService.syncPendingChanges());
 
       if (!mounted) return true;
 
@@ -265,6 +267,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
     final isFavorite = (medicine['is_favorite'] ?? 0) == 1;
 
     await DatabaseHelper.instance.toggleMedicineFavorite(id, !isFavorite);
+    unawaited(AutoSyncService.syncPendingChanges());
     await _loadMedicines();
   }
 
@@ -844,6 +847,7 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
       } else {
         await DatabaseHelper.instance.insertMedicine(data);
       }
+      unawaited(AutoSyncService.syncPendingChanges());
 
       if (!mounted) return;
 

@@ -84,10 +84,8 @@ class _MedicineDashboardScreenState extends State<MedicineDashboardScreen> {
   Widget build(BuildContext context) {
     final filtered = medicines
         .where(
-          (m) => m["name"]
-              .toString()
-              .toLowerCase()
-              .contains(search.toLowerCase()),
+          (m) =>
+              m["name"].toString().toLowerCase().contains(search.toLowerCase()),
         )
         .toList();
 
@@ -149,8 +147,7 @@ class _MedicineDashboardScreenState extends State<MedicineDashboardScreen> {
             Expanded(
               child: GridView.builder(
                 itemCount: filtered.length,
-                gridDelegate:
-                    const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   mainAxisSpacing: 10,
                   crossAxisSpacing: 10,
@@ -176,8 +173,7 @@ class _MedicineDashboardScreenState extends State<MedicineDashboardScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
                               m["type"].toString(),

@@ -48,8 +48,7 @@ class AppException implements Exception {
   bool get isServerError => kind == AppErrorKind.server;
   bool get isCancelled => kind == AppErrorKind.cancelled;
 
-  bool get canUseOfflineFallback =>
-      isNetworkError || isTimeout;
+  bool get canUseOfflineFallback => isNetworkError || isTimeout;
 
   bool get isRetryable =>
       isNetworkError ||
@@ -62,9 +61,8 @@ class AppException implements Exception {
 
   @override
   String toString() {
-    final reference = traceId == null || traceId!.isEmpty
-        ? ''
-        : ' (Reference: $traceId)';
+    final reference =
+        traceId == null || traceId!.isEmpty ? '' : ' (Reference: $traceId)';
     return '$userMessage$reference';
   }
 }

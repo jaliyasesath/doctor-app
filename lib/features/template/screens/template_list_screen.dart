@@ -160,7 +160,8 @@ class _TemplateListScreenState extends State<TemplateListScreen> {
                     if (favorites.isNotEmpty) ...[
                       const Text(
                         '⭐ Favorite Templates',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       const SizedBox(height: 10),
                       ...favorites.map(_buildTemplateCard),
@@ -169,7 +170,8 @@ class _TemplateListScreenState extends State<TemplateListScreen> {
                     if (others.isNotEmpty) ...[
                       const Text(
                         'All Templates',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       const SizedBox(height: 10),
                       ...others.map(_buildTemplateCard),

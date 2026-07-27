@@ -4,10 +4,6 @@ import 'package:sqflite/sqflite.dart';
 import '../../features/auth/data/doctor_session.dart';
 
 class DatabaseHelper {
-
-  
-
-
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
 
@@ -25,15 +21,13 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-     version: 31,
+      version: 31,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
   }
 
   Future<void> _createDB(Database db, int version) async {
-
-    
     await db.execute('''
       CREATE TABLE doctors (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -131,7 +125,7 @@ line_total REAL DEFAULT 0
   )
 ''');
 
-await db.execute('''
+    await db.execute('''
   CREATE TABLE prescription_bills (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     server_id INTEGER,
@@ -233,21 +227,19 @@ is_favorite INTEGER DEFAULT 0,
     created_at TEXT
   )
 ''');
-await _createIndexes(db);
+    await _createIndexes(db);
   }
-  
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    try {
+      await db.execute(
+        "ALTER TABLE doctors ADD COLUMN role TEXT DEFAULT 'Doctor'",
+      );
+    } catch (_) {}
 
     try {
-  await db.execute(
-    "ALTER TABLE doctors ADD COLUMN role TEXT DEFAULT 'Doctor'",
-  );
-} catch (_) {}
-
-try {
-  await db.execute('ALTER TABLE doctors ADD COLUMN specialization TEXT');
-} catch (_) {}
+      await db.execute('ALTER TABLE doctors ADD COLUMN specialization TEXT');
+    } catch (_) {}
     try {
       await db.execute('ALTER TABLE doctors ADD COLUMN server_id INTEGER');
     } catch (_) {}
@@ -317,11 +309,13 @@ try {
     } catch (_) {}
 
     try {
-      await db.execute('ALTER TABLE prescriptions ADD COLUMN server_id INTEGER');
+      await db
+          .execute('ALTER TABLE prescriptions ADD COLUMN server_id INTEGER');
     } catch (_) {}
 
     try {
-      await db.execute('ALTER TABLE prescriptions ADD COLUMN doctor_id INTEGER');
+      await db
+          .execute('ALTER TABLE prescriptions ADD COLUMN doctor_id INTEGER');
     } catch (_) {}
 
     try {
@@ -373,32 +367,32 @@ try {
     } catch (_) {}
 
     if (oldVersion < 19) {
-  try {
-    await db.execute(
-      'ALTER TABLE medicines ADD COLUMN is_deleted INTEGER DEFAULT 0',
-    );
-  } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE medicines ADD COLUMN is_deleted INTEGER DEFAULT 0',
+        );
+      } catch (_) {}
 
-  try {
-  await db.execute(
-    "ALTER TABLE patients ADD COLUMN queue_status TEXT DEFAULT 'Waiting'",
-  );
-} catch (_) {}
+      try {
+        await db.execute(
+          "ALTER TABLE patients ADD COLUMN queue_status TEXT DEFAULT 'Waiting'",
+        );
+      } catch (_) {}
 
-try {
-  await db.execute(
-    'ALTER TABLE patients ADD COLUMN queue_no INTEGER',
-  );
-} catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE patients ADD COLUMN queue_no INTEGER',
+        );
+      } catch (_) {}
 
-try {
-  await db.execute(
-    'ALTER TABLE patients ADD COLUMN queue_date TEXT',
-  );
-} catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE patients ADD COLUMN queue_date TEXT',
+        );
+      } catch (_) {}
 
-  if (oldVersion < 20) {
-  await db.execute('''
+      if (oldVersion < 20) {
+        await db.execute('''
     CREATE TABLE IF NOT EXISTS prescription_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       prescription_id INTEGER,
@@ -410,10 +404,8 @@ try {
       created_at TEXT
     )
   ''');
-}
-
-
-}
+      }
+    }
 
     if (oldVersion < 17) {
       await db.execute('''
@@ -451,7 +443,7 @@ try {
     }
 
     if (oldVersion < 23) {
-  await db.execute('''
+      await db.execute('''
     CREATE TABLE IF NOT EXISTS custom_clinical_chips (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       doctor_id INTEGER,
@@ -460,47 +452,47 @@ try {
       created_at TEXT
     )
   ''');
-}
+    }
 
-if (oldVersion < 24) {
-  try {
-    await db.execute(
-      'ALTER TABLE custom_clinical_chips ADD COLUMN doctor_id INTEGER',
-    );
-  } catch (_) {}
-}
+    if (oldVersion < 24) {
+      try {
+        await db.execute(
+          'ALTER TABLE custom_clinical_chips ADD COLUMN doctor_id INTEGER',
+        );
+      } catch (_) {}
+    }
 
-if (oldVersion < 25) {
-  try {
-    await db.execute(
-      'ALTER TABLE prescriptions ADD COLUMN follow_up_date TEXT',
-    );
-  } catch (_) {}
+    if (oldVersion < 25) {
+      try {
+        await db.execute(
+          'ALTER TABLE prescriptions ADD COLUMN follow_up_date TEXT',
+        );
+      } catch (_) {}
 
-  try {
-    await db.execute(
-      'ALTER TABLE prescriptions ADD COLUMN follow_up_note TEXT',
-    );
-  } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE prescriptions ADD COLUMN follow_up_note TEXT',
+        );
+      } catch (_) {}
 
-  try {
-    await db.execute(
-      "ALTER TABLE prescriptions ADD COLUMN follow_up_status TEXT DEFAULT 'pending'",
-    );
-  } catch (_) {}
+      try {
+        await db.execute(
+          "ALTER TABLE prescriptions ADD COLUMN follow_up_status TEXT DEFAULT 'pending'",
+        );
+      } catch (_) {}
 
-  try {
-    await db.execute(
-      'ALTER TABLE prescriptions ADD COLUMN reminder_sent INTEGER DEFAULT 0',
-    );
-  } catch (_) {}
-}
-if (oldVersion < 26) {
-  await _createIndexes(db);
-}
+      try {
+        await db.execute(
+          'ALTER TABLE prescriptions ADD COLUMN reminder_sent INTEGER DEFAULT 0',
+        );
+      } catch (_) {}
+    }
+    if (oldVersion < 26) {
+      await _createIndexes(db);
+    }
 
-if (oldVersion < 27) {
-  await db.execute('''
+    if (oldVersion < 27) {
+      await db.execute('''
     CREATE TABLE IF NOT EXISTS prescription_bills (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       server_id INTEGER,
@@ -531,109 +523,105 @@ if (oldVersion < 27) {
       updated_at TEXT
     )
   ''');
-}
+    }
 
-if (oldVersion < 28) {
-  try {
-    await db.execute(
-      'ALTER TABLE prescription_items ADD COLUMN prescription_only INTEGER DEFAULT 0',
-    );
-  } catch (_) {}
+    if (oldVersion < 28) {
+      try {
+        await db.execute(
+          'ALTER TABLE prescription_items ADD COLUMN prescription_only INTEGER DEFAULT 0',
+        );
+      } catch (_) {}
 
-  try {
-    await db.execute(
-      'ALTER TABLE prescription_items ADD COLUMN unit_price REAL DEFAULT 0',
-    );
-  } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE prescription_items ADD COLUMN unit_price REAL DEFAULT 0',
+        );
+      } catch (_) {}
 
-  try {
-    await db.execute(
-      'ALTER TABLE prescription_items ADD COLUMN quantity REAL DEFAULT 1',
-    );
-  } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE prescription_items ADD COLUMN quantity REAL DEFAULT 1',
+        );
+      } catch (_) {}
 
-  try {
-    await db.execute(
-      'ALTER TABLE prescription_items ADD COLUMN line_total REAL DEFAULT 0',
-    );
-  } catch (_) {}
-}
+      try {
+        await db.execute(
+          'ALTER TABLE prescription_items ADD COLUMN line_total REAL DEFAULT 0',
+        );
+      } catch (_) {}
+    }
 
-if (oldVersion < 29) {
-  try {
-    await db.execute(
-      'ALTER TABLE medicines ADD COLUMN selling_price REAL DEFAULT 0',
-    );
-  } catch (_) {}
+    if (oldVersion < 29) {
+      try {
+        await db.execute(
+          'ALTER TABLE medicines ADD COLUMN selling_price REAL DEFAULT 0',
+        );
+      } catch (_) {}
 
-  try {
-    await db.execute(
-      'ALTER TABLE medicines ADD COLUMN cost_price REAL DEFAULT 0',
-    );
-  } catch (_) {}
-}
+      try {
+        await db.execute(
+          'ALTER TABLE medicines ADD COLUMN cost_price REAL DEFAULT 0',
+        );
+      } catch (_) {}
+    }
 
-if (oldVersion < 30) {
+    if (oldVersion < 30) {
+      try {
+        await db.execute(
+          'ALTER TABLE medicines ADD COLUMN custom_dosage TEXT',
+        );
+      } catch (_) {}
 
-  try {
-    await db.execute(
-      'ALTER TABLE medicines ADD COLUMN custom_dosage TEXT',
-    );
-  } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE medicines ADD COLUMN custom_frequency TEXT',
+        );
+      } catch (_) {}
 
-  try {
-    await db.execute(
-      'ALTER TABLE medicines ADD COLUMN custom_frequency TEXT',
-    );
-  } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE medicines ADD COLUMN custom_duration TEXT',
+        );
+      } catch (_) {}
 
-  try {
-    await db.execute(
-      'ALTER TABLE medicines ADD COLUMN custom_duration TEXT',
-    );
-  } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE medicines ADD COLUMN custom_instructions TEXT',
+        );
+      } catch (_) {}
+    }
 
-  try {
-    await db.execute(
-      'ALTER TABLE medicines ADD COLUMN custom_instructions TEXT',
-    );
-  } catch (_) {}
+    if (oldVersion < 31) {
+      try {
+        await db.execute(
+          'ALTER TABLE medicines ADD COLUMN custom_medicine_name TEXT',
+        );
+      } catch (_) {}
 
-}
+      try {
+        await db.execute(
+          'ALTER TABLE medicines ADD COLUMN custom_generic_name TEXT',
+        );
+      } catch (_) {}
 
-if (oldVersion < 31) {
-  try {
-    await db.execute(
-      'ALTER TABLE medicines ADD COLUMN custom_medicine_name TEXT',
-    );
-  } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE medicines ADD COLUMN custom_brand_name TEXT',
+        );
+      } catch (_) {}
 
-  try {
-    await db.execute(
-      'ALTER TABLE medicines ADD COLUMN custom_generic_name TEXT',
-    );
-  } catch (_) {}
+      try {
+        await db.execute(
+          'ALTER TABLE medicines ADD COLUMN custom_drug_group TEXT',
+        );
+      } catch (_) {}
 
-  try {
-    await db.execute(
-      'ALTER TABLE medicines ADD COLUMN custom_brand_name TEXT',
-    );
-  } catch (_) {}
-
-  try {
-    await db.execute(
-      'ALTER TABLE medicines ADD COLUMN custom_drug_group TEXT',
-    );
-  } catch (_) {}
-
-  try {
-    await db.execute(
-      'ALTER TABLE medicines ADD COLUMN custom_medicine_type TEXT',
-    );
-  } catch (_) {}
-}
-
-
+      try {
+        await db.execute(
+          'ALTER TABLE medicines ADD COLUMN custom_medicine_type TEXT',
+        );
+      } catch (_) {}
+    }
   }
 
   // =========================
@@ -657,20 +645,20 @@ if (oldVersion < 31) {
   }
 
   Future<int> updateDoctor(
-  int id,
-  Map<String, dynamic> data,
-) async {
-  final db = await database;
+    int id,
+    Map<String, dynamic> data,
+  ) async {
+    final db = await database;
 
-  data['updated_at'] = DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toIso8601String();
 
-  return db.update(
-    'doctors',
-    data,
-    where: 'id = ?',
-    whereArgs: [id],
-  );
-}
+    return db.update(
+      'doctors',
+      data,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 
   Future<Map<String, dynamic>?> getDoctorByEmail(String email) async {
     final db = await database;
@@ -752,9 +740,8 @@ if (oldVersion < 31) {
     data['updated_at'] = DateTime.now().toIso8601String();
     data['created_at'] ??= DateTime.now().toIso8601String();
 
-data['queue_status'] ??= 'Waiting';
-data['queue_date'] ??=
-    DateTime.now().toIso8601String();
+    data['queue_status'] ??= 'Waiting';
+    data['queue_date'] ??= DateTime.now().toIso8601String();
     return db.insert('patients', data);
   }
 
@@ -927,84 +914,85 @@ data['queue_date'] ??=
   // =========================
 
   Future<void> insertPrescriptionItems(
-  int prescriptionId,
-  List<Map<String, dynamic>> items,
-) async {
-  final db = await database;
+    int prescriptionId,
+    List<Map<String, dynamic>> items,
+  ) async {
+    final db = await database;
 
-  for (final item in items) {
-    await db.insert('prescription_items', {
-      'prescription_id': prescriptionId,
-      'medicine_name': item['medicine_name'] ?? item['medicineName'] ?? '',
-      'dosage': item['dosage'] ?? '',
-      'frequency': item['frequency'] ?? '',
-      'duration': item['duration'] ?? '',
-      'instructions': item['instructions'] ?? '',
-      'created_at': DateTime.now().toIso8601String(),
-      'prescription_only': item['prescription_only'] ?? item['prescriptionOnly'] ?? 0,
-'unit_price': item['unit_price'] ?? item['unitPrice'] ?? 0,
-'quantity': item['quantity'] ?? 1,
-'line_total': item['line_total'] ?? item['lineTotal'] ?? 0,
-    });
+    for (final item in items) {
+      await db.insert('prescription_items', {
+        'prescription_id': prescriptionId,
+        'medicine_name': item['medicine_name'] ?? item['medicineName'] ?? '',
+        'dosage': item['dosage'] ?? '',
+        'frequency': item['frequency'] ?? '',
+        'duration': item['duration'] ?? '',
+        'instructions': item['instructions'] ?? '',
+        'created_at': DateTime.now().toIso8601String(),
+        'prescription_only':
+            item['prescription_only'] ?? item['prescriptionOnly'] ?? 0,
+        'unit_price': item['unit_price'] ?? item['unitPrice'] ?? 0,
+        'quantity': item['quantity'] ?? 1,
+        'line_total': item['line_total'] ?? item['lineTotal'] ?? 0,
+      });
+    }
   }
-}
 
-Future<void> replacePrescriptionItems(
-  int prescriptionId,
-  List<Map<String, dynamic>> items,
-) async {
-  final db = await database;
+  Future<void> replacePrescriptionItems(
+    int prescriptionId,
+    List<Map<String, dynamic>> items,
+  ) async {
+    final db = await database;
 
-  await db.delete(
-    'prescription_items',
-    where: 'prescription_id = ?',
-    whereArgs: [prescriptionId],
-  );
+    await db.delete(
+      'prescription_items',
+      where: 'prescription_id = ?',
+      whereArgs: [prescriptionId],
+    );
 
-  await insertPrescriptionItems(prescriptionId, items);
+    await insertPrescriptionItems(prescriptionId, items);
 
-  final itemsText = items.map((item) {
-    return '${item['medicine_name'] ?? item['medicineName'] ?? ''} | '
-        '${item['dosage'] ?? ''} | '
-        '${item['frequency'] ?? ''} | '
-        '${item['duration'] ?? ''} | '
-        '${item['instructions'] ?? ''}';
-  }).join('\n');
+    final itemsText = items.map((item) {
+      return '${item['medicine_name'] ?? item['medicineName'] ?? ''} | '
+          '${item['dosage'] ?? ''} | '
+          '${item['frequency'] ?? ''} | '
+          '${item['duration'] ?? ''} | '
+          '${item['instructions'] ?? ''}';
+    }).join('\n');
 
-  await db.update(
-    'prescriptions',
-    {
-      'items_text': itemsText,
-      'sync_status': 'pending',
-      'updated_at': DateTime.now().toIso8601String(),
-    },
-    where: 'id = ?',
-    whereArgs: [prescriptionId],
-  );
-}
+    await db.update(
+      'prescriptions',
+      {
+        'items_text': itemsText,
+        'sync_status': 'pending',
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [prescriptionId],
+    );
+  }
 
-Future<List<Map<String, dynamic>>> getPrescriptionItems(
-  int prescriptionId,
-) async {
-  final db = await database;
+  Future<List<Map<String, dynamic>>> getPrescriptionItems(
+    int prescriptionId,
+  ) async {
+    final db = await database;
 
-  return db.query(
-    'prescription_items',
-    where: 'prescription_id = ?',
-    whereArgs: [prescriptionId],
-    orderBy: 'id ASC',
-  );
-}
+    return db.query(
+      'prescription_items',
+      where: 'prescription_id = ?',
+      whereArgs: [prescriptionId],
+      orderBy: 'id ASC',
+    );
+  }
 
-Future<void> deletePrescriptionItems(int prescriptionId) async {
-  final db = await database;
+  Future<void> deletePrescriptionItems(int prescriptionId) async {
+    final db = await database;
 
-  await db.delete(
-    'prescription_items',
-    where: 'prescription_id = ?',
-    whereArgs: [prescriptionId],
-  );
-}
+    await db.delete(
+      'prescription_items',
+      where: 'prescription_id = ?',
+      whereArgs: [prescriptionId],
+    );
+  }
 
   Future<int> insertPrescription(Map<String, dynamic> data) async {
     final db = await database;
@@ -1199,8 +1187,6 @@ Future<void> deletePrescriptionItems(int prescriptionId) async {
   // LEGACY FIX
   // =========================
 
-  
-
   // =========================
   // TEMPLATES
   // =========================
@@ -1266,29 +1252,29 @@ Future<void> deletePrescriptionItems(int prescriptionId) async {
   }
 
   Future<int> deleteMedicine(int id) async {
-  final db = await database;
+    final db = await database;
 
-  return db.update(
-    'medicines',
-    {
-      'is_deleted': 1,
-      'sync_status': 'pending',
-      'updated_at': DateTime.now().toIso8601String(),
-    },
-    where: 'id = ?',
-    whereArgs: [id],
-  );
-}
+    return db.update(
+      'medicines',
+      {
+        'is_deleted': 1,
+        'sync_status': 'pending',
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 
-Future<int> permanentlyDeleteMedicine(int id) async {
-  final db = await database;
+  Future<int> permanentlyDeleteMedicine(int id) async {
+    final db = await database;
 
-  return db.delete(
-    'medicines',
-    where: 'id = ?',
-    whereArgs: [id],
-  );
-}
+    return db.delete(
+      'medicines',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 
   Future<Map<String, dynamic>?> getMedicineById(int id) async {
     final db = await database;
@@ -1304,45 +1290,45 @@ Future<int> permanentlyDeleteMedicine(int id) async {
   }
 
   Future<List<Map<String, dynamic>>> getMedicinesByDoctor(int doctorId) async {
-  final db = await database;
+    final db = await database;
 
-  return db.query(
-    'medicines',
-    where: 'doctor_id = ? AND (is_deleted IS NULL OR is_deleted = 0)',
-    whereArgs: [doctorId],
-    orderBy: 'is_favorite DESC, medicine_name ASC',
-  );
-}
+    return db.query(
+      'medicines',
+      where: 'doctor_id = ? AND (is_deleted IS NULL OR is_deleted = 0)',
+      whereArgs: [doctorId],
+      orderBy: 'is_favorite DESC, medicine_name ASC',
+    );
+  }
 
   Future<List<Map<String, dynamic>>> searchMedicinesByDoctor(
-  int doctorId,
-  String query,
-) async {
-  final db = await database;
-  final q = '%$query%';
+    int doctorId,
+    String query,
+  ) async {
+    final db = await database;
+    final q = '%$query%';
 
-  return db.query(
-    'medicines',
-    where:
-        'doctor_id = ? AND (is_deleted IS NULL OR is_deleted = 0) AND (medicine_name LIKE ? OR generic_name LIKE ? OR brand_name LIKE ? OR drug_group LIKE ?)',
-    whereArgs: [doctorId, q, q, q, q],
-    orderBy: 'is_favorite DESC, medicine_name ASC',
-  );
-}
+    return db.query(
+      'medicines',
+      where:
+          'doctor_id = ? AND (is_deleted IS NULL OR is_deleted = 0) AND (medicine_name LIKE ? OR generic_name LIKE ? OR brand_name LIKE ? OR drug_group LIKE ?)',
+      whereArgs: [doctorId, q, q, q, q],
+      orderBy: 'is_favorite DESC, medicine_name ASC',
+    );
+  }
 
   Future<List<Map<String, dynamic>>> getFavoriteMedicinesByDoctor(
-  int doctorId,
-) async {
-  final db = await database;
+    int doctorId,
+  ) async {
+    final db = await database;
 
-  return db.query(
-    'medicines',
-    where:
-        'doctor_id = ? AND is_favorite = ? AND (is_deleted IS NULL OR is_deleted = 0)',
-    whereArgs: [doctorId, 1],
-    orderBy: 'medicine_name ASC',
-  );
-}
+    return db.query(
+      'medicines',
+      where:
+          'doctor_id = ? AND is_favorite = ? AND (is_deleted IS NULL OR is_deleted = 0)',
+      whereArgs: [doctorId, 1],
+      orderBy: 'medicine_name ASC',
+    );
+  }
 
   Future<void> toggleMedicineFavorite(int id, bool isFavorite) async {
     final db = await database;
@@ -1399,105 +1385,96 @@ Future<int> permanentlyDeleteMedicine(int id) async {
     );
   }
 
- Future<void> upsertMedicineFromServer({
-  required int doctorId,
-  required int serverId,
+  Future<void> upsertMedicineFromServer({
+    required int doctorId,
+    required int serverId,
+    required String medicineName,
+    String? genericName,
+    String? brandName,
+    String? drugGroup,
+    String? doseForm,
+    String? strength,
+    String? customMedicineName,
+    String? customGenericName,
+    String? customBrandName,
+    String? customDrugGroup,
+    String? customMedicineType,
+    String? customDosage,
+    String? customFrequency,
+    String? customDuration,
+    String? customInstructions,
+    double sellingPrice = 0,
+    double costPrice = 0,
+    int isFavorite = 0,
+    String? createdAt,
+    String? updatedAt,
+  }) async {
+    final db = await database;
 
-  required String medicineName,
+    final existing = await db.query(
+      'medicines',
+      where: 'server_id = ? AND doctor_id = ?',
+      whereArgs: [serverId, doctorId],
+      limit: 1,
+    );
 
-  String? genericName,
-  String? brandName,
-  String? drugGroup,
-  String? doseForm,
-  String? strength,
+    final data = {
+      'server_id': serverId,
+      'doctor_id': doctorId,
+      'medicine_name': medicineName,
+      'custom_medicine_name': customMedicineName ?? '',
+      'custom_generic_name': customGenericName ?? '',
+      'custom_brand_name': customBrandName ?? '',
+      'custom_drug_group': customDrugGroup ?? '',
+      'custom_medicine_type': customMedicineType ?? '',
+      'generic_name': genericName ?? '',
+      'brand_name': brandName ?? '',
+      'drug_group': drugGroup ?? '',
+      'dose_form': doseForm ?? '',
+      'strength': strength ?? '',
+      'custom_dosage': customDosage ?? '',
+      'custom_frequency': customFrequency ?? '',
+      'custom_duration': customDuration ?? '',
+      'custom_instructions': customInstructions ?? '',
+      'selling_price': sellingPrice,
+      'cost_price': costPrice,
+      'is_favorite': isFavorite,
+      'sync_status': 'synced',
+      'is_deleted': 0,
+      'created_at': createdAt ?? DateTime.now().toIso8601String(),
+      'updated_at': updatedAt ?? DateTime.now().toIso8601String(),
+    };
 
-  String? customMedicineName,
-  String? customGenericName,
-  String? customBrandName,
-  String? customDrugGroup,
-  String? customMedicineType,
+    if (existing.isEmpty) {
+      await db.insert('medicines', data);
+    } else {
+      await db.update(
+        'medicines',
+        data,
+        where: 'id = ?',
+        whereArgs: [existing.first['id']],
+      );
+    }
+  }
 
-  String? customDosage,
-  String? customFrequency,
-  String? customDuration,
-  String? customInstructions,
+  Future<void> markMedicineDeletedFromServer({
+    required int doctorId,
+    required int serverId,
+    String? updatedAt,
+  }) async {
+    final db = await database;
 
-  double sellingPrice = 0,
-  double costPrice = 0,
-
-  int isFavorite = 0,
-
-  String? createdAt,
-  String? updatedAt,
-}) async {
-  final db = await database;
-
-  final existing = await db.query(
-    'medicines',
-    where: 'server_id = ? AND doctor_id = ?',
-    whereArgs: [serverId, doctorId],
-    limit: 1,
-  );
-
-final data = {
-  'server_id': serverId,
-  'doctor_id': doctorId,
-
-  'medicine_name': medicineName,
-  'custom_medicine_name': customMedicineName ?? '',
-  'custom_generic_name': customGenericName ?? '',
-  'custom_brand_name': customBrandName ?? '',
-  'custom_drug_group': customDrugGroup ?? '',
-  'custom_medicine_type': customMedicineType ?? '',
-
-  'generic_name': genericName ?? '',
-    'brand_name': brandName ?? '',
-    'drug_group': drugGroup ?? '',
-    'dose_form': doseForm ?? '',
-    'strength': strength ?? '',
-    'custom_dosage': customDosage ?? '',
-    'custom_frequency': customFrequency ?? '',
-    'custom_duration': customDuration ?? '',
-    'custom_instructions': customInstructions ?? '',
-    'selling_price': sellingPrice,
-    'cost_price': costPrice,
-    'is_favorite': isFavorite,
-    'sync_status': 'synced',
-    'is_deleted': 0,
-    'created_at': createdAt ?? DateTime.now().toIso8601String(),
-    'updated_at': updatedAt ?? DateTime.now().toIso8601String(),
-  };
-
-  if (existing.isEmpty) {
-    await db.insert('medicines', data);
-  } else {
     await db.update(
       'medicines',
-      data,
-      where: 'id = ?',
-      whereArgs: [existing.first['id']],
+      {
+        'is_deleted': 1,
+        'sync_status': 'synced',
+        'updated_at': updatedAt ?? DateTime.now().toIso8601String(),
+      },
+      where: 'doctor_id = ? AND server_id = ?',
+      whereArgs: [doctorId, serverId],
     );
   }
-}
-
-Future<void> markMedicineDeletedFromServer({
-  required int doctorId,
-  required int serverId,
-  String? updatedAt,
-}) async {
-  final db = await database;
-
-  await db.update(
-    'medicines',
-    {
-      'is_deleted': 1,
-      'sync_status': 'synced',
-      'updated_at': updatedAt ?? DateTime.now().toIso8601String(),
-    },
-    where: 'doctor_id = ? AND server_id = ?',
-    whereArgs: [doctorId, serverId],
-  );
-}
 
   bool hasDrugGroupAllergy({
     required String patientAllergies,
@@ -1510,10 +1487,6 @@ Future<void> markMedicineDeletedFromServer({
 
     return allergies.contains(group);
   }
-
-  
-
- 
 
   // =========================
   // CUSTOM INSTRUCTIONS
@@ -1598,323 +1571,312 @@ Future<void> markMedicineDeletedFromServer({
   }
 
   Future<void> _createIndexes(Database db) async {
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_patients_doctor_id ON patients(doctor_id)',
-  );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_patients_doctor_id ON patients(doctor_id)',
+    );
 
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_patients_doctor_name ON patients(doctor_id, patient_name)',
-  );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_patients_doctor_name ON patients(doctor_id, patient_name)',
+    );
 
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_patients_doctor_phone ON patients(doctor_id, phone_number)',
-  );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_patients_doctor_phone ON patients(doctor_id, phone_number)',
+    );
 
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_patients_queue ON patients(doctor_id, queue_status, queue_date)',
-  );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_patients_queue ON patients(doctor_id, queue_status, queue_date)',
+    );
 
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_prescriptions_doctor_id ON prescriptions(doctor_id)',
-  );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_prescriptions_doctor_id ON prescriptions(doctor_id)',
+    );
 
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_prescriptions_patient_doctor ON prescriptions(patient_id, doctor_id)',
-  );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_prescriptions_patient_doctor ON prescriptions(patient_id, doctor_id)',
+    );
 
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_prescriptions_date ON prescriptions(doctor_id, prescription_date)',
-  );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_prescriptions_date ON prescriptions(doctor_id, prescription_date)',
+    );
 
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_prescriptions_followup ON prescriptions(doctor_id, follow_up_status, follow_up_date)',
-  );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_prescriptions_followup ON prescriptions(doctor_id, follow_up_status, follow_up_date)',
+    );
 
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_prescriptions_sync ON prescriptions(sync_status)',
-  );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_prescriptions_sync ON prescriptions(sync_status)',
+    );
 
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_medicines_doctor_name ON medicines(doctor_id, medicine_name)',
-  );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_medicines_doctor_name ON medicines(doctor_id, medicine_name)',
+    );
 
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_medicines_doctor_favorite ON medicines(doctor_id, is_favorite, medicine_name)',
-  );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_medicines_doctor_favorite ON medicines(doctor_id, is_favorite, medicine_name)',
+    );
 
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_medicines_sync ON medicines(sync_status)',
-  );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_medicines_sync ON medicines(sync_status)',
+    );
 
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_custom_instructions_doctor ON custom_instructions(doctor_id, usage_count)',
-  );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_custom_instructions_doctor ON custom_instructions(doctor_id, usage_count)',
+    );
 
-  await db.execute(
-    'CREATE INDEX IF NOT EXISTS idx_prescription_items_prescription ON prescription_items(prescription_id)',
-  );
-}
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_prescription_items_prescription ON prescription_items(prescription_id)',
+    );
+  }
 
-Future<List<Map<String, dynamic>>> getPatientsByDoctorPaged(
-  int doctorId, {
-  int limit = 30,
-  int offset = 0,
-}) async {
-  final db = await database;
+  Future<List<Map<String, dynamic>>> getPatientsByDoctorPaged(
+    int doctorId, {
+    int limit = 30,
+    int offset = 0,
+  }) async {
+    final db = await database;
 
-  return db.query(
-    'patients',
-    where: 'doctor_id = ?',
-    whereArgs: [doctorId],
-    orderBy: 'id DESC',
-    limit: limit,
-    offset: offset,
-  );
-}
+    return db.query(
+      'patients',
+      where: 'doctor_id = ?',
+      whereArgs: [doctorId],
+      orderBy: 'id DESC',
+      limit: limit,
+      offset: offset,
+    );
+  }
 
-Future<List<Map<String, dynamic>>> searchPatientsByDoctorPaged(
-  int doctorId,
-  String query, {
-  int limit = 30,
-  int offset = 0,
-}) async {
-  final db = await database;
-  final q = '%${query.trim()}%';
+  Future<List<Map<String, dynamic>>> searchPatientsByDoctorPaged(
+    int doctorId,
+    String query, {
+    int limit = 30,
+    int offset = 0,
+  }) async {
+    final db = await database;
+    final q = '%${query.trim()}%';
 
-  return db.query(
-    'patients',
-    where: 'doctor_id = ? AND (patient_name LIKE ? OR phone_number LIKE ?)',
-    whereArgs: [doctorId, q, q],
-    orderBy: 'id DESC',
-    limit: limit,
-    offset: offset,
-  );
-}
+    return db.query(
+      'patients',
+      where: 'doctor_id = ? AND (patient_name LIKE ? OR phone_number LIKE ?)',
+      whereArgs: [doctorId, q, q],
+      orderBy: 'id DESC',
+      limit: limit,
+      offset: offset,
+    );
+  }
 
-Future<List<Map<String, dynamic>>> getPrescriptionsByDoctorPaged(
-  int doctorId, {
-  int limit = 30,
-  int offset = 0,
-}) async {
-  final db = await database;
+  Future<List<Map<String, dynamic>>> getPrescriptionsByDoctorPaged(
+    int doctorId, {
+    int limit = 30,
+    int offset = 0,
+  }) async {
+    final db = await database;
 
-  return db.query(
-    'prescriptions',
-    where: 'doctor_id = ?',
-    whereArgs: [doctorId],
-    orderBy: 'id DESC',
-    limit: limit,
-    offset: offset,
-  );
-}
+    return db.query(
+      'prescriptions',
+      where: 'doctor_id = ?',
+      whereArgs: [doctorId],
+      orderBy: 'id DESC',
+      limit: limit,
+      offset: offset,
+    );
+  }
 
-Future<List<Map<String, dynamic>>> getMedicinesByDoctorPaged(
-  int doctorId, {
-  int limit = 50,
-  int offset = 0,
-}) async {
-  final db = await database;
+  Future<List<Map<String, dynamic>>> getMedicinesByDoctorPaged(
+    int doctorId, {
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final db = await database;
 
-  return db.query(
-    'medicines',
-    where: 'doctor_id = ? AND (is_deleted IS NULL OR is_deleted = 0)',
-    whereArgs: [doctorId],
-    orderBy: 'is_favorite DESC, medicine_name ASC',
-    limit: limit,
-    offset: offset,
-  );
-}
-Future<List<Map<String, dynamic>>> searchMedicinesByDoctorPaged(
-  int doctorId,
-  String query, {
-  int limit = 50,
-  int offset = 0,
-}) async {
-  final db = await database;
-  final q = '%${query.trim()}%';
+    return db.query(
+      'medicines',
+      where: 'doctor_id = ? AND (is_deleted IS NULL OR is_deleted = 0)',
+      whereArgs: [doctorId],
+      orderBy: 'is_favorite DESC, medicine_name ASC',
+      limit: limit,
+      offset: offset,
+    );
+  }
 
-  return db.query(
-    'medicines',
-    where:
-        'doctor_id = ? AND (is_deleted IS NULL OR is_deleted = 0) AND (medicine_name LIKE ? OR generic_name LIKE ? OR brand_name LIKE ? OR drug_group LIKE ?)',
-    whereArgs: [doctorId, q, q, q, q],
-    orderBy: 'is_favorite DESC, medicine_name ASC',
-    limit: limit,
-    offset: offset,
-  );
-}
+  Future<List<Map<String, dynamic>>> searchMedicinesByDoctorPaged(
+    int doctorId,
+    String query, {
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final db = await database;
+    final q = '%${query.trim()}%';
+
+    return db.query(
+      'medicines',
+      where:
+          'doctor_id = ? AND (is_deleted IS NULL OR is_deleted = 0) AND (medicine_name LIKE ? OR generic_name LIKE ? OR brand_name LIKE ? OR drug_group LIKE ?)',
+      whereArgs: [doctorId, q, q, q, q],
+      orderBy: 'is_favorite DESC, medicine_name ASC',
+      limit: limit,
+      offset: offset,
+    );
+  }
 
 // =========================
 // PRESCRIPTION BILLS
 // =========================
 
-Future<int> insertPrescriptionBill(
-  Map<String, dynamic> data,
-) async {
-  final db = await database;
+  Future<int> insertPrescriptionBill(
+    Map<String, dynamic> data,
+  ) async {
+    final db = await database;
 
-  data['sync_status'] ??= 'pending';
-  data['created_at'] ??=
-      DateTime.now().toIso8601String();
+    data['sync_status'] ??= 'pending';
+    data['created_at'] ??= DateTime.now().toIso8601String();
 
-  data['updated_at'] =
-      DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toIso8601String();
 
-  return db.insert(
-    'prescription_bills',
-    data,
-  );
-}
+    return db.insert(
+      'prescription_bills',
+      data,
+    );
+  }
 
-Future<int> updatePrescriptionBill(
-  int id,
-  Map<String, dynamic> data,
-) async {
-  final db = await database;
+  Future<int> updatePrescriptionBill(
+    int id,
+    Map<String, dynamic> data,
+  ) async {
+    final db = await database;
 
-  data['sync_status'] = 'pending';
+    data['sync_status'] = 'pending';
 
-  data['updated_at'] =
-      DateTime.now().toIso8601String();
+    data['updated_at'] = DateTime.now().toIso8601String();
 
-  return db.update(
-    'prescription_bills',
-    data,
-    where: 'id = ?',
-    whereArgs: [id],
-  );
-}
+    return db.update(
+      'prescription_bills',
+      data,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 
-Future<List<Map<String, dynamic>>>
-    getBillsByDoctor(
-  int doctorId,
-) async {
-  final db = await database;
+  Future<List<Map<String, dynamic>>> getBillsByDoctor(
+    int doctorId,
+  ) async {
+    final db = await database;
 
-  return db.query(
-    'prescription_bills',
-    where: 'doctor_id = ?',
-    whereArgs: [doctorId],
-    orderBy: 'id DESC',
-  );
-}
+    return db.query(
+      'prescription_bills',
+      where: 'doctor_id = ?',
+      whereArgs: [doctorId],
+      orderBy: 'id DESC',
+    );
+  }
 
-Future<List<Map<String, dynamic>>>
-    getBillsByPatient(
-  int patientId,
-) async {
-  final db = await database;
+  Future<List<Map<String, dynamic>>> getBillsByPatient(
+    int patientId,
+  ) async {
+    final db = await database;
 
-  return db.query(
-    'prescription_bills',
-    where: 'patient_id = ?',
-    whereArgs: [patientId],
-    orderBy: 'id DESC',
-  );
-}
+    return db.query(
+      'prescription_bills',
+      where: 'patient_id = ?',
+      whereArgs: [patientId],
+      orderBy: 'id DESC',
+    );
+  }
 
-Future<Map<String, dynamic>?>
-    getBillByPrescription(
-  int prescriptionId,
-) async {
-  final db = await database;
+  Future<Map<String, dynamic>?> getBillByPrescription(
+    int prescriptionId,
+  ) async {
+    final db = await database;
 
-  final result = await db.query(
-    'prescription_bills',
-    where: 'prescription_id = ?',
-    whereArgs: [prescriptionId],
-    limit: 1,
-  );
+    final result = await db.query(
+      'prescription_bills',
+      where: 'prescription_id = ?',
+      whereArgs: [prescriptionId],
+      limit: 1,
+    );
 
-  return result.isNotEmpty
-      ? result.first
-      : null;
-}
+    return result.isNotEmpty ? result.first : null;
+  }
 
-Future<List<Map<String, dynamic>>>
-    getPendingBills() async {
-  final db = await database;
+  Future<List<Map<String, dynamic>>> getPendingBills() async {
+    final db = await database;
 
-  return db.query(
-    'prescription_bills',
-    where:
-        'sync_status = ? OR sync_status = ?',
-    whereArgs: ['pending', 'failed'],
-    orderBy: 'id ASC',
-  );
-}
+    return db.query(
+      'prescription_bills',
+      where: 'sync_status = ? OR sync_status = ?',
+      whereArgs: ['pending', 'failed'],
+      orderBy: 'id ASC',
+    );
+  }
 
-Future<void> markBillSynced(
-  int localId,
-  int serverId,
-) async {
-  final db = await database;
+  Future<void> markBillSynced(
+    int localId,
+    int serverId,
+  ) async {
+    final db = await database;
 
-  await db.update(
-    'prescription_bills',
-    {
-      'server_id': serverId,
-      'sync_status': 'synced',
-      'updated_at':
-          DateTime.now().toIso8601String(),
-    },
-    where: 'id = ?',
-    whereArgs: [localId],
-  );
-}
+    await db.update(
+      'prescription_bills',
+      {
+        'server_id': serverId,
+        'sync_status': 'synced',
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [localId],
+    );
+  }
 
-Future<void> markBillSyncFailed(
-  int localId,
-) async {
-  final db = await database;
+  Future<void> markBillSyncFailed(
+    int localId,
+  ) async {
+    final db = await database;
 
-  await db.update(
-    'prescription_bills',
-    {
-      'sync_status': 'failed',
-      'updated_at':
-          DateTime.now().toIso8601String(),
-    },
-    where: 'id = ?',
-    whereArgs: [localId],
-  );
-}
+    await db.update(
+      'prescription_bills',
+      {
+        'sync_status': 'failed',
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [localId],
+    );
+  }
 
   // =========================
   // DASHBOARD
   // =========================
 
   Future<int> getTodayPrescriptionCountByDoctor(int doctorId) async {
-  final db = await database;
-  final today = DateTime.now().toIso8601String().substring(0, 10);
+    final db = await database;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
 
-  final result = await db.rawQuery(
-    '''
+    final result = await db.rawQuery(
+      '''
     SELECT COUNT(*) as count
     FROM prescriptions
     WHERE doctor_id = ? AND prescription_date = ?
     ''',
-    [doctorId, today],
-  );
+      [doctorId, today],
+    );
 
-  return Sqflite.firstIntValue(result) ?? 0;
-}
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
 
-Future<int> getTodayPatientCountByDoctor(int doctorId) async {
-  final db = await database;
-  final today = DateTime.now().toIso8601String().substring(0, 10);
+  Future<int> getTodayPatientCountByDoctor(int doctorId) async {
+    final db = await database;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
 
-  final result = await db.rawQuery(
-    '''
+    final result = await db.rawQuery(
+      '''
     SELECT COUNT(DISTINCT patient_id) as count
     FROM prescriptions
     WHERE doctor_id = ? AND prescription_date = ?
     ''',
-    [doctorId, today],
-  );
+      [doctorId, today],
+    );
 
-  return Sqflite.firstIntValue(result) ?? 0;
-}
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
 
   Future<int> getTodayPrescriptionCount() async {
     final db = await database;
@@ -1961,9 +1923,9 @@ Future<int> getTodayPatientCountByDoctor(int doctorId) async {
   }
 
   Future<List<Map<String, dynamic>>> getTopMedicines() async {
-  final db = await database;
+    final db = await database;
 
-  final result = await db.rawQuery('''
+    final result = await db.rawQuery('''
     SELECT medicine_name as name, COUNT(*) as count
     FROM prescription_items
     WHERE medicine_name IS NOT NULL AND medicine_name != ''
@@ -1972,8 +1934,8 @@ Future<int> getTodayPatientCountByDoctor(int doctorId) async {
     LIMIT 5
   ''');
 
-  return result;
-}
+    return result;
+  }
 
   // =========================
   // SERVER UPSERT
@@ -2025,71 +1987,70 @@ Future<int> getTodayPatientCountByDoctor(int doctorId) async {
       );
     }
   }
+
   Future<void> bulkUpsertPatientsFromServer({
-  required int doctorId,
-  required List<dynamic> patients,
-}) async {
-  final db = await database;
+    required int doctorId,
+    required List<dynamic> patients,
+  }) async {
+    final db = await database;
 
-  await db.transaction((txn) async {
-    for (final item in patients) {
-      final p = Map<String, dynamic>.from(item as Map);
+    await db.transaction((txn) async {
+      for (final item in patients) {
+        final p = Map<String, dynamic>.from(item as Map);
 
-      final serverId = p['id'] as int;
+        final serverId = p['id'] as int;
 
-      final phone = p['phoneNumber']?.toString() ?? '';
+        final phone = p['phoneNumber']?.toString() ?? '';
 
-final existing = await txn.query(
-  'patients',
-  where:
-      '(server_id = ? AND doctor_id = ?) OR (phone_number = ? AND doctor_id = ?)',
-  whereArgs: [serverId, doctorId, phone, doctorId],
-  limit: 1,
-);
-
-     final data = {
-  'server_id': serverId,
-  'doctor_id': doctorId,
-  'patient_name': (p['patientName'] ?? '').toString(),
-  'patient_age': (p['patientAge'] ?? p['age'] ?? '').toString(),
-  'patient_gender': (p['patientGender'] ?? p['gender'] ?? '').toString(),
-  'phone_number': p['phoneNumber']?.toString(),
-  'address': p['address']?.toString(),
-  'notes': p['notes']?.toString(),
-
-  'allergies': p['allergies']?.toString() ?? '',
-  'chronic_diseases': p['chronicDiseases']?.toString() ?? '',
-  'important_alerts': p['importantAlerts']?.toString() ?? '',
-
-  if (p['queueStatus'] != null || p['queue_status'] != null)
-    'queue_status':
-        (p['queueStatus'] ?? p['queue_status']).toString(),
-  if (p['queueNo'] != null || p['queue_no'] != null)
-    'queue_no': int.tryParse(
-      (p['queueNo'] ?? p['queue_no']).toString(),
-    ),
-  if (p['queueDate'] != null || p['queue_date'] != null)
-    'queue_date':
-        (p['queueDate'] ?? p['queue_date']).toString(),
-
-  'sync_status': 'synced',
-  'updated_at': p['updatedAt']?.toString() ?? DateTime.now().toIso8601String(),
-  'created_at': p['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
-};
-
-      if (existing.isEmpty) {
-        await txn.insert('patients', data);
-      } else {
-        await txn.update(
+        final existing = await txn.query(
           'patients',
-          data,
-          where: 'id = ?',
-          whereArgs: [existing.first['id']],
+          where:
+              '(server_id = ? AND doctor_id = ?) OR (phone_number = ? AND doctor_id = ?)',
+          whereArgs: [serverId, doctorId, phone, doctorId],
+          limit: 1,
         );
+
+        final data = {
+          'server_id': serverId,
+          'doctor_id': doctorId,
+          'patient_name': (p['patientName'] ?? '').toString(),
+          'patient_age': (p['patientAge'] ?? p['age'] ?? '').toString(),
+          'patient_gender':
+              (p['patientGender'] ?? p['gender'] ?? '').toString(),
+          'phone_number': p['phoneNumber']?.toString(),
+          'address': p['address']?.toString(),
+          'notes': p['notes']?.toString(),
+          'allergies': p['allergies']?.toString() ?? '',
+          'chronic_diseases': p['chronicDiseases']?.toString() ?? '',
+          'important_alerts': p['importantAlerts']?.toString() ?? '',
+          if (p['queueStatus'] != null || p['queue_status'] != null)
+            'queue_status': (p['queueStatus'] ?? p['queue_status']).toString(),
+          if (p['queueNo'] != null || p['queue_no'] != null)
+            'queue_no': int.tryParse(
+              (p['queueNo'] ?? p['queue_no']).toString(),
+            ),
+          if (p['queueDate'] != null || p['queue_date'] != null)
+            'queue_date': (p['queueDate'] ?? p['queue_date']).toString(),
+          'sync_status': 'synced',
+          'updated_at':
+              p['updatedAt']?.toString() ?? DateTime.now().toIso8601String(),
+          'created_at':
+              p['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
+        };
+
+        if (existing.isEmpty) {
+          await txn.insert('patients', data);
+        } else {
+          await txn.update(
+            'patients',
+            data,
+            where: 'id = ?',
+            whereArgs: [existing.first['id']],
+          );
+        }
       }
-    }
-  });
-}
+    });
+  }
 
   Future<void> upsertPrescriptionFromServer({
     required int doctorId,
@@ -2108,18 +2069,18 @@ final existing = await txn.query(
   }) async {
     final db = await database;
 
-   final patient = await db.query(
-  'patients',
-  where: 'server_id = ? AND doctor_id = ?',
-  whereArgs: [serverPatientId, doctorId],
-  limit: 1,
-);
+    final patient = await db.query(
+      'patients',
+      where: 'server_id = ? AND doctor_id = ?',
+      whereArgs: [serverPatientId, doctorId],
+      limit: 1,
+    );
 
-int? localPatientId;
+    int? localPatientId;
 
-if (patient.isNotEmpty) {
-  localPatientId = patient.first['id'] as int;
-}
+    if (patient.isNotEmpty) {
+      localPatientId = patient.first['id'] as int;
+    }
 
     final existing = await db.query(
       'prescriptions',
@@ -2159,231 +2120,215 @@ if (patient.isNotEmpty) {
   }
 
   Future<void> assignOldLocalDataToDoctor(int doctorId) async {
-  final db = await database;
+    final db = await database;
 
-  await db.update(
-    'patients',
-    {'doctor_id': doctorId},
-    where: 'doctor_id IS NULL OR doctor_id = 0',
-  );
+    await db.update(
+      'patients',
+      {'doctor_id': doctorId},
+      where: 'doctor_id IS NULL OR doctor_id = 0',
+    );
 
-  await db.update(
-    'medicines',
-    {'doctor_id': doctorId},
-    where: 'doctor_id IS NULL OR doctor_id = 0',
-  );
+    await db.update(
+      'medicines',
+      {'doctor_id': doctorId},
+      where: 'doctor_id IS NULL OR doctor_id = 0',
+    );
 
-  await db.update(
-    'prescriptions',
-    {'doctor_id': doctorId},
-    where: 'doctor_id IS NULL OR doctor_id = 0',
-  );
-}
+    await db.update(
+      'prescriptions',
+      {'doctor_id': doctorId},
+      where: 'doctor_id IS NULL OR doctor_id = 0',
+    );
+  }
 
 // =========================
 // CUSTOM CLINICAL CHIPS
 // =========================
 
-Future<void> deleteClinicalChip({
-  required int doctorId,
-  required String category,
-  required String value,
-}) async {
-  final db = await database;
+  Future<void> deleteClinicalChip({
+    required int doctorId,
+    required String category,
+    required String value,
+  }) async {
+    final db = await database;
 
-  await db.delete(
-    'custom_clinical_chips',
-    where: 'doctor_id = ? AND category = ? AND value = ?',
-    whereArgs: [doctorId, category, value],
-  );
-}
+    await db.delete(
+      'custom_clinical_chips',
+      where: 'doctor_id = ? AND category = ? AND value = ?',
+      whereArgs: [doctorId, category, value],
+    );
+  }
 
-Future<void> insertClinicalChip({
-  required int doctorId,
-  required String category,
-  required String value,
-}) async {
-  final db = await database;
+  Future<void> insertClinicalChip({
+    required int doctorId,
+    required String category,
+    required String value,
+  }) async {
+    final db = await database;
 
-  final existing = await db.query(
-    'custom_clinical_chips',
-    where: 'doctor_id = ? AND category = ? AND value = ?',
-    whereArgs: [doctorId, category, value],
-    limit: 1,
-  );
+    final existing = await db.query(
+      'custom_clinical_chips',
+      where: 'doctor_id = ? AND category = ? AND value = ?',
+      whereArgs: [doctorId, category, value],
+      limit: 1,
+    );
 
-  if (existing.isNotEmpty) return;
+    if (existing.isNotEmpty) return;
 
-  await db.insert(
-    'custom_clinical_chips',
-    {
-      'doctor_id': doctorId,
-      'category': category,
-      'value': value,
-      'created_at': DateTime.now().toIso8601String(),
-    },
-  );
-}
+    await db.insert(
+      'custom_clinical_chips',
+      {
+        'doctor_id': doctorId,
+        'category': category,
+        'value': value,
+        'created_at': DateTime.now().toIso8601String(),
+      },
+    );
+  }
 
-Future<List<String>> getClinicalChips({
-  required int doctorId,
-  required String category,
-}) async {
-  final db = await database;
+  Future<List<String>> getClinicalChips({
+    required int doctorId,
+    required String category,
+  }) async {
+    final db = await database;
 
-  final result = await db.query(
-    'custom_clinical_chips',
-    where: 'doctor_id = ? AND category = ?',
-    whereArgs: [doctorId, category],
-    orderBy: 'value ASC',
-  );
+    final result = await db.query(
+      'custom_clinical_chips',
+      where: 'doctor_id = ? AND category = ?',
+      whereArgs: [doctorId, category],
+      orderBy: 'value ASC',
+    );
 
-  return result.map((e) => e['value'].toString()).toList();
-}
-Future<Map<String, dynamic>?> getLastPrescriptionByPatient({
-  required int patientId,
-  required int doctorId,
-}) async {
-  final db = await database;
+    return result.map((e) => e['value'].toString()).toList();
+  }
 
-  final result = await db.query(
-    'prescriptions',
-    where: 'patient_id = ? AND doctor_id = ?',
-    whereArgs: [patientId, doctorId],
-    orderBy: 'prescription_date DESC, id DESC',
-    limit: 1,
-  );
+  Future<Map<String, dynamic>?> getLastPrescriptionByPatient({
+    required int patientId,
+    required int doctorId,
+  }) async {
+    final db = await database;
 
-  return result.isNotEmpty ? result.first : null;
-}
+    final result = await db.query(
+      'prescriptions',
+      where: 'patient_id = ? AND doctor_id = ?',
+      whereArgs: [patientId, doctorId],
+      orderBy: 'prescription_date DESC, id DESC',
+      limit: 1,
+    );
 
-Future<List<Map<String, dynamic>>> getLastPrescriptionMedicines(
-  int prescriptionId,
-) async {
-  final db = await database;
+    return result.isNotEmpty ? result.first : null;
+  }
 
-  return db.query(
-    'prescription_items',
-    where: 'prescription_id = ?',
-    whereArgs: [prescriptionId],
-    orderBy: 'id ASC',
-  );
-}
+  Future<List<Map<String, dynamic>>> getLastPrescriptionMedicines(
+    int prescriptionId,
+  ) async {
+    final db = await database;
 
-Future<List<Map<String, dynamic>>>
-    getTodayFollowUps({
-  required int doctorId,
-}) async {
-  final db = await database;
+    return db.query(
+      'prescription_items',
+      where: 'prescription_id = ?',
+      whereArgs: [prescriptionId],
+      orderBy: 'id ASC',
+    );
+  }
 
-  final today =
-      DateTime.now()
-          .toIso8601String()
-          .substring(0, 10);
+  Future<List<Map<String, dynamic>>> getTodayFollowUps({
+    required int doctorId,
+  }) async {
+    final db = await database;
 
-  return await db.query(
-  'prescriptions',
-  where:
-      'doctor_id = ? AND follow_up_date LIKE ? AND follow_up_status = ?',
-  whereArgs: [
-    doctorId,
-    '$today%',
-    'pending',
-  ],
-  orderBy: 'follow_up_date ASC',
-);
-}
-Future<List<Map<String, dynamic>>>
-    getUpcomingFollowUps({
-  required int doctorId,
-}) async {
-  final db = await database;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
 
-  final today =
-      DateTime.now()
-          .toIso8601String()
-          .substring(0, 10);
+    return await db.query(
+      'prescriptions',
+      where: 'doctor_id = ? AND follow_up_date LIKE ? AND follow_up_status = ?',
+      whereArgs: [
+        doctorId,
+        '$today%',
+        'pending',
+      ],
+      orderBy: 'follow_up_date ASC',
+    );
+  }
 
-  return db.query(
-    'prescriptions',
-    where:
-        'doctor_id = ? AND follow_up_date > ? AND follow_up_status = ?',
-    whereArgs: [
-      doctorId,
-      today,
-      'pending',
-    ],
-    orderBy: 'follow_up_date ASC',
-  );
-}
+  Future<List<Map<String, dynamic>>> getUpcomingFollowUps({
+    required int doctorId,
+  }) async {
+    final db = await database;
 
-Future<List<Map<String, dynamic>>>
-    getOverdueFollowUps({
-  required int doctorId,
-}) async {
-  final db = await database;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
 
-  final today =
-      DateTime.now()
-          .toIso8601String()
-          .substring(0, 10);
+    return db.query(
+      'prescriptions',
+      where: 'doctor_id = ? AND follow_up_date > ? AND follow_up_status = ?',
+      whereArgs: [
+        doctorId,
+        today,
+        'pending',
+      ],
+      orderBy: 'follow_up_date ASC',
+    );
+  }
 
-  return db.query(
-    'prescriptions',
-    where:
-        'doctor_id = ? AND follow_up_date < ? AND follow_up_status = ?',
-    whereArgs: [
-      doctorId,
-      today,
-      'pending',
-    ],
-    orderBy: 'follow_up_date ASC',
-  );
-}
+  Future<List<Map<String, dynamic>>> getOverdueFollowUps({
+    required int doctorId,
+  }) async {
+    final db = await database;
 
-Future<List<Map<String, dynamic>>>
-    getCompletedFollowUps({
-  required int doctorId,
-}) async {
-  final db = await database;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
 
-  return db.query(
-    'prescriptions',
-    where:
-        'doctor_id = ? AND follow_up_status = ?',
-    whereArgs: [
-      doctorId,
-      'completed',
-    ],
-    orderBy: 'follow_up_date DESC',
-    limit: 50,
-  );
-}
+    return db.query(
+      'prescriptions',
+      where: 'doctor_id = ? AND follow_up_date < ? AND follow_up_status = ?',
+      whereArgs: [
+        doctorId,
+        today,
+        'pending',
+      ],
+      orderBy: 'follow_up_date ASC',
+    );
+  }
 
-Future<void> completeFollowUp(
-  int prescriptionId,
-) async {
-  final db = await database;
+  Future<List<Map<String, dynamic>>> getCompletedFollowUps({
+    required int doctorId,
+  }) async {
+    final db = await database;
 
-  await db.update(
-    'prescriptions',
-    {
-      'follow_up_status':
-          'completed',
-    },
-    where: 'id = ?',
-    whereArgs: [prescriptionId],
-  );
-}
+    return db.query(
+      'prescriptions',
+      where: 'doctor_id = ? AND follow_up_status = ?',
+      whereArgs: [
+        doctorId,
+        'completed',
+      ],
+      orderBy: 'follow_up_date DESC',
+      limit: 50,
+    );
+  }
 
-Future<Map<String, dynamic>> getTodayIncomeSummaryByDoctor(
-  int doctorId,
-) async {
-  final db = await database;
-  final today = DateTime.now().toIso8601String().substring(0, 10);
+  Future<void> completeFollowUp(
+    int prescriptionId,
+  ) async {
+    final db = await database;
 
-  final result = await db.rawQuery(
-    '''
+    await db.update(
+      'prescriptions',
+      {
+        'follow_up_status': 'completed',
+      },
+      where: 'id = ?',
+      whereArgs: [prescriptionId],
+    );
+  }
+
+  Future<Map<String, dynamic>> getTodayIncomeSummaryByDoctor(
+    int doctorId,
+  ) async {
+    final db = await database;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+
+    final result = await db.rawQuery(
+      '''
     SELECT 
       COUNT(*) as bill_count,
       SUM(total_amount) as total_income,
@@ -2395,172 +2340,171 @@ Future<Map<String, dynamic>> getTodayIncomeSummaryByDoctor(
     WHERE doctor_id = ?
       AND created_at LIKE ?
     ''',
-    [doctorId, '$today%'],
-  );
+      [doctorId, '$today%'],
+    );
 
-  return result.first;
-}
+    return result.first;
+  }
 
-Future<List<Map<String, dynamic>>> getTodayBillsByDoctor(
-  int doctorId,
-) async {
-  final db = await database;
-  final today = DateTime.now().toIso8601String().substring(0, 10);
+  Future<List<Map<String, dynamic>>> getTodayBillsByDoctor(
+    int doctorId,
+  ) async {
+    final db = await database;
+    final today = DateTime.now().toIso8601String().substring(0, 10);
 
-  return db.query(
-    'prescription_bills',
-    where: 'doctor_id = ? AND created_at LIKE ?',
-    whereArgs: [doctorId, '$today%'],
-    orderBy: 'id DESC',
-  );
-}
+    return db.query(
+      'prescription_bills',
+      where: 'doctor_id = ? AND created_at LIKE ?',
+      whereArgs: [doctorId, '$today%'],
+      orderBy: 'id DESC',
+    );
+  }
 
-Future<List<Map<String, dynamic>>> getAllBills() async {
-  final db = await database;
+  Future<List<Map<String, dynamic>>> getAllBills() async {
+    final db = await database;
 
-  return db.query(
-    'prescription_bills',
-    orderBy: 'id DESC',
-  );
-}
+    return db.query(
+      'prescription_bills',
+      orderBy: 'id DESC',
+    );
+  }
 
-Future<List<Map<String, dynamic>>> getTodayQueuePatients({
-  String? status,
-}) async {
-  final db = await database;
-  final doctorId = await DoctorSession.getActiveDoctorIdForData();
-  final today = DateTime.now().toIso8601String().split('T').first;
+  Future<List<Map<String, dynamic>>> getTodayQueuePatients({
+    String? status,
+  }) async {
+    final db = await database;
+    final doctorId = await DoctorSession.getActiveDoctorIdForData();
+    final today = DateTime.now().toIso8601String().split('T').first;
 
-  if (doctorId == null) return [];
+    if (doctorId == null) return [];
 
-  if (status == null || status == 'waiting') {
+    if (status == null || status == 'waiting') {
+      return db.query(
+        'patients',
+        where: 'doctor_id = ? AND date(queue_date) = date(?) AND '
+            '(queue_status = ? OR queue_status = ?)',
+        whereArgs: [doctorId, today, 'Waiting', 'Serving'],
+        orderBy: 'queue_no ASC, id ASC',
+      );
+    }
+
     return db.query(
       'patients',
       where:
-          'doctor_id = ? AND date(queue_date) = date(?) AND '
-          '(queue_status = ? OR queue_status = ?)',
-      whereArgs: [doctorId, today, 'Waiting', 'Serving'],
+          'doctor_id = ? AND date(queue_date) = date(?) AND queue_status = ?',
+      whereArgs: [doctorId, today, status],
       orderBy: 'queue_no ASC, id ASC',
     );
   }
 
-  return db.query(
-    'patients',
-    where: 'doctor_id = ? AND date(queue_date) = date(?) AND queue_status = ?',
-    whereArgs: [doctorId, today, status],
-    orderBy: 'queue_no ASC, id ASC',
-  );
-}
+  Future<List<Map<String, dynamic>>> getPreviousPendingQueuePatients() async {
+    final db = await database;
+    final doctorId = await DoctorSession.getActiveDoctorIdForData();
+    final today = DateTime.now().toIso8601String().split('T').first;
 
-Future<List<Map<String, dynamic>>> getPreviousPendingQueuePatients() async {
-  final db = await database;
-  final doctorId = await DoctorSession.getActiveDoctorIdForData();
-  final today = DateTime.now().toIso8601String().split('T').first;
+    if (doctorId == null) return [];
 
-  if (doctorId == null) return [];
+    return db.query(
+      'patients',
+      where: 'doctor_id = ? AND date(queue_date) < date(?) AND '
+          '(queue_status = ? OR queue_status = ?)',
+      whereArgs: [doctorId, today, 'Waiting', 'Serving'],
+      orderBy: 'queue_date ASC, queue_no ASC, id ASC',
+    );
+  }
 
-  return db.query(
-    'patients',
-    where:
-        'doctor_id = ? AND date(queue_date) < date(?) AND '
-        '(queue_status = ? OR queue_status = ?)',
-    whereArgs: [doctorId, today, 'Waiting', 'Serving'],
-    orderBy: 'queue_date ASC, queue_no ASC, id ASC',
-  );
-}
+  Future<void> cacheQueuePatientsFromServer({
+    required int doctorId,
+    required List<dynamic> patients,
+  }) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
 
-Future<void> cacheQueuePatientsFromServer({
-  required int doctorId,
-  required List<dynamic> patients,
-}) async {
-  final db = await database;
-  final now = DateTime.now().toIso8601String();
+    await db.transaction((txn) async {
+      for (final item in patients) {
+        final patient = Map<String, dynamic>.from(item as Map);
+        final serverId = int.tryParse(patient['id']?.toString() ?? '');
 
-  await db.transaction((txn) async {
-    for (final item in patients) {
-      final patient = Map<String, dynamic>.from(item as Map);
-      final serverId = int.tryParse(patient['id']?.toString() ?? '');
+        if (serverId == null) continue;
 
-      if (serverId == null) continue;
-
-      final existing = await txn.query(
-        'patients',
-        where: 'server_id = ? AND doctor_id = ?',
-        whereArgs: [serverId, doctorId],
-        limit: 1,
-      );
-
-      final data = <String, dynamic>{
-        'server_id': serverId,
-        'doctor_id': doctorId,
-        'patient_name': (patient['patientName'] ?? '').toString(),
-        'patient_age':
-            (patient['patientAge'] ?? patient['age'] ?? '').toString(),
-        'patient_gender':
-            (patient['patientGender'] ?? patient['gender'] ?? '').toString(),
-        'phone_number': patient['phoneNumber']?.toString(),
-        'address': patient['address']?.toString(),
-        'notes': patient['notes']?.toString(),
-        'allergies': patient['allergies']?.toString() ?? '',
-        'chronic_diseases': patient['chronicDiseases']?.toString() ?? '',
-        'important_alerts': patient['importantAlerts']?.toString() ?? '',
-        'queue_status':
-            (patient['queueStatus'] ?? patient['queue_status'] ?? 'Waiting')
-                .toString(),
-        'queue_no': int.tryParse(
-          (patient['queueNo'] ?? patient['queue_no'] ?? serverId).toString(),
-        ),
-        'queue_date':
-            (patient['queueDate'] ?? patient['queue_date'] ??
-                    patient['createdAt'] ?? now)
-                .toString(),
-        'sync_status': 'synced',
-        'updated_at': patient['updatedAt']?.toString() ?? now,
-        'created_at': patient['createdAt']?.toString() ?? now,
-      };
-
-      if (existing.isEmpty) {
-        await txn.insert('patients', data);
-      } else {
-        await txn.update(
+        final existing = await txn.query(
           'patients',
-          data,
-          where: 'id = ?',
-          whereArgs: [existing.first['id']],
+          where: 'server_id = ? AND doctor_id = ?',
+          whereArgs: [serverId, doctorId],
+          limit: 1,
         );
+
+        final data = <String, dynamic>{
+          'server_id': serverId,
+          'doctor_id': doctorId,
+          'patient_name': (patient['patientName'] ?? '').toString(),
+          'patient_age':
+              (patient['patientAge'] ?? patient['age'] ?? '').toString(),
+          'patient_gender':
+              (patient['patientGender'] ?? patient['gender'] ?? '').toString(),
+          'phone_number': patient['phoneNumber']?.toString(),
+          'address': patient['address']?.toString(),
+          'notes': patient['notes']?.toString(),
+          'allergies': patient['allergies']?.toString() ?? '',
+          'chronic_diseases': patient['chronicDiseases']?.toString() ?? '',
+          'important_alerts': patient['importantAlerts']?.toString() ?? '',
+          'queue_status':
+              (patient['queueStatus'] ?? patient['queue_status'] ?? 'Waiting')
+                  .toString(),
+          'queue_no': int.tryParse(
+            (patient['queueNo'] ?? patient['queue_no'] ?? serverId).toString(),
+          ),
+          'queue_date': (patient['queueDate'] ??
+                  patient['queue_date'] ??
+                  patient['createdAt'] ??
+                  now)
+              .toString(),
+          'sync_status': 'synced',
+          'updated_at': patient['updatedAt']?.toString() ?? now,
+          'created_at': patient['createdAt']?.toString() ?? now,
+        };
+
+        if (existing.isEmpty) {
+          await txn.insert('patients', data);
+        } else {
+          await txn.update(
+            'patients',
+            data,
+            where: 'id = ?',
+            whereArgs: [existing.first['id']],
+          );
+        }
       }
-    }
-  });
-}
+    });
+  }
 
-Future<void> moveQueuePatientToToday(int patientId) async {
-  final db = await database;
-  final today = DateTime.now().toIso8601String().split('T').first;
+  Future<void> moveQueuePatientToToday(int patientId) async {
+    final db = await database;
+    final today = DateTime.now().toIso8601String().split('T').first;
 
-  final result = await db.rawQuery(
-    '''
+    final result = await db.rawQuery(
+      '''
     SELECT MAX(queue_no) AS max_no
     FROM patients
     WHERE date(queue_date) = date(?)
     ''',
-    [today],
-  );
+      [today],
+    );
 
-  final nextQueueNo =
-      ((result.first['max_no'] as num?)?.toInt() ?? 0) + 1;
+    final nextQueueNo = ((result.first['max_no'] as num?)?.toInt() ?? 0) + 1;
 
-  await db.update(
-    'patients',
-    {
-      'queue_date': today,
-      'queue_no': nextQueueNo,
-      'queue_status': 'Waiting',
-      'sync_status': 'pending',
-      'updated_at': DateTime.now().toIso8601String(),
-    },
-    where: 'id = ?',
-    whereArgs: [patientId],
-  );
-}
+    await db.update(
+      'patients',
+      {
+        'queue_date': today,
+        'queue_no': nextQueueNo,
+        'queue_status': 'Waiting',
+        'sync_status': 'pending',
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [patientId],
+    );
+  }
 }
 //

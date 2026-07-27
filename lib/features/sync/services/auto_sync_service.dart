@@ -8,29 +8,21 @@ import 'network_service.dart';
 import 'sync_service.dart';
 
 class AutoSyncService {
-  static const Duration _normalInterval = Duration(minutes: 2);
-  static const Duration _maximumBackoff = Duration(minutes: 15);
-
   static StreamSubscription<List<ConnectivityResult>>? _subscription;
-  static Timer? _timer;
 
   static bool _syncing = false;
-  static Duration _nextDelay = _normalInterval;
-  static DateTime? _lastAttemptAt;
+  static bool _syncRequestedWhileRunning = false;
 
   static void start() {
     final existingSubscription = _subscription;
     if (existingSubscription != null) {
       unawaited(existingSubscription.cancel());
     }
-    _timer?.cancel();
-
     _subscription = Connectivity().onConnectivityChanged.listen(
       (result) async {
         if (!result.any((item) => item != ConnectivityResult.none)) return;
 
-        await _runSync(force: true);
-        _scheduleNext();
+        await syncPendingChanges();
       },
       onError: (Object error, StackTrace stackTrace) {
         AppErrorHandler.recordUnawaited(
@@ -39,53 +31,42 @@ class AutoSyncService {
           source: 'AutoSync',
           context: 'Connectivity stream',
         );
-        _increaseBackoff();
-        _scheduleNext();
       },
     );
-
-    _scheduleNext();
   }
 
-  static void _scheduleNext() {
-    _timer?.cancel();
-
-    _timer = Timer(_nextDelay, () async {
-      await _runSync();
-      _scheduleNext();
-    });
-  }
-
-  static Future<void> _runSync({bool force = false}) async {
-    if (_syncing) return;
-
-    final now = DateTime.now();
-    if (!force &&
-        _lastAttemptAt != null &&
-        now.difference(_lastAttemptAt!) < const Duration(seconds: 30)) {
+  static Future<void> syncPendingChanges() async {
+    if (_syncing) {
+      _syncRequestedWhileRunning = true;
       return;
     }
 
+    final hasPending = await SyncService().hasPendingLocalChanges();
+    if (!hasPending) return;
+
+    _syncing = true;
+
     try {
-      final online = await NetworkService.isOnline();
-      if (!online) return;
+      do {
+        _syncRequestedWhileRunning = false;
 
-      _syncing = true;
-      _lastAttemptAt = now;
+        final online = await NetworkService.isOnline();
+        if (!online) return;
 
-      final result = await SyncService().syncAll();
+        final pendingNow = await SyncService().hasPendingLocalChanges();
+        if (!pendingNow) return;
 
-      if (result.lastError.isEmpty && !result.hasFailures) {
-        _nextDelay = _normalInterval;
-      } else {
-        await AppLogger.warning(
-          result.lastError.isEmpty
-              ? 'Sync completed with one or more failed items.'
-              : result.lastError,
-          source: 'AutoSync',
-        );
-        _increaseBackoff();
-      }
+        final result = await SyncService().syncAll();
+
+        if (result.hasFailures || result.lastError.isNotEmpty) {
+          await AppLogger.warning(
+            result.lastError.isNotEmpty
+                ? result.lastError
+                : 'Sync completed with one or more failed items.',
+            source: 'AutoSync',
+          );
+        }
+      } while (_syncRequestedWhileRunning);
     } catch (error, stackTrace) {
       AppErrorHandler.recordUnawaited(
         error,
@@ -93,29 +74,16 @@ class AutoSyncService {
         source: 'AutoSync',
         context: 'Background synchronization',
       );
-      _increaseBackoff();
     } finally {
       _syncing = false;
     }
   }
 
-  static void _increaseBackoff() {
-    final doubledSeconds = _nextDelay.inSeconds * 2;
-    final cappedSeconds = doubledSeconds > _maximumBackoff.inSeconds
-        ? _maximumBackoff.inSeconds
-        : doubledSeconds;
-
-    _nextDelay = Duration(seconds: cappedSeconds);
-  }
-
   static Future<void> stop() async {
     await _subscription?.cancel();
-    _timer?.cancel();
 
     _subscription = null;
-    _timer = null;
     _syncing = false;
-    _nextDelay = _normalInterval;
-    _lastAttemptAt = null;
+    _syncRequestedWhileRunning = false;
   }
 }

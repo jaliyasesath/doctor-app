@@ -12,8 +12,7 @@ class ReceptionPatientSearchScreen extends StatefulWidget {
 
 class _ReceptionPatientSearchScreenState
     extends State<ReceptionPatientSearchScreen> {
-  final TextEditingController _searchController =
-      TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
 
   bool _loading = false;
 
@@ -34,8 +33,7 @@ class _ReceptionPatientSearchScreenState
     try {
       final db = await DatabaseHelper.instance.database;
 
-      final q =
-          _searchController.text.trim().toLowerCase();
+      final q = _searchController.text.trim().toLowerCase();
 
       List<Map<String, dynamic>> result;
 
@@ -112,20 +110,15 @@ class _ReceptionPatientSearchScreenState
   Widget _patientCard(
     Map<String, dynamic> patient,
   ) {
-    final name =
-        patient['patient_name']?.toString() ?? '';
+    final name = patient['patient_name']?.toString() ?? '';
 
-    final phone =
-        patient['phone_number']?.toString() ?? '';
+    final phone = patient['phone_number']?.toString() ?? '';
 
-    final gender =
-        patient['patient_gender']?.toString() ?? '';
+    final gender = patient['patient_gender']?.toString() ?? '';
 
-    final age =
-        patient['patient_age']?.toString() ?? '';
+    final age = patient['patient_age']?.toString() ?? '';
 
-    final serverId =
-        patient['server_id']?.toString() ?? '';
+    final serverId = patient['server_id']?.toString() ?? '';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -135,16 +128,13 @@ class _ReceptionPatientSearchScreenState
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 CircleAvatar(
                   child: Text(
-                    name.isEmpty
-                        ? '?'
-                        : name.substring(0, 1),
+                    name.isEmpty ? '?' : name.substring(0, 1),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -192,10 +182,8 @@ class _ReceptionPatientSearchScreenState
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText:
-                    'Search by name, phone or patient ID',
-                prefixIcon:
-                    const Icon(Icons.search),
+                hintText: 'Search by name, phone or patient ID',
+                prefixIcon: const Icon(Icons.search),
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: _searchPatients,
@@ -203,8 +191,7 @@ class _ReceptionPatientSearchScreenState
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
-                  borderRadius:
-                      BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide.none,
                 ),
               ),
@@ -216,17 +203,14 @@ class _ReceptionPatientSearchScreenState
           Expanded(
             child: _loading
                 ? const Center(
-                    child:
-                        CircularProgressIndicator(),
+                    child: CircularProgressIndicator(),
                   )
                 : _patients.isEmpty
                     ? const Center(
-                        child:
-                            Text('No patients found'),
+                        child: Text('No patients found'),
                       )
                     : ListView.builder(
-                        padding:
-                            const EdgeInsets.symmetric(
+                        padding: const EdgeInsets.symmetric(
                           horizontal: 16,
                         ),
                         itemCount: _patients.length,

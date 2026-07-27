@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,6 +7,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
 
 import '../../data/local/database_helper.dart';
+import '../sync/services/auto_sync_service.dart';
 
 class LocalClinicServer {
   static HttpServer? _server;
@@ -13,8 +15,7 @@ class LocalClinicServer {
 
   static bool get isRunning => _running;
 
-  static String get _today =>
-      DateTime.now().toIso8601String().split('T').first;
+  static String get _today => DateTime.now().toIso8601String().split('T').first;
 
   static Future<void> start({int port = 8080}) async {
     if (_running) return;
@@ -61,8 +62,7 @@ class LocalClinicServer {
         'serving': await countStatus('Serving'),
         'completed': await countStatus('Completed'),
         'skipped': await countStatus('Skipped'),
-        'previousPending':
-            (previousPending.first['count'] as int?) ?? 0,
+        'previousPending': (previousPending.first['count'] as int?) ?? 0,
       });
     });
 
@@ -80,8 +80,7 @@ class LocalClinicServer {
       return _json(await _todayPatientsByStatuses(['Completed']));
     });
 
-    router.get('/api/Patients/previous-pending',
-        (Request request) async {
+    router.get('/api/Patients/previous-pending', (Request request) async {
       return _json(await _previousPendingPatients());
     });
 
@@ -99,15 +98,13 @@ class LocalClinicServer {
         [_today],
       );
 
-      final nextQueueNo =
-          ((result.first['max_no'] as num?)?.toInt() ?? 0) + 1;
+      final nextQueueNo = ((result.first['max_no'] as num?)?.toInt() ?? 0) + 1;
 
       final localId = await DatabaseHelper.instance.insertPatient({
         'doctor_id': data['doctorId'] ?? 0,
         'patient_name': data['patientName']?.toString() ?? '',
-        'patient_age': data['age']?.toString() ??
-            data['patientAge']?.toString() ??
-            '',
+        'patient_age':
+            data['age']?.toString() ?? data['patientAge']?.toString() ?? '',
         'patient_gender': data['gender']?.toString() ??
             data['patientGender']?.toString() ??
             '',
@@ -122,6 +119,7 @@ class LocalClinicServer {
         'queue_date': _today,
         'sync_status': 'pending',
       });
+      unawaited(AutoSyncService.syncPendingChanges());
 
       return _json({
         'success': true,
@@ -140,9 +138,9 @@ class LocalClinicServer {
         (Request request, String id) async {
       final patientId = int.tryParse(id) ?? 0;
       await DatabaseHelper.instance.moveQueuePatientToToday(patientId);
+      unawaited(AutoSyncService.syncPendingChanges());
 
-      final patient =
-          await DatabaseHelper.instance.getPatientById(patientId);
+      final patient = await DatabaseHelper.instance.getPatientById(patientId);
 
       if (patient == null) {
         return _json(
@@ -230,8 +228,7 @@ class LocalClinicServer {
     return patients.map(_mapPatient).toList();
   }
 
-  static Future<List<Map<String, dynamic>>>
-      _previousPendingPatients() async {
+  static Future<List<Map<String, dynamic>>> _previousPendingPatients() async {
     final db = await DatabaseHelper.instance.database;
 
     final patients = await db.rawQuery(
@@ -286,6 +283,7 @@ class LocalClinicServer {
       where: 'id = ?',
       whereArgs: [patientId],
     );
+    unawaited(AutoSyncService.syncPendingChanges());
   }
 
   static Response _json(dynamic data, {int statusCode = 200}) {

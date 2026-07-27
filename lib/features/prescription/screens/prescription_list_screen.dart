@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../data/local/database_helper.dart';
 import '../../patient/data/api_patient_service.dart';
 import '../../auth/data/doctor_session.dart';
 import '../../sync/services/network_service.dart';
+import '../../sync/services/auto_sync_service.dart';
 import '../../sync/services/sync_service.dart';
 import '../../template/data/template_service.dart';
 import '../../template/models/template_model.dart';
@@ -292,6 +295,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       'doctor_id': doctorId,
       'instruction_text': value,
     });
+    unawaited(AutoSyncService.syncPendingChanges());
 
     await _loadCustomInstructions();
 

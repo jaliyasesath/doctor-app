@@ -3,16 +3,13 @@ class ApiConfig {
   static String mode = 'cloud';
 
   // Temporary HTTP VPS address
-  static const String cloudBaseUrl =
-      'http://169.58.40.160/api';
+  static const String cloudBaseUrl = 'http://169.58.40.160/api';
 
   // Local computer API
-  static const String localWifiBaseUrl =
-      'http://192.168.8.91:5219/api';
+  static const String localWifiBaseUrl = 'http://192.168.8.91:5219/api';
 
   // Doctor phone hotspot server
-  static const String hotspotBaseUrl =
-      'http://192.168.43.1:8080/api';
+  static const String hotspotBaseUrl = 'http://192.168.43.1:8080/api';
 
   static String customHotspotBaseUrl = hotspotBaseUrl;
 

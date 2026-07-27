@@ -41,11 +41,9 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
     final activated = await LicenseService.isActivated();
     final expired = await LicenseService.isTrialExpired();
     final remaining = await LicenseService.getRemainingTrialTime();
-    final deviceAuthorized =
-        await LicenseService.isCurrentDeviceAuthorized();
+    final deviceAuthorized = await LicenseService.isCurrentDeviceAuthorized();
 
-    final subscriptionActive =
-        await LicenseService.hasActiveSubscription();
+    final subscriptionActive = await LicenseService.hasActiveSubscription();
 
     if (!mounted) return;
 
@@ -113,9 +111,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          active
-              ? 'Subscription active'
-              : 'No active subscription found',
+          active ? 'Subscription active' : 'No active subscription found',
         ),
       ),
     );
@@ -222,7 +218,6 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 20),
-
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -242,9 +237,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
                           label: const Text('Refresh Subscription'),
                         ),
                       ),
-
                       const SizedBox(height: 10),
-
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -254,17 +247,13 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
                           label: const Text('Activate License'),
                         ),
                       ),
-
                       const SizedBox(height: 16),
-
                       const Text(
                         'Plans: Monthly / Yearly\nPlease contact admin after payment.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.black54),
                       ),
-
                       const SizedBox(height: 10),
-
                       TextButton(
                         onPressed: _resetTrialForTesting,
                         child: const Text('Reset Trial (Testing)'),
@@ -313,7 +302,6 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
                       ),
                     ),
                     const SizedBox(height: 18),
-
                     SizedBox(
                       width: double.infinity,
                       height: 50,
@@ -329,25 +317,18 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
                         child: const Text('Continue Trial'),
                       ),
                     ),
-
                     const SizedBox(height: 10),
-
                     OutlinedButton(
-                      onPressed: _checkingSubscription
-                          ? null
-                          : _refreshSubscription,
+                      onPressed:
+                          _checkingSubscription ? null : _refreshSubscription,
                       child: const Text('Refresh Subscription'),
                     ),
-
                     const SizedBox(height: 10),
-
                     OutlinedButton(
                       onPressed: _openActivation,
                       child: const Text('Activate License'),
                     ),
-
                     const SizedBox(height: 10),
-
                     TextButton(
                       onPressed: _resetTrialForTesting,
                       child: const Text('Reset Trial (Testing)'),

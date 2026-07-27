@@ -99,7 +99,8 @@ class AppLogger {
     await _trimIfRequired(file);
 
     final buffer = StringBuffer()
-      ..writeln('${DateTime.now().toUtc().toIso8601String()} [$level] [$source]')
+      ..writeln(
+          '${DateTime.now().toUtc().toIso8601String()} [$level] [$source]')
       ..writeln(_singleLine(message));
 
     if (error is AppException) {
@@ -123,11 +124,13 @@ class AppLogger {
 
   static Future<File> _logFile() async {
     final directory = await getApplicationSupportDirectory();
-    final logDirectory = Directory('${directory.path}${Platform.pathSeparator}logs');
+    final logDirectory =
+        Directory('${directory.path}${Platform.pathSeparator}logs');
     if (!await logDirectory.exists()) {
       await logDirectory.create(recursive: true);
     }
-    return File('${logDirectory.path}${Platform.pathSeparator}doctor_app_errors.log');
+    return File(
+        '${logDirectory.path}${Platform.pathSeparator}doctor_app_errors.log');
   }
 
   static Future<void> _trimIfRequired(File file) async {

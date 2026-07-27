@@ -105,9 +105,7 @@ class _LicenseActivateScreenState extends State<LicenseActivateScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
                       const SizedBox(height: 16),
-
                       TextField(
                         controller: _licenseController,
                         decoration: InputDecoration(
@@ -118,9 +116,7 @@ class _LicenseActivateScreenState extends State<LicenseActivateScreen> {
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 16),
-
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -138,11 +134,9 @@ class _LicenseActivateScreenState extends State<LicenseActivateScreen> {
                           label: const Text('Activate License'),
                         ),
                       ),
-
                       const SizedBox(height: 22),
                       const Divider(),
                       const SizedBox(height: 14),
-
                       const Text(
                         'Subscription Plans',
                         style: TextStyle(
@@ -150,17 +144,13 @@ class _LicenseActivateScreenState extends State<LicenseActivateScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       const Text(
                         'For monthly or yearly subscription, please contact admin after payment. Then tap Refresh Subscription.',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.black54),
                       ),
-
                       const SizedBox(height: 16),
-
                       Row(
                         children: [
                           Expanded(
@@ -184,9 +174,7 @@ class _LicenseActivateScreenState extends State<LicenseActivateScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 14),
-
                       SizedBox(
                         width: double.infinity,
                         height: 48,

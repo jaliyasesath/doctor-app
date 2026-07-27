@@ -55,7 +55,8 @@ class TokenStorage {
 
     final random = Random.secure();
     final bytes = List<int>.generate(24, (_) => random.nextInt(256));
-    final id = bytes.map((value) => value.toRadixString(16).padLeft(2, '0')).join();
+    final id =
+        bytes.map((value) => value.toRadixString(16).padLeft(2, '0')).join();
     await prefs.setString(_deviceIdKey, id);
     return id;
   }

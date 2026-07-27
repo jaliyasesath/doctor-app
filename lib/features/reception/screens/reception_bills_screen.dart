@@ -8,106 +8,92 @@ class ReceptionBillsScreen extends StatefulWidget {
   const ReceptionBillsScreen({super.key});
 
   @override
-  State<ReceptionBillsScreen> createState() =>
-      _ReceptionBillsScreenState();
+  State<ReceptionBillsScreen> createState() => _ReceptionBillsScreenState();
 }
 
-class _ReceptionBillsScreenState
-    extends State<ReceptionBillsScreen> {
-      Timer? _refreshTimer;
-  final TextEditingController _searchController =
-      TextEditingController();
+class _ReceptionBillsScreenState extends State<ReceptionBillsScreen> {
+  Timer? _refreshTimer;
+  final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
   List<Map<String, dynamic>> _allBills = [];
   List<Map<String, dynamic>> _filteredBills = [];
 
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
- _loadBills(showLoader: true);
+    _loadBills(showLoader: true);
 
-  _refreshTimer = Timer.periodic(
-    const Duration(seconds: 30),
-    (_) {
-      _loadBills();
-    },
-  );
-}
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) {
+        _loadBills();
+      },
+    );
+  }
 
   Future<void> _loadBills({bool showLoader = false}) async {
-  if (showLoader && mounted) {
-    setState(() => _loading = true);
-  }
-
-  final doctorId = await DoctorSession.getDoctorId();
-
-  if (doctorId == null) {
-    if (mounted) setState(() => _loading = false);
-    return;
-  }
-
-  final data =
-    await DatabaseHelper.instance.getAllBills();
-
-  if (!mounted) return;
-
-  final currentSearch = _searchController.text.trim().toLowerCase();
-
-  setState(() {
-    _allBills = List<Map<String, dynamic>>.from(data);
-
-    if (currentSearch.isEmpty) {
-      _filteredBills = _allBills;
-    } else {
-      _filteredBills = _allBills.where((bill) {
-        final rx =
-            bill['prescription_no']?.toString().toLowerCase() ?? '';
-
-        final patientId =
-            bill['patient_id']?.toString().toLowerCase() ?? '';
-
-        final amount =
-            bill['total_amount']?.toString().toLowerCase() ?? '';
-
-        return rx.contains(currentSearch) ||
-            patientId.contains(currentSearch) ||
-            amount.contains(currentSearch);
-      }).toList();
+    if (showLoader && mounted) {
+      setState(() => _loading = true);
     }
 
-    _loading = false;
-  });
-}
+    final doctorId = await DoctorSession.getDoctorId();
+
+    if (doctorId == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+
+    final data = await DatabaseHelper.instance.getAllBills();
+
+    if (!mounted) return;
+
+    final currentSearch = _searchController.text.trim().toLowerCase();
+
+    setState(() {
+      _allBills = List<Map<String, dynamic>>.from(data);
+
+      if (currentSearch.isEmpty) {
+        _filteredBills = _allBills;
+      } else {
+        _filteredBills = _allBills.where((bill) {
+          final rx = bill['prescription_no']?.toString().toLowerCase() ?? '';
+
+          final patientId = bill['patient_id']?.toString().toLowerCase() ?? '';
+
+          final amount = bill['total_amount']?.toString().toLowerCase() ?? '';
+
+          return rx.contains(currentSearch) ||
+              patientId.contains(currentSearch) ||
+              amount.contains(currentSearch);
+        }).toList();
+      }
+
+      _loading = false;
+    });
+  }
 
   void _filterBills(String value) {
     final q = value.trim().toLowerCase();
 
     setState(() {
       _filteredBills = _allBills.where((bill) {
-        final rx =
-            bill['prescription_no']?.toString().toLowerCase() ?? '';
+        final rx = bill['prescription_no']?.toString().toLowerCase() ?? '';
 
-        final patientId =
-            bill['patient_id']?.toString().toLowerCase() ?? '';
+        final patientId = bill['patient_id']?.toString().toLowerCase() ?? '';
 
-        final amount =
-            bill['total_amount']?.toString().toLowerCase() ?? '';
+        final amount = bill['total_amount']?.toString().toLowerCase() ?? '';
 
-        return rx.contains(q) ||
-            patientId.contains(q) ||
-            amount.contains(q);
+        return rx.contains(q) || patientId.contains(q) || amount.contains(q);
       }).toList();
     });
   }
 
   Widget _billCard(Map<String, dynamic> bill) {
     final rxNo = bill['prescription_no']?.toString() ?? '-';
-    final total =
-        (bill['total_amount'] as num?)?.toDouble() ?? 0;
-    final paid =
-        (bill['paid_amount'] as num?)?.toDouble() ?? 0;
+    final total = (bill['total_amount'] as num?)?.toDouble() ?? 0;
+    final paid = (bill['paid_amount'] as num?)?.toDouble() ?? 0;
     final method = bill['payment_method']?.toString() ?? '-';
     final status = bill['payment_status']?.toString() ?? '-';
     final createdAt = bill['created_at']?.toString() ?? '';
@@ -129,35 +115,35 @@ void initState() {
           '${createdAt.isEmpty ? '' : createdAt.substring(0, 10)}',
         ),
         isThreeLine: true,
-       trailing: IconButton(
-  icon: const Icon(Icons.print),
-  onPressed: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PrintPreviewScreen(
-          passedRxNo: rxNo,
-          passedDate: createdAt.isEmpty
-              ? DateTime.now().toString().substring(0, 10)
-              : createdAt.substring(0, 10),
-          allowBillSave: false,
+        trailing: IconButton(
+          icon: const Icon(Icons.print),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PrintPreviewScreen(
+                  passedRxNo: rxNo,
+                  passedDate: createdAt.isEmpty
+                      ? DateTime.now().toString().substring(0, 10)
+                      : createdAt.substring(0, 10),
+                  allowBillSave: false,
+                ),
+              ),
+            );
+          },
         ),
-      ),
-    );
-  },
-),
       ),
     );
   }
 
   @override
-void dispose() {
-  _refreshTimer?.cancel();
+  void dispose() {
+    _refreshTimer?.cancel();
 
-  _searchController.dispose();
+    _searchController.dispose();
 
-  super.dispose();
-}
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -231,9 +231,7 @@ class _AdminSubscriptionScreenState extends State<AdminSubscriptionScreen> {
                                     ),
                                   ],
                                 ),
-
                                 const SizedBox(height: 12),
-
                                 Container(
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(10),
@@ -253,7 +251,6 @@ class _AdminSubscriptionScreenState extends State<AdminSubscriptionScreen> {
                                     ),
                                   ),
                                 ),
-
                                 if (sub != null) ...[
                                   const SizedBox(height: 8),
                                   Text(
@@ -263,9 +260,7 @@ class _AdminSubscriptionScreenState extends State<AdminSubscriptionScreen> {
                                     'End Date: ${sub['endDate'] ?? '-'}',
                                   ),
                                 ],
-
                                 const SizedBox(height: 14),
-
                                 Wrap(
                                   spacing: 8,
                                   runSpacing: 8,

@@ -33,7 +33,8 @@ class ApiClient {
     } on FormatException catch (error) {
       throw AppException(
         message: 'Invalid API URL: $baseUrl$path',
-        userMessage: 'The server address is invalid. Check connection settings.',
+        userMessage:
+            'The server address is invalid. Check connection settings.',
         code: 'INVALID_API_URL',
         kind: AppErrorKind.configuration,
         cause: error,
