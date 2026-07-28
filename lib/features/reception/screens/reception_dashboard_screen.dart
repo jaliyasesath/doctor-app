@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../auth/data/doctor_session.dart';
@@ -5,6 +7,8 @@ import '../../local_server/screens/reception_hotspot_connect_screen.dart';
 import '../../medicines/screens/medicine_screen.dart';
 import '../../patient/screens/add_patient_screen.dart' as patient_screen;
 import '../../prescription/screens/prescription_history_screen.dart';
+import '../../queue/services/queue_realtime_service.dart';
+import '../../queue/services/queue_sync_service.dart';
 import 'reception_bills_screen.dart';
 import 'reception_patient_search_screen.dart';
 import 'reception_queue_screen.dart';
@@ -24,6 +28,8 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
   void initState() {
     super.initState();
     _loadUser();
+    unawaited(QueueRealtimeService.instance.connect());
+    unawaited(QueueSyncService.instance.syncChanges());
   }
 
   Future<void> _loadUser() async {
@@ -82,6 +88,7 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
             tooltip: 'Logout',
             icon: const Icon(Icons.logout),
             onPressed: () async {
+              await QueueRealtimeService.instance.disconnect();
               await DoctorSession.clearSession();
 
               if (!mounted) return;

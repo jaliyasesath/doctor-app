@@ -2783,6 +2783,8 @@ is_favorite INTEGER DEFAULT 0,
 
   Future<List<Map<String, dynamic>>> getTodayQueuePatients({
     String? status,
+    int? limit,
+    int offset = 0,
   }) async {
     final db = await database;
     final doctorId = await DoctorSession.getActiveDoctorIdForData();
@@ -2797,6 +2799,8 @@ is_favorite INTEGER DEFAULT 0,
             '(queue_status = ? OR queue_status = ?)',
         whereArgs: [doctorId, today, 'Waiting', 'Serving'],
         orderBy: 'queue_no ASC, id ASC',
+        limit: limit,
+        offset: limit == null ? null : offset,
       );
     }
 
@@ -2806,10 +2810,15 @@ is_favorite INTEGER DEFAULT 0,
           'doctor_id = ? AND date(queue_date) = date(?) AND queue_status = ?',
       whereArgs: [doctorId, today, status],
       orderBy: 'queue_no ASC, id ASC',
+      limit: limit,
+      offset: limit == null ? null : offset,
     );
   }
 
-  Future<List<Map<String, dynamic>>> getPreviousPendingQueuePatients() async {
+  Future<List<Map<String, dynamic>>> getPreviousPendingQueuePatients({
+    int? limit,
+    int offset = 0,
+  }) async {
     final db = await database;
     final doctorId = await DoctorSession.getActiveDoctorIdForData();
     final today = DateTime.now().toIso8601String().split('T').first;
@@ -2822,6 +2831,8 @@ is_favorite INTEGER DEFAULT 0,
           '(queue_status = ? OR queue_status = ?)',
       whereArgs: [doctorId, today, 'Waiting', 'Serving'],
       orderBy: 'queue_date ASC, queue_no ASC, id ASC',
+      limit: limit,
+      offset: limit == null ? null : offset,
     );
   }
 
@@ -2846,8 +2857,11 @@ is_favorite INTEGER DEFAULT 0,
           limit: 1,
         );
 
-        if (existing.isNotEmpty &&
-            existing.first['sync_status']?.toString() == 'conflict') {
+        final localSyncStatus = existing.isEmpty
+            ? ''
+            : existing.first['sync_status']?.toString() ?? '';
+
+        if (existing.isNotEmpty && localSyncStatus == 'conflict') {
           await txn.update(
             'patients',
             {
@@ -2857,6 +2871,25 @@ is_favorite INTEGER DEFAULT 0,
             where: 'id = ?',
             whereArgs: [existing.first['id']],
           );
+          continue;
+        }
+
+        if (existing.isNotEmpty && localSyncStatus == 'pending') {
+          continue;
+        }
+
+        final isDeleted = patient['isDeleted'] == true ||
+            patient['is_deleted'] == 1 ||
+            patient['is_deleted'] == true;
+
+        if (isDeleted) {
+          if (existing.isNotEmpty) {
+            await txn.delete(
+              'patients',
+              where: 'id = ?',
+              whereArgs: [existing.first['id']],
+            );
+          }
           continue;
         }
 
@@ -2886,6 +2919,7 @@ is_favorite INTEGER DEFAULT 0,
                   now)
               .toString(),
           'sync_status': 'synced',
+          'is_deleted': 0,
           'server_version': patient['version'] ?? 1,
           'conflict_server_json': null,
           'updated_at': patient['updatedAt']?.toString() ?? now,

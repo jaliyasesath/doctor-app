@@ -2,9 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../data/local/database_helper.dart';
+import '../../../core/errors/offline_fallback_policy.dart';
+import '../../../core/widgets/app_error_ui.dart';
 import '../../patient/data/api_patient_service.dart';
-import '../../sync/services/network_service.dart';
+import '../../queue/services/queue_local_page_service.dart';
+import '../../queue/services/queue_realtime_service.dart';
+import '../../queue/services/queue_sync_service.dart';
 
 class ReceptionQueueScreen extends StatefulWidget {
   final String initialTab;
@@ -18,14 +21,23 @@ class ReceptionQueueScreen extends StatefulWidget {
   State<ReceptionQueueScreen> createState() => _ReceptionQueueScreenState();
 }
 
-class _ReceptionQueueScreenState extends State<ReceptionQueueScreen> {
-  Timer? _autoRefreshTimer;
+class _ReceptionQueueScreenState extends State<ReceptionQueueScreen>
+    with WidgetsBindingObserver {
+  StreamSubscription<Map<String, dynamic>>? _queueEventSubscription;
+  Timer? _realtimeRefreshDebounce;
+  final ScrollController _scrollController = ScrollController();
 
   final ApiPatientService _api = ApiPatientService();
-  final DatabaseHelper _db = DatabaseHelper.instance;
+  final QueueLocalPageService _localPages = QueueLocalPageService();
 
   bool _loading = true;
   bool _refreshing = false;
+  bool _refreshRequested = false;
+  bool _loadingMore = false;
+  bool _hasMoreToday = false;
+  bool _hasMorePrevious = false;
+  int _todayPage = 1;
+  int _previousPage = 1;
   String _error = '';
   String _selectedTab = 'waiting';
 
@@ -36,26 +48,63 @@ class _ReceptionQueueScreenState extends State<ReceptionQueueScreen> {
   void initState() {
     super.initState();
 
-    _selectedTab = widget.initialTab;
-    _loadData(showLoader: true);
+    WidgetsBinding.instance.addObserver(this);
+    _queueEventSubscription =
+        QueueRealtimeService.instance.events.listen(_onQueueChanged);
+    _scrollController.addListener(_onScroll);
 
-    _autoRefreshTimer = Timer.periodic(
-      const Duration(seconds: 15),
-      (_) {
-        if (!mounted || _refreshing) return;
-        _loadData();
+    _selectedTab = widget.initialTab;
+    unawaited(_loadData(showLoader: true));
+    unawaited(QueueRealtimeService.instance.connect());
+  }
+
+  void _onQueueChanged(Map<String, dynamic> event) {
+    if (!mounted) return;
+
+    _realtimeRefreshDebounce?.cancel();
+    _realtimeRefreshDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () {
+        if (!mounted) return;
+        unawaited(_loadData(performSync: false));
       },
     );
   }
 
+  void _onScroll() {
+    if (!_scrollController.hasClients || _loadingMore) return;
+
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 280) {
+      unawaited(_loadMore());
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+
+    unawaited(QueueRealtimeService.instance.connect());
+    unawaited(_loadData());
+  }
+
   @override
   void dispose() {
-    _autoRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _scrollController.dispose();
+    _realtimeRefreshDebounce?.cancel();
+    unawaited(_queueEventSubscription?.cancel());
     super.dispose();
   }
 
-  Future<void> _loadData({bool showLoader = false}) async {
-    if (_refreshing) return;
+  Future<void> _loadData({
+    bool showLoader = false,
+    bool performSync = true,
+  }) async {
+    if (_refreshing) {
+      _refreshRequested = true;
+      return;
+    }
 
     _refreshing = true;
 
@@ -66,78 +115,110 @@ class _ReceptionQueueScreenState extends State<ReceptionQueueScreen> {
       });
     }
 
-    try {
-      final online = await NetworkService.isOnline();
-
-      List<dynamic> todayData = [];
-      List<dynamic> previousData = [];
-
-      if (online) {
-        if (_selectedTab == 'waiting') {
-          todayData = await _api.getWaitingPatients();
-          previousData = await _api.getPreviousPendingPatients();
-        } else if (_selectedTab == 'skipped') {
-          todayData = await _api.getSkippedPatients();
-        } else {
-          todayData = await _api.getCompletedPatients();
-        }
-      } else {
-        if (_selectedTab == 'waiting') {
-          final todayRows = await _db.getTodayQueuePatients(status: 'waiting');
-          final previousRows = await _db.getPreviousPendingQueuePatients();
-
-          todayData = _mapLocalPatients(todayRows, 'Waiting');
-          previousData = _mapLocalPatients(previousRows, 'Waiting');
-        } else if (_selectedTab == 'skipped') {
-          final rows = await _db.getTodayQueuePatients(status: 'Skipped');
-          todayData = _mapLocalPatients(rows, 'Skipped');
-        } else {
-          final rows = await _db.getTodayQueuePatients(status: 'Completed');
-          todayData = _mapLocalPatients(rows, 'Completed');
-        }
+    Object? syncError;
+    if (performSync) {
+      try {
+        await QueueSyncService.instance.syncChanges();
+      } catch (error) {
+        syncError = error;
       }
+    }
+
+    try {
+      final today = await _localPages.getToday(
+        status: _selectedTab == 'completed'
+            ? 'Completed'
+            : _selectedTab == 'skipped'
+                ? 'Skipped'
+                : 'waiting',
+        page: 1,
+      );
+      final previous = _selectedTab == 'waiting'
+          ? await _localPages.getPreviousPending(page: 1)
+          : const QueueLocalPage(items: [], hasMore: false);
 
       if (!mounted) return;
-
       setState(() {
-        _patients = todayData;
-        _previousPendingPatients =
-            _selectedTab == 'waiting' ? previousData : [];
+        _patients = today.items;
+        _previousPendingPatients = previous.items;
+        _todayPage = 1;
+        _previousPage = 1;
+        _hasMoreToday = today.hasMore;
+        _hasMorePrevious = previous.hasMore;
         _loading = false;
-        _error = '';
+        _error = syncError != null &&
+                _patients.isEmpty &&
+                _previousPendingPatients.isEmpty &&
+                !OfflineFallbackPolicy.isAllowed(syncError)
+            ? AppErrorUiModel.fromError(syncError).message
+            : '';
       });
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
-
       setState(() {
-        _error = e.toString();
+        _error = AppErrorUiModel.fromError(error).message;
         _loading = false;
       });
     } finally {
       _refreshing = false;
+      if (_refreshRequested && mounted) {
+        _refreshRequested = false;
+        unawaited(_loadData());
+      }
     }
   }
 
-  List<Map<String, dynamic>> _mapLocalPatients(
-    List<Map<String, dynamic>> patients,
-    String defaultStatus,
+  Future<void> _loadMore() async {
+    if (_loadingMore || _loading) return;
+
+    final canLoadToday = _hasMoreToday;
+    final canLoadPrevious = _selectedTab == 'waiting' && _hasMorePrevious;
+    if (!canLoadToday && !canLoadPrevious) return;
+
+    setState(() => _loadingMore = true);
+    try {
+      if (canLoadToday) {
+        final nextPage = _todayPage + 1;
+        final page = await _localPages.getToday(
+          status: _selectedTab == 'completed'
+              ? 'Completed'
+              : _selectedTab == 'skipped'
+                  ? 'Skipped'
+                  : 'waiting',
+          page: nextPage,
+        );
+        if (!mounted) return;
+        setState(() {
+          _patients = _mergeById(_patients, page.items);
+          _todayPage = nextPage;
+          _hasMoreToday = page.hasMore;
+        });
+      } else if (canLoadPrevious) {
+        final nextPage = _previousPage + 1;
+        final page = await _localPages.getPreviousPending(page: nextPage);
+        if (!mounted) return;
+        setState(() {
+          _previousPendingPatients =
+              _mergeById(_previousPendingPatients, page.items);
+          _previousPage = nextPage;
+          _hasMorePrevious = page.hasMore;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  List<dynamic> _mergeById(
+    List<dynamic> existing,
+    List<Map<String, dynamic>> incoming,
   ) {
-    return patients.map((patient) {
-      return {
-        'id': patient['id'],
-        'patientCode': patient['server_id'] != null
-            ? 'P${patient['server_id']}'
-            : 'OFF-${patient['id']}',
-        'queueNo': patient['queue_no'] ?? patient['id'],
-        'queueStatus': patient['queue_status'] ?? defaultStatus,
-        'queueDate': patient['queue_date'],
-        'patientName': patient['patient_name'] ?? '',
-        'patientAge': patient['patient_age'] ?? '',
-        'patientGender': patient['patient_gender'] ?? '',
-        'phoneNumber': patient['phone_number'] ?? '',
-        'address': patient['address'] ?? '',
-      };
-    }).toList();
+    final byId = <String, dynamic>{};
+    for (final item in [...existing, ...incoming]) {
+      final map = Map<String, dynamic>.from(item as Map);
+      byId[map['id']?.toString() ?? 'local:${map['localId']}'] = map;
+    }
+    return byId.values.toList();
   }
 
   int? _patientId(Map<String, dynamic> patient) {
@@ -482,6 +563,7 @@ class _ReceptionQueueScreenState extends State<ReceptionQueueScreen> {
     return RefreshIndicator(
       onRefresh: () => _loadData(showLoader: false),
       child: ListView(
+        controller: _scrollController,
         padding: const EdgeInsets.all(16),
         children: [
           if (_selectedTab == 'waiting') ...[
@@ -523,6 +605,11 @@ class _ReceptionQueueScreenState extends State<ReceptionQueueScreen> {
               );
             }),
           ],
+          if (_loadingMore)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              child: Center(child: CircularProgressIndicator()),
+            ),
         ],
       ),
     );

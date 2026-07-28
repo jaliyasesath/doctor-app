@@ -4,6 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../../../core/errors/app_error_handler.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../queue/services/queue_sync_service.dart';
 import 'network_service.dart';
 import 'sync_service.dart';
 
@@ -21,6 +22,17 @@ class AutoSyncService {
     _subscription = Connectivity().onConnectivityChanged.listen(
       (result) async {
         if (!result.any((item) => item != ConnectivityResult.none)) return;
+
+        try {
+          await QueueSyncService.instance.syncChanges();
+        } catch (error, stackTrace) {
+          AppErrorHandler.recordUnawaited(
+            error,
+            stackTrace,
+            source: 'AutoSync',
+            context: 'Queue recovery after connectivity restore',
+          );
+        }
 
         await syncPendingChanges();
       },

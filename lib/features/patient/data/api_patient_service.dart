@@ -11,6 +11,20 @@ import '../../net_service/api_config.dart';
 import '../../net_service/token_storage.dart';
 import 'package:sqflite/sqflite.dart';
 
+class QueueChangesPage {
+  final List<dynamic> data;
+  final String nextCursorTime;
+  final int nextCursorId;
+  final bool hasMore;
+
+  const QueueChangesPage({
+    required this.data,
+    required this.nextCursorTime,
+    required this.nextCursorId,
+    required this.hasMore,
+  });
+}
+
 class ApiPatientService {
   Future<Map<String, dynamic>> getQueueSummary() async {
     try {
@@ -393,11 +407,17 @@ class ApiPatientService {
     _throwForResponse(response);
   }
 
-  Future<List<dynamic>> getWaitingPatients() async {
+  Future<List<dynamic>> getWaitingPatients({
+    int page = 1,
+    int pageSize = 30,
+  }) async {
     final token = await _getToken();
 
     final response = await http
-        .get(_uri('/Patients/waiting'), headers: _headers(token ?? ''))
+        .get(
+          _uri('/Patients/waiting?page=$page&pageSize=$pageSize'),
+          headers: _headers(token ?? ''),
+        )
         .timeout(const Duration(seconds: 15));
 
     if (_isSuccess(response)) {
@@ -409,13 +429,18 @@ class ApiPatientService {
     _throwForResponse(response);
   }
 
-  Future<List<dynamic>> getPreviousPendingPatients() async {
+  Future<List<dynamic>> getPreviousPendingPatients({
+    int page = 1,
+    int pageSize = 30,
+  }) async {
     try {
       final token = await _getToken();
 
       final response = await http
           .get(
-            _uri('/Patients/previous-pending'),
+            _uri(
+              '/Patients/previous-pending?page=$page&pageSize=$pageSize',
+            ),
             headers: _headers(token ?? ''),
           )
           .timeout(const Duration(seconds: 15));
@@ -459,6 +484,41 @@ class ApiPatientService {
         };
       }).toList();
     }
+  }
+
+  Future<QueueChangesPage> getQueueChanges({
+    String? afterTime,
+    int afterId = 0,
+    int pageSize = 100,
+  }) async {
+    final token = await _getToken();
+    final query = <String, String>{
+      'afterId': afterId.toString(),
+      'pageSize': pageSize.toString(),
+      if (afterTime != null && afterTime.isNotEmpty) 'afterTime': afterTime,
+    };
+
+    final base = _uri('/Patients/queue-changes');
+    final uri = base.replace(queryParameters: query);
+    final response = await http
+        .get(uri, headers: _headers(token ?? ''))
+        .timeout(const Duration(seconds: 20));
+
+    if (!_isSuccess(response)) {
+      _throwForResponse(response);
+    }
+
+    final decoded = Map<String, dynamic>.from(
+      jsonDecode(response.body) as Map,
+    );
+
+    return QueueChangesPage(
+      data: List<dynamic>.from(decoded['data'] as List? ?? const []),
+      nextCursorTime: decoded['nextCursorTime']?.toString() ?? '',
+      nextCursorId:
+          int.tryParse(decoded['nextCursorId']?.toString() ?? '') ?? 0,
+      hasMore: decoded['hasMore'] == true,
+    );
   }
 
   Future<void> movePatientToToday(int id) async {
@@ -506,11 +566,17 @@ class ApiPatientService {
     }
   }
 
-  Future<List<dynamic>> getSkippedPatients() async {
+  Future<List<dynamic>> getSkippedPatients({
+    int page = 1,
+    int pageSize = 30,
+  }) async {
     final token = await _getToken();
 
     final response = await http
-        .get(_uri('/Patients/skipped'), headers: _headers(token ?? ''))
+        .get(
+          _uri('/Patients/skipped?page=$page&pageSize=$pageSize'),
+          headers: _headers(token ?? ''),
+        )
         .timeout(const Duration(seconds: 15));
 
     if (_isSuccess(response)) {
@@ -522,12 +588,15 @@ class ApiPatientService {
     _throwForResponse(response);
   }
 
-  Future<List<dynamic>> getCompletedPatients() async {
+  Future<List<dynamic>> getCompletedPatients({
+    int page = 1,
+    int pageSize = 30,
+  }) async {
     final token = await _getToken();
 
     final response = await http
         .get(
-          _uri('/Patients/completed'),
+          _uri('/Patients/completed?page=$page&pageSize=$pageSize'),
           headers: _headers(token ?? ''),
         )
         .timeout(const Duration(seconds: 15));

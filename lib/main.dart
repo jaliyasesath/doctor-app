@@ -8,6 +8,8 @@ import 'core/widgets/app_error_fallback.dart';
 import 'features/license/screens/license_gate_screen.dart';
 import 'features/net_service/auto_api_resolver.dart';
 import 'features/net_service/connection_mode_service.dart';
+import 'features/queue/services/queue_realtime_service.dart';
+import 'features/queue/services/queue_sync_service.dart';
 import 'features/sync/services/auto_sync_service.dart';
 // import 'features/notifications/services/local_notification_service.dart';
 
@@ -90,8 +92,33 @@ Future<void> _runStartupTask(
   }
 }
 
-class DoctorApp extends StatelessWidget {
+class DoctorApp extends StatefulWidget {
   const DoctorApp({super.key});
+
+  @override
+  State<DoctorApp> createState() => _DoctorAppState();
+}
+
+class _DoctorAppState extends State<DoctorApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+
+    unawaited(QueueRealtimeService.instance.connect());
+    unawaited(QueueSyncService.instance.syncChanges());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

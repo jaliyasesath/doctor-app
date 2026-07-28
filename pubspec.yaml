@@ -15,6 +15,7 @@ dependencies:
 
   # NETWORK / API
   http: ^1.2.2
+  signalr_netcore: ^1.4.4
 
   # DATABASE
   sqflite: ^2.3.3

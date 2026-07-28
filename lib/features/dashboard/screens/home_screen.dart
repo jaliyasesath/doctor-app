@@ -10,6 +10,8 @@ import '../../license/data/license_api_service.dart';
 import '../../opd/screens/opd_fast_mode_screen.dart';
 import '../../patient/screens/patient_master_screen.dart';
 import '../../queue/screens/doctor_queue_screen.dart';
+import '../../queue/services/queue_realtime_service.dart';
+import '../../queue/services/queue_sync_service.dart';
 import '../../prescription/screens/patient_history_screen.dart';
 import '../../prescription/screens/prescription_history_screen.dart';
 import '../../prescription/screens/prescription_list_screen.dart';
@@ -59,7 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _doctorName = 'Doctor';
 
   Timer? _licenseTimer;
-  Timer? _summaryTimer;
+  StreamSubscription<Map<String, dynamic>>? _queueEventSubscription;
 
   Map<String, dynamic> _queueSummary = {
     'waiting': 0,
@@ -89,20 +91,18 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadDoctorName();
     _checkInternet();
     _refreshAll();
+    _queueEventSubscription = QueueRealtimeService.instance.events.listen((_) {
+      if (!mounted) return;
+      unawaited(_loadQueueSummary());
+    });
+    unawaited(QueueRealtimeService.instance.connect());
+    unawaited(QueueSyncService.instance.syncChanges());
 
     _licenseTimer = Timer.periodic(
       const Duration(minutes: 1),
       (_) {
         if (!mounted) return;
         _checkLicenseOnDashboard();
-      },
-    );
-
-    _summaryTimer = Timer.periodic(
-      const Duration(seconds: 15),
-      (_) {
-        if (!mounted) return;
-        _loadQueueSummary();
       },
     );
   }
@@ -329,6 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _logout() async {
+    await QueueRealtimeService.instance.disconnect();
     await DoctorSession.clearSession();
 
     if (!mounted) return;
@@ -1674,7 +1675,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _summaryTimer?.cancel();
+    unawaited(_queueEventSubscription?.cancel());
     _licenseTimer?.cancel();
     super.dispose();
   }
