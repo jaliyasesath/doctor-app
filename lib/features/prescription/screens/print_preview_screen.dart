@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 //import 'package:blue_thermal_printer/blue_thermal_printer.dart';
@@ -13,6 +14,7 @@ import '../services/wifi_thermal_printer_service.dart';
 import '../utils/prescription_pdf_helper.dart';
 import 'printer_settings_screen.dart';
 import '../../../data/local/database_helper.dart';
+import '../../sync/services/auto_sync_service.dart';
 
 class PrintPreviewScreen extends StatefulWidget {
   final String? passedRxNo;
@@ -475,6 +477,7 @@ GET WELL SOON
         'payment_status': 'Paid',
         'notes': 'Bill generated from preview',
       });
+      unawaited(AutoSyncService.syncPendingChanges());
     }
   }
 

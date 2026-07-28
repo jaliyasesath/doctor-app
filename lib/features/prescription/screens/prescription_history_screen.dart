@@ -6,6 +6,7 @@ import '../data/prescription_store.dart';
 import '../models/prescription_item.dart';
 import 'print_preview_screen.dart';
 import '../../reception/screens/reception_prescription_edit_screen.dart';
+import '../../sync/services/auto_sync_service.dart';
 
 class PrescriptionHistoryScreen extends StatefulWidget {
   final bool receptionMode;
@@ -149,12 +150,15 @@ class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
   Future<void> _delete(int id) async {
     try {
       await DatabaseHelper.instance.deletePrescription(id);
+      unawaited(AutoSyncService.syncPendingChanges());
       await _loadPrescriptions();
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Prescription deleted locally')),
+        const SnackBar(
+          content: Text('Prescription deleted and queued for sync'),
+        ),
       );
     } catch (e) {
       if (!mounted) return;

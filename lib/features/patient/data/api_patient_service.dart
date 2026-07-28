@@ -233,11 +233,14 @@ class ApiPatientService {
     _throwForResponse(response);
   }
 
-  Future<void> deletePatient(int id) async {
+  Future<void> deletePatient(int id, int expectedVersion) async {
     final token = await _getToken();
 
     final response = await http
-        .delete(_uri('/Patients/$id'), headers: _headers(token ?? ''))
+        .delete(
+          _uri('/Patients/$id?expectedVersion=$expectedVersion'),
+          headers: _headers(token ?? ''),
+        )
         .timeout(const Duration(seconds: 15));
 
     if (!_isSuccess(response)) {
@@ -320,6 +323,7 @@ class ApiPatientService {
     required String phone,
     required String address,
     required String notes,
+    required int expectedVersion,
   }) async {
     final token = await _getToken();
 
@@ -335,6 +339,7 @@ class ApiPatientService {
             'phoneNumber': phone,
             'address': address,
             'notes': notes,
+            'expectedVersion': expectedVersion,
           }),
         )
         .timeout(const Duration(seconds: 15));
@@ -357,6 +362,7 @@ class ApiPatientService {
     required String allergies,
     required String chronicDiseases,
     required String importantAlerts,
+    int? expectedVersion,
   }) async {
     final token = await _getToken();
 
@@ -375,6 +381,7 @@ class ApiPatientService {
             'allergies': allergies,
             'chronicDiseases': chronicDiseases,
             'importantAlerts': importantAlerts,
+            'expectedVersion': expectedVersion,
           }),
         )
         .timeout(const Duration(seconds: 15));

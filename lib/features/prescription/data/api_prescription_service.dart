@@ -16,6 +16,7 @@ class ApiPrescriptionService {
     required String visitNotes,
     required String qrValue,
     required List<Map<String, dynamic>> items,
+    int? expectedVersion,
   }) async {
     final response = await _api.post('/Prescriptions/upsert', {
       'id': serverId,
@@ -27,6 +28,7 @@ class ApiPrescriptionService {
       'visitNotes': visitNotes,
       'qrValue': qrValue,
       'items': items,
+      'expectedVersion': expectedVersion,
     });
 
     return Map<String, dynamic>.from(response);
@@ -74,7 +76,9 @@ class ApiPrescriptionService {
   // =========================
   // DELETE
   // =========================
-  Future<void> deletePrescription(int id) async {
-    await _api.delete('/Prescriptions/$id');
+  Future<void> deletePrescription(int id, int expectedVersion) async {
+    await _api.delete(
+      '/Prescriptions/$id?expectedVersion=$expectedVersion',
+    );
   }
 }

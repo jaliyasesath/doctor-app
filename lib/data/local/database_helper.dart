@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -21,7 +23,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 31,
+      version: 34,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -73,7 +75,10 @@ chronic_diseases TEXT,
 important_alerts TEXT,
 queue_status TEXT DEFAULT 'Waiting',
 queue_no INTEGER,
-queue_date TEXT
+queue_date TEXT,
+is_deleted INTEGER DEFAULT 0,
+server_version INTEGER DEFAULT 0,
+conflict_server_json TEXT
       )
     ''');
 
@@ -105,6 +110,10 @@ queue_date TEXT
 follow_up_note TEXT,
 follow_up_status TEXT DEFAULT 'pending',
 reminder_sent INTEGER DEFAULT 0
+,
+is_deleted INTEGER DEFAULT 0,
+server_version INTEGER DEFAULT 0,
+conflict_server_json TEXT
       )
     ''');
 
@@ -151,6 +160,8 @@ line_total REAL DEFAULT 0
     notes TEXT,
 
     sync_status TEXT DEFAULT 'pending',
+    server_version INTEGER DEFAULT 0,
+    is_deleted INTEGER DEFAULT 0,
 
     created_at TEXT,
     updated_at TEXT
@@ -551,6 +562,55 @@ is_favorite INTEGER DEFAULT 0,
       } catch (_) {}
     }
 
+    if (oldVersion < 32) {
+      await db.execute(
+        'ALTER TABLE patients ADD COLUMN is_deleted INTEGER DEFAULT 0',
+      );
+      await db.execute(
+        'ALTER TABLE prescriptions ADD COLUMN is_deleted INTEGER DEFAULT 0',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_patients_delete_sync '
+        'ON patients(doctor_id, is_deleted, sync_status)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_prescriptions_delete_sync '
+        'ON prescriptions(doctor_id, is_deleted, sync_status)',
+      );
+    }
+
+    if (oldVersion < 33) {
+      await db.execute(
+        'ALTER TABLE prescription_bills '
+        'ADD COLUMN server_version INTEGER DEFAULT 0',
+      );
+      await db.execute(
+        'ALTER TABLE prescription_bills '
+        'ADD COLUMN is_deleted INTEGER DEFAULT 0',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_bills_sync '
+        'ON prescription_bills(doctor_id, is_deleted, sync_status)',
+      );
+    }
+
+    if (oldVersion < 34) {
+      await db.execute(
+        'ALTER TABLE patients '
+        'ADD COLUMN server_version INTEGER DEFAULT 0',
+      );
+      await db.execute(
+        'ALTER TABLE patients ADD COLUMN conflict_server_json TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE prescriptions '
+        'ADD COLUMN server_version INTEGER DEFAULT 0',
+      );
+      await db.execute(
+        'ALTER TABLE prescriptions ADD COLUMN conflict_server_json TEXT',
+      );
+    }
+
     if (oldVersion < 29) {
       try {
         await db.execute(
@@ -761,7 +821,11 @@ is_favorite INTEGER DEFAULT 0,
 
   Future<List<Map<String, dynamic>>> getPatients() async {
     final db = await database;
-    return db.query('patients', orderBy: 'id DESC');
+    return db.query(
+      'patients',
+      where: 'is_deleted = 0',
+      orderBy: 'id DESC',
+    );
   }
 
   Future<List<Map<String, dynamic>>> getPatientsByDoctor(int doctorId) async {
@@ -769,7 +833,7 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'patients',
-      where: 'doctor_id = ?',
+      where: 'doctor_id = ? AND is_deleted = 0',
       whereArgs: [doctorId],
       orderBy: 'id DESC',
     );
@@ -781,7 +845,7 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'patients',
-      where: 'patient_name LIKE ? OR phone_number LIKE ?',
+      where: 'is_deleted = 0 AND (patient_name LIKE ? OR phone_number LIKE ?)',
       whereArgs: [q, q],
       orderBy: 'id DESC',
     );
@@ -796,7 +860,8 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'patients',
-      where: 'doctor_id = ? AND (patient_name LIKE ? OR phone_number LIKE ?)',
+      where:
+          'doctor_id = ? AND is_deleted = 0 AND (patient_name LIKE ? OR phone_number LIKE ?)',
       whereArgs: [doctorId, q, q],
       orderBy: 'id DESC',
     );
@@ -804,9 +869,27 @@ is_favorite INTEGER DEFAULT 0,
 
   Future<int> deletePatient(int id) async {
     final db = await database;
-
-    return db.delete(
+    final rows = await db.query(
       'patients',
+      columns: ['server_id'],
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return 0;
+
+    final serverId = rows.first['server_id'] as int?;
+    if (serverId == null || serverId <= 0) {
+      return db.delete('patients', where: 'id = ?', whereArgs: [id]);
+    }
+
+    return db.update(
+      'patients',
+      {
+        'is_deleted': 1,
+        'sync_status': 'pending',
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      },
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -817,7 +900,7 @@ is_favorite INTEGER DEFAULT 0,
 
     final result = await db.query(
       'patients',
-      where: 'id = ?',
+      where: 'id = ? AND is_deleted = 0',
       whereArgs: [id],
       limit: 1,
     );
@@ -880,7 +963,11 @@ is_favorite INTEGER DEFAULT 0,
     );
   }
 
-  Future<void> markPatientSynced(int localId, int serverId) async {
+  Future<void> markPatientSynced(
+    int localId,
+    int serverId,
+    int serverVersion,
+  ) async {
     final db = await database;
 
     await db.update(
@@ -888,6 +975,8 @@ is_favorite INTEGER DEFAULT 0,
       {
         'sync_status': 'synced',
         'server_id': serverId,
+        'server_version': serverVersion,
+        'conflict_server_json': null,
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',
@@ -906,6 +995,41 @@ is_favorite INTEGER DEFAULT 0,
       },
       where: 'id = ?',
       whereArgs: [localId],
+    );
+  }
+
+  Future<void> markPatientSyncConflict(
+    int localId,
+    String message,
+  ) async {
+    final db = await database;
+    await db.update(
+      'patients',
+      {
+        'sync_status': 'conflict',
+        'is_deleted': 0,
+        'conflict_server_json': jsonEncode({'message': message}),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [localId],
+    );
+  }
+
+  Future<void> removeSyncedPatientTombstone(int localId) async {
+    final db = await database;
+    await db.delete('patients', where: 'id = ?', whereArgs: [localId]);
+  }
+
+  Future<void> markPatientDeletedFromServer({
+    required int doctorId,
+    required int serverId,
+  }) async {
+    final db = await database;
+    await db.delete(
+      'patients',
+      where: 'doctor_id = ? AND server_id = ?',
+      whereArgs: [doctorId, serverId],
     );
   }
 
@@ -1022,6 +1146,7 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'prescriptions',
+      where: 'is_deleted = 0',
       orderBy: 'id DESC',
     );
   }
@@ -1033,7 +1158,7 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'prescriptions',
-      where: 'doctor_id = ?',
+      where: 'doctor_id = ? AND is_deleted = 0',
       whereArgs: [doctorId],
       orderBy: 'id DESC',
     );
@@ -1046,7 +1171,7 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'prescriptions',
-      where: 'patient_id = ?',
+      where: 'patient_id = ? AND is_deleted = 0',
       whereArgs: [patientId],
       orderBy: 'id DESC',
     );
@@ -1060,7 +1185,7 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'prescriptions',
-      where: 'patient_id = ? AND doctor_id = ?',
+      where: 'patient_id = ? AND doctor_id = ? AND is_deleted = 0',
       whereArgs: [patientId, doctorId],
       orderBy: 'id DESC',
     );
@@ -1074,7 +1199,7 @@ is_favorite INTEGER DEFAULT 0,
 
     final result = await db.query(
       'prescriptions',
-      where: 'prescription_no = ? AND doctor_id = ?',
+      where: 'prescription_no = ? AND doctor_id = ? AND is_deleted = 0',
       whereArgs: [rxNo, doctorId],
       limit: 1,
     );
@@ -1113,9 +1238,32 @@ is_favorite INTEGER DEFAULT 0,
 
   Future<int> deletePrescription(int id) async {
     final db = await database;
-
-    return db.delete(
+    final rows = await db.query(
       'prescriptions',
+      columns: ['server_id'],
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (rows.isEmpty) return 0;
+
+    final serverId = rows.first['server_id'] as int?;
+    if (serverId == null || serverId <= 0) {
+      await db.delete(
+        'prescription_items',
+        where: 'prescription_id = ?',
+        whereArgs: [id],
+      );
+      return db.delete('prescriptions', where: 'id = ?', whereArgs: [id]);
+    }
+
+    return db.update(
+      'prescriptions',
+      {
+        'is_deleted': 1,
+        'sync_status': 'pending',
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      },
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -1136,6 +1284,7 @@ is_favorite INTEGER DEFAULT 0,
     int localId,
     int serverId,
     int serverPatientId,
+    int serverVersion,
   ) async {
     final db = await database;
 
@@ -1145,6 +1294,8 @@ is_favorite INTEGER DEFAULT 0,
         'sync_status': 'synced',
         'server_id': serverId,
         'server_patient_id': serverPatientId,
+        'server_version': serverVersion,
+        'conflict_server_json': null,
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',
@@ -1164,6 +1315,69 @@ is_favorite INTEGER DEFAULT 0,
       where: 'id = ?',
       whereArgs: [localId],
     );
+  }
+
+  Future<void> markPrescriptionSyncConflict(
+    int localId,
+    String message,
+  ) async {
+    final db = await database;
+    await db.update(
+      'prescriptions',
+      {
+        'sync_status': 'conflict',
+        'is_deleted': 0,
+        'conflict_server_json': jsonEncode({'message': message}),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [localId],
+    );
+  }
+
+  Future<void> removeSyncedPrescriptionTombstone(int localId) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete(
+        'prescription_items',
+        where: 'prescription_id = ?',
+        whereArgs: [localId],
+      );
+      await txn.delete(
+        'prescriptions',
+        where: 'id = ?',
+        whereArgs: [localId],
+      );
+    });
+  }
+
+  Future<void> markPrescriptionDeletedFromServer({
+    required int doctorId,
+    required int serverId,
+  }) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      final rows = await txn.query(
+        'prescriptions',
+        columns: ['id'],
+        where: 'doctor_id = ? AND server_id = ?',
+        whereArgs: [doctorId, serverId],
+        limit: 1,
+      );
+      if (rows.isEmpty) return;
+
+      final localId = rows.first['id'] as int;
+      await txn.delete(
+        'prescription_items',
+        where: 'prescription_id = ?',
+        whereArgs: [localId],
+      );
+      await txn.delete(
+        'prescriptions',
+        where: 'id = ?',
+        whereArgs: [localId],
+      );
+    });
   }
 
   Future<void> attachServerPatientIdToLocalPrescription({
@@ -1510,7 +1724,7 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'custom_instructions',
-      where: 'doctor_id = ?',
+      where: 'doctor_id = ? AND is_deleted = 0',
       whereArgs: [doctorId],
       orderBy: 'usage_count DESC, instruction_text ASC',
     );
@@ -1637,7 +1851,7 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'patients',
-      where: 'doctor_id = ?',
+      where: 'doctor_id = ? AND is_deleted = 0',
       whereArgs: [doctorId],
       orderBy: 'id DESC',
       limit: limit,
@@ -1656,7 +1870,8 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'patients',
-      where: 'doctor_id = ? AND (patient_name LIKE ? OR phone_number LIKE ?)',
+      where:
+          'doctor_id = ? AND is_deleted = 0 AND (patient_name LIKE ? OR phone_number LIKE ?)',
       whereArgs: [doctorId, q, q],
       orderBy: 'id DESC',
       limit: limit,
@@ -1673,7 +1888,7 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'prescriptions',
-      where: 'doctor_id = ?',
+      where: 'doctor_id = ? AND is_deleted = 0',
       whereArgs: [doctorId],
       orderBy: 'id DESC',
       limit: limit,
@@ -1763,7 +1978,7 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'prescription_bills',
-      where: 'doctor_id = ?',
+      where: 'doctor_id = ? AND is_deleted = 0',
       whereArgs: [doctorId],
       orderBy: 'id DESC',
     );
@@ -1776,7 +1991,7 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'prescription_bills',
-      where: 'patient_id = ?',
+      where: 'patient_id = ? AND is_deleted = 0',
       whereArgs: [patientId],
       orderBy: 'id DESC',
     );
@@ -1789,7 +2004,7 @@ is_favorite INTEGER DEFAULT 0,
 
     final result = await db.query(
       'prescription_bills',
-      where: 'prescription_id = ?',
+      where: 'prescription_id = ? AND is_deleted = 0',
       whereArgs: [prescriptionId],
       limit: 1,
     );
@@ -1811,6 +2026,7 @@ is_favorite INTEGER DEFAULT 0,
   Future<void> markBillSynced(
     int localId,
     int serverId,
+    int serverVersion,
   ) async {
     final db = await database;
 
@@ -1818,6 +2034,7 @@ is_favorite INTEGER DEFAULT 0,
       'prescription_bills',
       {
         'server_id': serverId,
+        'server_version': serverVersion,
         'sync_status': 'synced',
         'updated_at': DateTime.now().toIso8601String(),
       },
@@ -1840,6 +2057,125 @@ is_favorite INTEGER DEFAULT 0,
       where: 'id = ?',
       whereArgs: [localId],
     );
+  }
+
+  Future<Map<String, dynamic>?> getPatientByLocalId(int localId) async {
+    final db = await database;
+    final rows = await db.query(
+      'patients',
+      where: 'id = ? AND is_deleted = 0',
+      whereArgs: [localId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  Future<Map<String, dynamic>?> getPrescriptionByLocalId(int localId) async {
+    final db = await database;
+    final rows = await db.query(
+      'prescriptions',
+      where: 'id = ? AND is_deleted = 0',
+      whereArgs: [localId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  Future<void> upsertBillFromServer({
+    required int doctorId,
+    required Map<String, dynamic> bill,
+  }) async {
+    final db = await database;
+    final serverId = bill['id'] as int;
+
+    var existing = await db.query(
+      'prescription_bills',
+      where: 'doctor_id = ? AND server_id = ?',
+      whereArgs: [doctorId, serverId],
+      limit: 1,
+    );
+
+    if (bill['isDeleted'] == true) {
+      if (existing.isNotEmpty) {
+        await db.delete(
+          'prescription_bills',
+          where: 'id = ?',
+          whereArgs: [existing.first['id']],
+        );
+      }
+      return;
+    }
+
+    int? localPatientId;
+    final serverPatientId = bill['patientId'] as int?;
+    if (serverPatientId != null) {
+      final patient = await db.query(
+        'patients',
+        columns: ['id'],
+        where: 'doctor_id = ? AND server_id = ? AND is_deleted = 0',
+        whereArgs: [doctorId, serverPatientId],
+        limit: 1,
+      );
+      if (patient.isNotEmpty) localPatientId = patient.first['id'] as int;
+    }
+
+    int? localPrescriptionId;
+    final serverPrescriptionId = bill['prescriptionId'] as int?;
+    if (serverPrescriptionId != null) {
+      final prescription = await db.query(
+        'prescriptions',
+        columns: ['id'],
+        where: 'doctor_id = ? AND server_id = ? AND is_deleted = 0',
+        whereArgs: [doctorId, serverPrescriptionId],
+        limit: 1,
+      );
+      if (prescription.isNotEmpty) {
+        localPrescriptionId = prescription.first['id'] as int;
+      }
+    }
+
+    if (existing.isEmpty && localPrescriptionId != null) {
+      existing = await db.query(
+        'prescription_bills',
+        where: 'doctor_id = ? AND prescription_id = ?',
+        whereArgs: [doctorId, localPrescriptionId],
+        limit: 1,
+      );
+    }
+
+    final data = <String, dynamic>{
+      'server_id': serverId,
+      'server_version': bill['version'] ?? 1,
+      'doctor_id': doctorId,
+      'patient_id': localPatientId,
+      'prescription_id': localPrescriptionId,
+      'prescription_no': bill['prescriptionNo']?.toString() ?? '',
+      'consultation_fee': bill['consultationFee'] ?? 0,
+      'medicine_charges': bill['medicineCharges'] ?? 0,
+      'other_charges': bill['otherCharges'] ?? 0,
+      'discount_amount': bill['discountAmount'] ?? 0,
+      'total_amount': bill['totalAmount'] ?? 0,
+      'paid_amount': bill['paidAmount'] ?? 0,
+      'balance_amount': bill['balanceAmount'] ?? 0,
+      'payment_method': bill['paymentMethod']?.toString() ?? '',
+      'payment_status': bill['paymentStatus']?.toString() ?? '',
+      'notes': bill['notes']?.toString() ?? '',
+      'sync_status': 'synced',
+      'is_deleted': 0,
+      'created_at': bill['createdAt']?.toString(),
+      'updated_at': bill['updatedAt']?.toString(),
+    };
+
+    if (existing.isEmpty) {
+      await db.insert('prescription_bills', data);
+    } else {
+      await db.update(
+        'prescription_bills',
+        data,
+        where: 'id = ?',
+        whereArgs: [existing.first['id']],
+      );
+    }
   }
 
   // =========================
@@ -1952,6 +2288,7 @@ is_favorite INTEGER DEFAULT 0,
     String? notes,
     String? updatedAt,
     String? createdAt,
+    int serverVersion = 1,
   }) async {
     final db = await database;
 
@@ -1961,6 +2298,30 @@ is_favorite INTEGER DEFAULT 0,
       whereArgs: [serverId, doctorId],
       limit: 1,
     );
+
+    if (existing.isNotEmpty &&
+        existing.first['sync_status']?.toString() == 'conflict') {
+      await db.update(
+        'patients',
+        {
+          'server_version': serverVersion,
+          'conflict_server_json': jsonEncode({
+            'id': serverId,
+            'patientName': patientName,
+            'patientAge': patientAge,
+            'patientGender': patientGender,
+            'phoneNumber': phoneNumber,
+            'address': address,
+            'notes': notes,
+            'version': serverVersion,
+            'updatedAt': updatedAt,
+          }),
+        },
+        where: 'id = ?',
+        whereArgs: [existing.first['id']],
+      );
+      return;
+    }
 
     final data = {
       'server_id': serverId,
@@ -1972,6 +2333,8 @@ is_favorite INTEGER DEFAULT 0,
       'address': address,
       'notes': notes,
       'sync_status': 'synced',
+      'server_version': serverVersion,
+      'conflict_server_json': null,
       'updated_at': updatedAt ?? DateTime.now().toIso8601String(),
       'created_at': createdAt ?? DateTime.now().toIso8601String(),
     };
@@ -1999,6 +2362,14 @@ is_favorite INTEGER DEFAULT 0,
         final p = Map<String, dynamic>.from(item as Map);
 
         final serverId = p['id'] as int;
+        if (p['isDeleted'] == true) {
+          await txn.delete(
+            'patients',
+            where: 'doctor_id = ? AND server_id = ?',
+            whereArgs: [doctorId, serverId],
+          );
+          continue;
+        }
 
         final phone = p['phoneNumber']?.toString() ?? '';
 
@@ -2009,6 +2380,20 @@ is_favorite INTEGER DEFAULT 0,
           whereArgs: [serverId, doctorId, phone, doctorId],
           limit: 1,
         );
+
+        if (existing.isNotEmpty &&
+            existing.first['sync_status']?.toString() == 'conflict') {
+          await txn.update(
+            'patients',
+            {
+              'server_version': p['version'] ?? 1,
+              'conflict_server_json': jsonEncode(p),
+            },
+            where: 'id = ?',
+            whereArgs: [existing.first['id']],
+          );
+          continue;
+        }
 
         final data = {
           'server_id': serverId,
@@ -2032,6 +2417,9 @@ is_favorite INTEGER DEFAULT 0,
           if (p['queueDate'] != null || p['queue_date'] != null)
             'queue_date': (p['queueDate'] ?? p['queue_date']).toString(),
           'sync_status': 'synced',
+          'is_deleted': 0,
+          'server_version': p['version'] ?? 1,
+          'conflict_server_json': null,
           'updated_at':
               p['updatedAt']?.toString() ?? DateTime.now().toIso8601String(),
           'created_at':
@@ -2066,6 +2454,8 @@ is_favorite INTEGER DEFAULT 0,
     String? diagnosis,
     String? visitNotes,
     String? updatedAt,
+    required int serverVersion,
+    Map<String, dynamic>? serverPayload,
   }) async {
     final db = await database;
 
@@ -2089,6 +2479,20 @@ is_favorite INTEGER DEFAULT 0,
       limit: 1,
     );
 
+    if (existing.isNotEmpty &&
+        existing.first['sync_status']?.toString() == 'conflict') {
+      await db.update(
+        'prescriptions',
+        {
+          'server_version': serverVersion,
+          'conflict_server_json': jsonEncode(serverPayload ?? const {}),
+        },
+        where: 'id = ?',
+        whereArgs: [existing.first['id']],
+      );
+      return;
+    }
+
     final data = {
       'server_id': serverId,
       'doctor_id': doctorId,
@@ -2104,6 +2508,9 @@ is_favorite INTEGER DEFAULT 0,
       'diagnosis': diagnosis,
       'visit_notes': visitNotes,
       'sync_status': 'synced',
+      'server_version': serverVersion,
+      'conflict_server_json': null,
+      'is_deleted': 0,
       'updated_at': updatedAt ?? DateTime.now().toIso8601String(),
     };
 
@@ -2338,6 +2745,7 @@ is_favorite INTEGER DEFAULT 0,
       SUM(balance_amount) as balance_total
     FROM prescription_bills
     WHERE doctor_id = ?
+      AND is_deleted = 0
       AND created_at LIKE ?
     ''',
       [doctorId, '$today%'],
@@ -2354,7 +2762,7 @@ is_favorite INTEGER DEFAULT 0,
 
     return db.query(
       'prescription_bills',
-      where: 'doctor_id = ? AND created_at LIKE ?',
+      where: 'doctor_id = ? AND is_deleted = 0 AND created_at LIKE ?',
       whereArgs: [doctorId, '$today%'],
       orderBy: 'id DESC',
     );
@@ -2362,9 +2770,13 @@ is_favorite INTEGER DEFAULT 0,
 
   Future<List<Map<String, dynamic>>> getAllBills() async {
     final db = await database;
+    final doctorId = await DoctorSession.getActiveDoctorIdForData();
+    if (doctorId == null) return [];
 
     return db.query(
       'prescription_bills',
+      where: 'doctor_id = ? AND is_deleted = 0',
+      whereArgs: [doctorId],
       orderBy: 'id DESC',
     );
   }
@@ -2434,6 +2846,20 @@ is_favorite INTEGER DEFAULT 0,
           limit: 1,
         );
 
+        if (existing.isNotEmpty &&
+            existing.first['sync_status']?.toString() == 'conflict') {
+          await txn.update(
+            'patients',
+            {
+              'server_version': patient['version'] ?? 1,
+              'conflict_server_json': jsonEncode(patient),
+            },
+            where: 'id = ?',
+            whereArgs: [existing.first['id']],
+          );
+          continue;
+        }
+
         final data = <String, dynamic>{
           'server_id': serverId,
           'doctor_id': doctorId,
@@ -2460,6 +2886,8 @@ is_favorite INTEGER DEFAULT 0,
                   now)
               .toString(),
           'sync_status': 'synced',
+          'server_version': patient['version'] ?? 1,
+          'conflict_server_json': null,
           'updated_at': patient['updatedAt']?.toString() ?? now,
           'created_at': patient['createdAt']?.toString() ?? now,
         };

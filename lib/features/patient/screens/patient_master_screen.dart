@@ -4,6 +4,7 @@ import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 import '../../prescription/screens/patient_profile_screen.dart';
 import '../../sync/services/network_service.dart';
+import '../../sync/services/auto_sync_service.dart';
 import '../../sync/services/sync_service.dart';
 import 'patient_edit_screen.dart';
 
@@ -182,12 +183,13 @@ class _PatientMasterScreenState extends State<PatientMasterScreen> {
   Future<void> _deletePatient(int id) async {
     try {
       await DatabaseHelper.instance.deletePatient(id);
+      unawaited(AutoSyncService.syncPendingChanges());
       await _loadPatients();
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Patient deleted locally')),
+        const SnackBar(content: Text('Patient deleted and queued for sync')),
       );
     } catch (e) {
       if (!mounted) return;
