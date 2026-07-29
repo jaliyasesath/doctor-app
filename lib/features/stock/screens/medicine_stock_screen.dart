@@ -16,6 +16,8 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
   static const _green = Color(0xFF0F766E);
   static const _deepGreen = Color(0xFF064E3B);
   static const _freshGreen = Color(0xFF22A06B);
+  static const _appBarAccent = Color(0xFFFFD166);
+  static const _appBarAccentMuted = Color(0xFFFFE7A3);
   static const _surface = Color(0xFFF1F8F6);
 
   final _api = MedicineStockApiService();
@@ -474,7 +476,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '$totalQuantity units  •  $low low stock  •  $expiry alerts',
+                  '$totalQuantity units  â€¢  $low low stock  â€¢  $expiry alerts',
                   style: const TextStyle(
                     color: Color(0xFFD7F5EA),
                     fontSize: 12.5,
@@ -577,7 +579,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                 title: Text(_text(item['medicineName']),
                     style: const TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: Text(
-                  '$warning • ${_number(item['activeBatchCount'])} active batches',
+                  '$warning â€¢ ${_number(item['activeBatchCount'])} active batches',
                 ),
                 trailing: Text(
                   '${_number(item['availableQuantity'])}',
@@ -668,7 +670,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                 title: Text(_text(item['medicineName']),
                     style: const TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: Text(
-                  '${_text(item['movementType'])} • ${_text(item['notes'])}\n'
+                  '${_text(item['movementType'])} â€¢ ${_text(item['notes'])}\n'
                   '${_text(item['createdAt']).replaceFirst('T', ' ')}',
                 ),
                 isThreeLine: true,
@@ -717,9 +719,9 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
         appBar: AppBar(
           backgroundColor: _deepGreen,
           surfaceTintColor: Colors.transparent,
-          foregroundColor: Colors.white,
-          iconTheme: const IconThemeData(color: Colors.white),
-          actionsIconTheme: const IconThemeData(color: Colors.white),
+          foregroundColor: _appBarAccent,
+          iconTheme: const IconThemeData(color: _appBarAccent),
+          actionsIconTheme: const IconThemeData(color: _appBarAccent),
           systemOverlayStyle: SystemUiOverlayStyle.light,
           elevation: 0,
           scrolledUnderElevation: 0,
@@ -732,7 +734,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
           title: const Text(
             'Medicine Stock',
             style: TextStyle(
-              color: Colors.white,
+              color: _appBarAccent,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -756,11 +758,11 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
           ],
           bottom: TabBar(
             controller: _tabs,
-            dividerColor: Colors.white24,
-            indicatorColor: Colors.white,
+            dividerColor: Color(0x55FFD166),
+            indicatorColor: _appBarAccent,
             indicatorWeight: 3,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
+            labelColor: _appBarAccent,
+            unselectedLabelColor: _appBarAccentMuted,
             labelStyle: const TextStyle(fontWeight: FontWeight.w700),
             unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
             tabs: const [

@@ -18,6 +18,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
   static const Color _ppDeepGreen = Color(0xFF064E3B);
   static const Color _ppGreen = Color(0xFF0F766E);
   static const Color _ppFreshGreen = Color(0xFF22A06B);
+  static const Color _ppAppBarAccent = Color(0xFFFFD166);
 
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -549,7 +550,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${medicines.length} medicines  •  $favorites favourites',
+                  '${medicines.length} medicines  â€¢  $favorites favourites',
                   style: const TextStyle(
                     color: Color(0xFFD7F5EA),
                     fontSize: 12.5,
@@ -611,15 +612,15 @@ class _MedicineScreenState extends State<MedicineScreen> {
       appBar: AppBar(
         backgroundColor: _ppDeepGreen,
         surfaceTintColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
+        foregroundColor: _ppAppBarAccent,
+        iconTheme: const IconThemeData(color: _ppAppBarAccent),
         systemOverlayStyle: SystemUiOverlayStyle.light,
         elevation: 0,
         scrolledUnderElevation: 0,
         title: Text(
           'Medicines (${medicines.length})',
           style: const TextStyle(
-            color: Colors.white,
+            color: _ppAppBarAccent,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -726,6 +727,7 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
   static const Color _ppDeepGreen = Color(0xFF064E3B);
   static const Color _ppGreen = Color(0xFF0F766E);
   static const Color _ppFreshGreen = Color(0xFF22A06B);
+  static const Color _ppAppBarAccent = Color(0xFFFFD166);
 
   final _formKey = GlobalKey<FormState>();
 
@@ -1110,15 +1112,15 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
       appBar: AppBar(
         backgroundColor: _ppDeepGreen,
         surfaceTintColor: Colors.transparent,
-        foregroundColor: Colors.white,
-        iconTheme: const IconThemeData(color: Colors.white),
+        foregroundColor: _ppAppBarAccent,
+        iconTheme: const IconThemeData(color: _ppAppBarAccent),
         systemOverlayStyle: SystemUiOverlayStyle.light,
         elevation: 0,
         scrolledUnderElevation: 0,
         title: Text(
           title,
           style: const TextStyle(
-            color: Colors.white,
+            color: _ppAppBarAccent,
             fontWeight: FontWeight.w800,
           ),
         ),
