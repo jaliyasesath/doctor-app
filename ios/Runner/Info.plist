@@ -53,6 +53,12 @@
     <key>NSLocalNetworkUsageDescription</key>
     <string>Local network access is required to connect the doctor and reception devices through the clinic hotspot.</string>
 
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Bluetooth access is required to connect and print with the BT-58D thermal printer.</string>
+
+    <key>NSBluetoothPeripheralUsageDescription</key>
+    <string>Bluetooth access is required to send prescriptions and bills to the thermal printer.</string>
+
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsLocalNetworking</key>

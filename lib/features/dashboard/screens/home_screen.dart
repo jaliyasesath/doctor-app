@@ -29,6 +29,7 @@ import '../../billing/screens/billing_report_screen.dart';
 import '../../license/screens/license_gate_screen.dart';
 import '../../license/data/license_service.dart';
 import '../../reception/screens/manage_reception_accounts_screen.dart';
+import '../../stock/screens/medicine_stock_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -412,6 +413,9 @@ class _HomeScreenState extends State<HomeScreen> {
         break;
       case 'Medicines':
         screen = const MedicineScreen();
+        break;
+      case 'Medicine Stock':
+        screen = const MedicineStockScreen();
         break;
       case 'Prescription History':
         screen = const PrescriptionHistoryScreen();
@@ -1515,6 +1519,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     icon: Icons.medication,
                     color: _primaryGreen,
                     onTap: () => _navigate('Medicines'),
+                  ),
+                  _featureCard(
+                    title: 'Medicine Stock',
+                    subtitle: 'Batches, stock levels and dispensing',
+                    icon: Icons.inventory_2,
+                    color: _deepGreen,
+                    onTap: () => _navigate('Medicine Stock'),
                   ),
                   _featureCard(
                     title: 'Prescription History',

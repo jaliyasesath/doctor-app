@@ -14,6 +14,10 @@ class MedicineScreen extends StatefulWidget {
 }
 
 class _MedicineScreenState extends State<MedicineScreen> {
+  static const Color _ppDeepGreen = Color(0xFF064E3B);
+  static const Color _ppGreen = Color(0xFF0F766E);
+  static const Color _ppFreshGreen = Color(0xFF22A06B);
+
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
@@ -492,6 +496,97 @@ class _MedicineScreenState extends State<MedicineScreen> {
     );
   }
 
+  Widget _buildPageHeader() {
+    final favorites =
+        medicines.where((item) => (item['is_favorite'] ?? 0) == 1).length;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [_ppDeepGreen, _ppGreen, _ppFreshGreen],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x2A064E3B),
+            blurRadius: 22,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .16),
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(color: Colors.white24),
+            ),
+            child: const Icon(
+              Icons.medication_rounded,
+              color: Colors.white,
+              size: 29,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Medicine Library',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${medicines.length} medicines  •  $favorites favourites',
+                  style: const TextStyle(
+                    color: Color(0xFFD7F5EA),
+                    fontSize: 12.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!isReception)
+            Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => _openMedicineForm(),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+                  child: Row(
+                    children: [
+                      Icon(Icons.add_rounded, color: _ppGreen, size: 20),
+                      SizedBox(width: 5),
+                      Text(
+                        'Add',
+                        style: TextStyle(
+                          color: _ppDeepGreen,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
 
@@ -545,8 +640,9 @@ class _MedicineScreenState extends State<MedicineScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            _buildPageHeader(),
             Container(
-              margin: const EdgeInsets.all(14),
+              margin: const EdgeInsets.fromLTRB(14, 12, 14, 14),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
@@ -618,6 +714,10 @@ class MedicineFormScreen extends StatefulWidget {
 }
 
 class _MedicineFormScreenState extends State<MedicineFormScreen> {
+  static const Color _ppDeepGreen = Color(0xFF064E3B);
+  static const Color _ppGreen = Color(0xFF0F766E);
+  static const Color _ppFreshGreen = Color(0xFF22A06B);
+
   final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _medicineNameController = TextEditingController();
@@ -759,6 +859,113 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+      ),
+    );
+  }
+
+  Widget _formBanner(String title) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [_ppDeepGreen, _ppGreen, _ppFreshGreen],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x26064E3B),
+            blurRadius: 20,
+            offset: Offset(0, 9),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .16),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              isEdit ? Icons.edit_rounded : Icons.add_box_rounded,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  isReception
+                      ? 'Update the doctor-specific medicine price.'
+                      : 'Keep medicine details accurate for prescriptions and stock.',
+                  style: const TextStyle(
+                    color: Color(0xFFD7F5EA),
+                    fontSize: 12.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title, String subtitle, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE2F4EE),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: _ppGreen, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF16352D),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -921,6 +1128,13 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
               key: _formKey,
               child: Column(
                 children: [
+                  _formBanner(title),
+                  const SizedBox(height: 20),
+                  _sectionTitle(
+                    'Medicine Identity',
+                    'Basic clinical and brand information',
+                    Icons.biotech_outlined,
+                  ),
                   _field(
                     controller: _medicineNameController,
                     label: 'Medicine Name',
@@ -969,7 +1183,12 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
                     enabled: !isReception,
                     hint: '500mg / 250mg / 5ml',
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 22),
+                  _sectionTitle(
+                    'Pricing & Preference',
+                    'Doctor-specific prices and quick access',
+                    Icons.payments_outlined,
+                  ),
                   _field(
                     controller: _sellingPriceController,
                     label: 'Selling Price',

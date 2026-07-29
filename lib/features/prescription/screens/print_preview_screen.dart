@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../auth/data/doctor_session.dart';
 import '../data/prescription_store.dart';
+import '../services/bluetooth_thermal_printer_service.dart';
 import '../services/wifi_thermal_printer_service.dart';
 import '../utils/prescription_pdf_helper.dart';
 import 'printer_settings_screen.dart';
@@ -34,12 +35,14 @@ class PrintPreviewScreen extends StatefulWidget {
 
 class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
   final WifiThermalPrinterService _wifiPrinter = WifiThermalPrinterService();
-  //final BlueThermalPrinter printer = BlueThermalPrinter.instance;
+  final BluetoothThermalPrinterService _bluetoothPrinter =
+      BluetoothThermalPrinterService();
 
   bool _isLoadingRx = true;
   bool _isLoadingDoctor = true;
   bool _isSharingPdf = false;
   bool _isSharingWhatsApp = false;
+  bool _isPrinting = false;
   bool _isBillMode = false;
   bool _alreadyBilled = false;
 
@@ -315,14 +318,84 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
       return;
     }
 
-    if (Platform.isIOS) {
-      await _printWifiIos();
-    } else if (Platform.isAndroid) {
+    setState(() => _isPrinting = true);
+
+    try {
+      final currentDate =
+          widget.passedDate ?? DateTime.now().toString().substring(0, 10);
+
+      final printed = await _bluetoothPrinter.printDocument(
+        billMode: _isBillMode,
+        medicalCenterName: medicalCenterName,
+        doctorName: doctorName,
+        specialization: specialization,
+        clinicAddress: clinicAddress,
+        rxNo: rxNo,
+        date: currentDate,
+        patientName: PrescriptionStore.patientName,
+        patientAge: PrescriptionStore.patientAge,
+        patientGender: PrescriptionStore.patientGender,
+        items: PrescriptionStore.items,
+        qualifications: qualifications,
+        profession: profession,
+        slmcRegNo: slmcRegNo,
+        affiliation: affiliation,
+        contactNumber: contactNumber,
+        consultationFee: PrescriptionStore.consultationFee,
+        qrValue: qrValue,
+      );
+
+      if (!mounted) return;
+      if (printed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isBillMode
+                  ? 'Bill sent to BT-58D printer.'
+                  : 'Prescription sent to BT-58D printer.',
+            ),
+            backgroundColor: const Color(0xFF0F766E),
+          ),
+        );
+      } else {
+        final openSettings = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Printer not connected'),
+            content: const Text(
+              'Pair BT-58D in the phone Bluetooth settings, then connect it in Thermal Printer settings.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Printer Settings'),
+              ),
+            ],
+          ),
+        );
+        if (openSettings == true && mounted) {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const PrinterSettingsScreen(),
+            ),
+          );
+        }
+      }
+    } catch (error) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Android Bluetooth print disabled in iOS build mode'),
+        SnackBar(
+          content: Text('Thermal print failed: $error'),
+          backgroundColor: Colors.red.shade700,
         ),
       );
+    } finally {
+      if (mounted) setState(() => _isPrinting = false);
     }
   }
 
@@ -879,9 +952,21 @@ GET WELL SOON
                     child: SizedBox(
                       height: 48,
                       child: ElevatedButton.icon(
-                        icon: const Icon(Icons.print),
-                        label: const Text('Print Now', maxLines: 1),
-                        onPressed: _printNow,
+                        icon: _isPrinting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.print),
+                        label: Text(
+                          _isPrinting ? 'Printing...' : 'Print Now',
+                          maxLines: 1,
+                        ),
+                        onPressed: _isPrinting ? null : _printNow,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF064E3B),
                           foregroundColor: Colors.white,
