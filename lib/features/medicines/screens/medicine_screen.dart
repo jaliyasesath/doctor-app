@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/widgets/app_error_ui.dart';
 import '../../../data/local/database_helper.dart';
@@ -608,11 +609,19 @@ class _MedicineScreenState extends State<MedicineScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F7F6),
       appBar: AppBar(
+        backgroundColor: _ppDeepGreen,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        systemOverlayStyle: SystemUiOverlayStyle.light,
         elevation: 0,
+        scrolledUnderElevation: 0,
         title: Text(
           'Medicines (${medicines.length})',
-          style: const TextStyle(fontWeight: FontWeight.w700),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         flexibleSpace: const DecoratedBox(
           decoration: BoxDecoration(
@@ -1099,11 +1108,19 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F7F6),
       appBar: AppBar(
+        backgroundColor: _ppDeepGreen,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
+        systemOverlayStyle: SystemUiOverlayStyle.light,
         elevation: 0,
+        scrolledUnderElevation: 0,
         title: Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.w700),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         flexibleSpace: const DecoratedBox(
           decoration: BoxDecoration(

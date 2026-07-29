@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/widgets/app_error_ui.dart';
 import '../data/medicine_stock_api_service.dart';
@@ -531,13 +532,13 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                   ),
                   SizedBox(
                     width: width < 104 ? constraints.maxWidth : width,
-                    child: _metric('Low stock', '$low', Icons.warning_amber,
-                        Colors.orange),
+                    child: _metric(
+                        'Low stock', '$low', Icons.warning_amber, Colors.orange),
                   ),
                   SizedBox(
                     width: width < 104 ? constraints.maxWidth : width,
-                    child: _metric('Expiry alerts', '$expiry', Icons.event_busy,
-                        Colors.red),
+                    child: _metric(
+                        'Expiry alerts', '$expiry', Icons.event_busy, Colors.red),
                   ),
                 ],
               );
@@ -714,14 +715,27 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
       child: Scaffold(
         backgroundColor: _surface,
         appBar: AppBar(
+          backgroundColor: _deepGreen,
+          surfaceTintColor: Colors.transparent,
           foregroundColor: Colors.white,
+          iconTheme: const IconThemeData(color: Colors.white),
+          actionsIconTheme: const IconThemeData(color: Colors.white),
+          systemOverlayStyle: SystemUiOverlayStyle.light,
+          elevation: 0,
+          scrolledUnderElevation: 0,
           flexibleSpace: const DecoratedBox(
             decoration: BoxDecoration(
               gradient:
                   LinearGradient(colors: [_deepGreen, _green, _freshGreen]),
             ),
           ),
-          title: const Text('Medicine Stock'),
+          title: const Text(
+            'Medicine Stock',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           actions: [
             PopupMenuButton<String>(
               onSelected: (value) {
@@ -742,9 +756,13 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
           ],
           bottom: TabBar(
             controller: _tabs,
+            dividerColor: Colors.white24,
             indicatorColor: Colors.white,
+            indicatorWeight: 3,
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white70,
+            labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
             tabs: const [
               Tab(text: 'Overview'),
               Tab(text: 'Batches'),
