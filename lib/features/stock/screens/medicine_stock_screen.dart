@@ -532,13 +532,13 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                   ),
                   SizedBox(
                     width: width < 104 ? constraints.maxWidth : width,
-                    child: _metric(
-                        'Low stock', '$low', Icons.warning_amber, Colors.orange),
+                    child: _metric('Low stock', '$low', Icons.warning_amber,
+                        Colors.orange),
                   ),
                   SizedBox(
                     width: width < 104 ? constraints.maxWidth : width,
-                    child: _metric(
-                        'Expiry alerts', '$expiry', Icons.event_busy, Colors.red),
+                    child: _metric('Expiry alerts', '$expiry', Icons.event_busy,
+                        Colors.red),
                   ),
                 ],
               );
