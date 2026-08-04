@@ -1197,6 +1197,9 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
 
       PrescriptionStore.add(
         PrescriptionItem(
+          medicineId: int.tryParse(
+            selected!['server_id']?.toString() ?? '',
+          ),
           medicineName: selected!['medicine_name'].toString(),
           dosage: dosageController.text.trim(),
           frequency: selectedFrequency,
@@ -1386,6 +1389,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
 
       final itemRows = items.map((item) {
         return {
+          'medicine_id': item.medicineId,
           'medicine_name': item.medicineName,
           'dosage': item.dosage,
           'frequency': item.frequency,
@@ -1795,6 +1799,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
     if (result == true) {
       setState(() {
         PrescriptionStore.items[index] = PrescriptionItem(
+          medicineId: item.medicineId,
           medicineName: item.medicineName,
           dosage: dosageController.text.trim(),
           frequency: selectedFrequency,

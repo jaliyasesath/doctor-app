@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/widgets/app_error_ui.dart';
+import '../../notifications/services/local_notification_service.dart';
 import '../data/medicine_stock_api_service.dart';
+import '../domain/stock_validation.dart';
 
 class MedicineStockScreen extends StatefulWidget {
   const MedicineStockScreen({super.key});
@@ -26,6 +31,10 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
   List<Map<String, dynamic>> _summary = [];
   List<Map<String, dynamic>> _batches = [];
   List<Map<String, dynamic>> _movements = [];
+  Map<String, dynamic> _valuation = {};
+  int _lowStockThreshold = 10;
+  int _expiringWithinDays = 90;
+  bool _showingOfflineCache = false;
   bool _loading = true;
   Object? _error;
 
@@ -55,20 +64,66 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
       _error = null;
     });
     try {
+      final prefs = await SharedPreferences.getInstance();
+      _lowStockThreshold = prefs.getInt('stock_low_threshold') ?? 10;
+      _expiringWithinDays = prefs.getInt('stock_expiry_days') ?? 90;
       final results = await Future.wait([
-        _api.summary(search: _search.text.trim()),
-        _api.batches(),
-        _api.movements(),
+        _api.allSummary(
+          search: _search.text.trim(),
+          lowStockThreshold: _lowStockThreshold,
+          expiringWithinDays: _expiringWithinDays,
+        ),
+        _api.allBatches(),
+        _api.allMovements(),
+        _api.valuation(),
       ]);
       if (!mounted) return;
       setState(() {
         _summary = _rows(results[0]);
         _batches = _rows(results[1]);
         _movements = _rows(results[2]);
+        _valuation = Map<String, dynamic>.from(results[3]);
+        _showingOfflineCache = false;
       });
+      await prefs.setString('stock_summary_cache', jsonEncode(_summary));
+      await prefs.setString('stock_batches_cache', jsonEncode(_batches));
+      await prefs.setString('stock_movements_cache', jsonEncode(_movements));
+      await prefs.setString('stock_valuation_cache', jsonEncode(_valuation));
+      final lowCount = _summary.where((x) => x['isLowStock'] == true).length;
+      final expiryCount = _summary
+          .where((x) => x['isExpired'] == true || x['isExpiringSoon'] == true)
+          .length;
+      await LocalNotificationService.showDailyStockAlert(
+        lowStockCount: lowCount,
+        expiryAlertCount: expiryCount,
+      );
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error);
+      final prefs = await SharedPreferences.getInstance();
+      try {
+        final summary = jsonDecode(prefs.getString('stock_summary_cache') ?? '[]');
+        final batches = jsonDecode(prefs.getString('stock_batches_cache') ?? '[]');
+        final movements = jsonDecode(prefs.getString('stock_movements_cache') ?? '[]');
+        final valuation = jsonDecode(prefs.getString('stock_valuation_cache') ?? '{}');
+        if (summary is List && summary.isNotEmpty) {
+          setState(() {
+            _summary = summary.map((e) => Map<String, dynamic>.from(e)).toList();
+            _batches = (batches as List)
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList();
+            _movements = (movements as List)
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList();
+            _valuation = Map<String, dynamic>.from(valuation as Map);
+            _showingOfflineCache = true;
+            _error = null;
+          });
+        } else {
+          setState(() => _error = error);
+        }
+      } catch (_) {
+        setState(() => _error = error);
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -80,6 +135,14 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
   String _text(dynamic value) => value?.toString() ?? '';
 
   Future<void> _run(Future<void> Function() operation) async {
+    if (_showingOfflineCache) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Stock changes require an online connection.'),
+        ),
+      );
+      return;
+    }
     try {
       await operation();
       if (!mounted) return;
@@ -196,11 +259,17 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     );
     if (result != true) return;
     final qty = num.tryParse(quantity.text);
-    if (batch.text.trim().isEmpty || qty == null || qty <= 0) {
+    final validation = StockValidation.receive(
+      batchNumber: batch.text,
+      quantity: qty ?? 0,
+      costPrice: num.tryParse(cost.text) ?? -1,
+      sellingPrice: num.tryParse(selling.text) ?? -1,
+      expiryDate: expiry,
+    );
+    if (validation != null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Enter batch number and valid quantity.')),
+          SnackBar(content: Text(validation)),
         );
       }
       return;
@@ -267,7 +336,18 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     );
     if (ok != true) return;
     final qty = num.tryParse(quantity.text);
-    if (qty == null || qty <= 0 || reason.text.trim().isEmpty) return;
+    final validation = StockValidation.adjustment(
+      quantity: qty ?? 0,
+      reason: reason.text,
+    );
+    if (validation != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(validation)),
+        );
+      }
+      return;
+    }
     await _run(() async {
       await _api.adjust({
         'stockBatchId': _id(item['id']),
@@ -280,66 +360,128 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
   }
 
   Future<void> _dispense() async {
-    if (_summary.isEmpty) return;
-    var medicine = _summary.first;
-    final prescriptionId = TextEditingController();
-    final quantity = TextEditingController(text: '1');
+    if (_showingOfflineCache) {
+      await _run(() async {});
+      return;
+    }
+    Map<String, dynamic>? prescription;
+    final selectedQuantities = <int, num>{};
+    List<Map<String, dynamic>> prescriptions = [];
+    try {
+      prescriptions = _rows(await _api.pendingPrescriptions());
+    } catch (error) {
+      if (mounted) AppErrorUi.show(context, error, onRetry: _dispense);
+      return;
+    }
+    if (!mounted) return;
+    if (prescriptions.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No prescriptions are waiting to be dispensed.')),
+        );
+      }
+      return;
+    }
+    prescription = prescriptions.first;
+    void loadItems(Map<String, dynamic> value) {
+      selectedQuantities.clear();
+      final items = value['items'];
+      if (items is List) {
+        for (final raw in items) {
+          final item = Map<String, dynamic>.from(raw as Map);
+          final id = _id(item['medicineId']);
+          final quantity = _number(item['quantity']);
+          if (id > 0 && quantity > 0) selectedQuantities[id] = quantity;
+        }
+      }
+    }
+    loadItems(prescription);
     final ok = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Dispense Prescription'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: prescriptionId,
-              keyboardType: TextInputType.number,
-              decoration:
-                  const InputDecoration(labelText: 'Server prescription ID'),
-            ),
-            DropdownButtonFormField<Map<String, dynamic>>(
-              initialValue: medicine,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Medicine'),
-              items: _summary
-                  .map(
-                    (item) => DropdownMenuItem(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Dispense Prescription'),
+          content: SizedBox(
+            width: 520,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<Map<String, dynamic>>(
+                    initialValue: prescription,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Prescription'),
+                    items: prescriptions.map((item) => DropdownMenuItem(
                       value: item,
-                      child: Text(_text(item['medicineName'])),
+                      child: Text(
+                        '${_text(item['prescriptionNo'])} — ${_text(item['patientName'])}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    )).toList(),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() {
+                        prescription = value;
+                        loadItems(value);
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  if (_number(prescription?['unmatchedItemCount']) > 0)
+                    const Text(
+                      'Some medicines are not linked to stock and cannot be dispensed.',
+                      style: TextStyle(color: Colors.orange),
                     ),
-                  )
-                  .toList(),
-              onChanged: (value) => medicine = value ?? medicine,
+                  ...((prescription?['items'] as List? ?? const []).map((raw) {
+                    final item = Map<String, dynamic>.from(raw as Map);
+                    final medicineId = _id(item['medicineId']);
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(_text(item['medicineName'])),
+                      subtitle: Text('Quantity: ${selectedQuantities[medicineId] ?? 0}'),
+                      trailing: Checkbox(
+                        value: selectedQuantities.containsKey(medicineId),
+                        onChanged: (checked) => setDialogState(() {
+                          if (checked == true) {
+                            selectedQuantities[medicineId] = _number(item['quantity']);
+                          } else {
+                            selectedQuantities.remove(medicineId);
+                          }
+                        }),
+                      ),
+                    );
+                  })),
+                ],
+              ),
             ),
-            TextField(
-              controller: quantity,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Quantity'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: selectedQuantities.isEmpty
+                  ? null
+                  : () => Navigator.pop(dialogContext, true),
+              child: const Text('Dispense All'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Dispense'),
-          ),
-        ],
       ),
     );
     if (ok != true) return;
-    final rxId = int.tryParse(prescriptionId.text);
-    final qty = num.tryParse(quantity.text);
-    if (rxId == null || rxId <= 0 || qty == null || qty <= 0) return;
+    final rxId = _id(prescription?['id']);
+    if (rxId <= 0 || selectedQuantities.isEmpty) return;
     await _run(() async {
       final response = await _api.dispense({
         'prescriptionId': rxId,
-        'items': [
-          {'medicineId': _id(medicine['id']), 'quantity': qty},
-        ],
+        'items': selectedQuantities.entries
+            .map((entry) => {
+                  'medicineId': entry.key,
+                  'quantity': entry.value,
+                })
+            .toList(),
         'idempotencyKey': _key('dispense'),
       });
       if (!mounted) return;
@@ -395,6 +537,59 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
         'idempotencyKey': _key('reverse'),
       });
     });
+  }
+
+  Future<void> _configureAlerts() async {
+    final low = TextEditingController(text: '$_lowStockThreshold');
+    final days = TextEditingController(text: '$_expiringWithinDays');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Stock Alert Settings'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: low,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Low-stock level'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: days,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Expiry warning days'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final lowValue = int.tryParse(low.text);
+    final daysValue = int.tryParse(days.text);
+    if (lowValue == null || lowValue < 0 ||
+        daysValue == null || daysValue < 1 || daysValue > 3650) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Enter valid alert settings.')),
+        );
+      }
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('stock_low_threshold', lowValue);
+    await prefs.setInt('stock_expiry_days', daysValue);
+    await _load();
   }
 
   Widget _metric(String label, String value, IconData icon, Color color) {
@@ -476,7 +671,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '$totalQuantity units  â€¢  $low low stock  â€¢  $expiry alerts',
+                  '$totalQuantity units  •  $low low stock  •  $expiry alerts',
                   style: const TextStyle(
                     color: Color(0xFFD7F5EA),
                     fontSize: 12.5,
@@ -500,6 +695,17 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (_showingOfflineCache) ...[
+            MaterialBanner(
+              content: const Text(
+                'Offline cached stock is shown. Stock changes are disabled.',
+              ),
+              actions: [
+                TextButton(onPressed: _load, child: const Text('RETRY')),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
           _stockHero(low, expiry),
           const SizedBox(height: 14),
           TextField(
@@ -546,6 +752,19 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
               );
             },
           ),
+          const SizedBox(height: 10),
+          Card(
+            elevation: 0,
+            child: ListTile(
+              leading: const Icon(Icons.account_balance_wallet_outlined,
+                  color: _green),
+              title: const Text('Stock valuation'),
+              subtitle: Text(
+                'Cost: ${_number(_valuation['costValue']).toStringAsFixed(2)}  •  '
+                'Retail: ${_number(_valuation['retailValue']).toStringAsFixed(2)}',
+              ),
+            ),
+          ),
           const SizedBox(height: 14),
           ..._summary.map((item) {
             final lowStock = item['isLowStock'] == true;
@@ -579,7 +798,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                 title: Text(_text(item['medicineName']),
                     style: const TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: Text(
-                  '$warning â€¢ ${_number(item['activeBatchCount'])} active batches',
+                  '$warning • ${_number(item['activeBatchCount'])} active batches',
                 ),
                 trailing: Text(
                   '${_number(item['availableQuantity'])}',
@@ -670,7 +889,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                 title: Text(_text(item['medicineName']),
                     style: const TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: Text(
-                  '${_text(item['movementType'])} â€¢ ${_text(item['notes'])}\n'
+                  '${_text(item['movementType'])} • ${_text(item['notes'])}\n'
                   '${_text(item['createdAt']).replaceFirst('T', ' ')}',
                 ),
                 isThreeLine: true,
@@ -739,6 +958,11 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
             ),
           ),
           actions: [
+            IconButton(
+              onPressed: _configureAlerts,
+              tooltip: 'Stock alert settings',
+              icon: const Icon(Icons.tune),
+            ),
             PopupMenuButton<String>(
               onSelected: (value) {
                 if (value == 'dispense') _dispense();
@@ -758,7 +982,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
           ],
           bottom: TabBar(
             controller: _tabs,
-            dividerColor: Color(0x55FFD166),
+            dividerColor: const Color(0x55FFD166),
             indicatorColor: _appBarAccent,
             indicatorWeight: 3,
             labelColor: _appBarAccent,

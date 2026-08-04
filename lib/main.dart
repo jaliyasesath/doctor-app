@@ -11,7 +11,7 @@ import 'features/net_service/connection_mode_service.dart';
 import 'features/queue/services/queue_realtime_service.dart';
 import 'features/queue/services/queue_sync_service.dart';
 import 'features/sync/services/auto_sync_service.dart';
-// import 'features/notifications/services/local_notification_service.dart';
+import 'features/notifications/services/local_notification_service.dart';
 
 void main() {
   runZonedGuarded(() async {
@@ -46,8 +46,7 @@ void main() {
       return const AppErrorFallback();
     };
 
-    // iOS testing සඳහා temporarily disabled.
-    // await LocalNotificationService.init();
+    await _runStartupTask('Notifications', LocalNotificationService.init);
 
     await _runStartupTask(
       'LoadConnectionMode',

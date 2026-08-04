@@ -19,6 +19,7 @@ class LocalNotificationService {
 
     const settings = InitializationSettings(
       android: androidSettings,
+      iOS: DarwinInitializationSettings(),
     );
 
     await _plugin.initialize(
@@ -64,6 +65,10 @@ class LocalNotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
 
     await androidPlugin?.requestNotificationsPermission();
+
+    final iosPlugin = _plugin.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
+    await iosPlugin?.requestPermissions(alert: true, badge: true, sound: true);
   }
 
   static Future<bool> consumePendingFollowUpOpen() async {
@@ -98,13 +103,6 @@ class LocalNotificationService {
     required String reason,
     required DateTime date,
   }) async {
-    // TEST MODE: after 1 minute
-    final scheduledDate = DateTime.now().add(
-      const Duration(minutes: 1),
-    );
-
-    /*
-    // PRODUCTION MODE: 8:00 AM on follow-up date
     final scheduledDate = DateTime(
       date.year,
       date.month,
@@ -112,7 +110,6 @@ class LocalNotificationService {
       8,
       0,
     );
-    */
 
     if (scheduledDate.isBefore(DateTime.now())) {
       return;
@@ -143,6 +140,33 @@ class LocalNotificationService {
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
+  }
+
+  static Future<void> showDailyStockAlert({
+    required int lowStockCount,
+    required int expiryAlertCount,
+  }) async {
+    if (lowStockCount == 0 && expiryAlertCount == 0) return;
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toIso8601String().split('T').first;
+    if (prefs.getString('last_stock_alert_date') == today) return;
+
+    await _plugin.show(
+      900001,
+      'Medicine Stock Attention',
+      '$lowStockCount low-stock medicines • $expiryAlertCount expiry alerts',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'medicine_stock_channel',
+          'Medicine Stock Alerts',
+          channelDescription: 'Low-stock and medicine expiry alerts',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+      ),
+    );
+    await prefs.setString('last_stock_alert_date', today);
   }
 
   static Future<void> cancelNotification(int id) async {

@@ -1,4 +1,5 @@
 class PrescriptionItem {
+  final int? medicineId;
   final String medicineName;
   final String dosage;
   final String frequency;
@@ -11,6 +12,7 @@ class PrescriptionItem {
   final double lineTotal;
 
   PrescriptionItem({
+    this.medicineId,
     required this.medicineName,
     required this.dosage,
     required this.frequency,

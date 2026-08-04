@@ -23,7 +23,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 34,
+      version: 35,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -121,6 +121,7 @@ conflict_server_json TEXT
   CREATE TABLE prescription_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     prescription_id INTEGER,
+    medicine_id INTEGER,
     medicine_name TEXT,
     dosage TEXT,
     frequency TEXT,
@@ -611,6 +612,16 @@ is_favorite INTEGER DEFAULT 0,
       );
     }
 
+    if (oldVersion < 35) {
+      await db.execute(
+        'ALTER TABLE prescription_items ADD COLUMN medicine_id INTEGER',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_prescription_items_medicine '
+        'ON prescription_items(medicine_id)',
+      );
+    }
+
     if (oldVersion < 29) {
       try {
         await db.execute(
@@ -1046,6 +1057,7 @@ is_favorite INTEGER DEFAULT 0,
     for (final item in items) {
       await db.insert('prescription_items', {
         'prescription_id': prescriptionId,
+        'medicine_id': item['medicine_id'] ?? item['medicineId'],
         'medicine_name': item['medicine_name'] ?? item['medicineName'] ?? '',
         'dosage': item['dosage'] ?? '',
         'frequency': item['frequency'] ?? '',
@@ -1839,6 +1851,9 @@ is_favorite INTEGER DEFAULT 0,
 
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_prescription_items_prescription ON prescription_items(prescription_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_prescription_items_medicine ON prescription_items(medicine_id)',
     );
   }
 
