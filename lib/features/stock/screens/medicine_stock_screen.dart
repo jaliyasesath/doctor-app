@@ -18,6 +18,7 @@ class MedicineStockScreen extends StatefulWidget {
 
 class _MedicineStockScreenState extends State<MedicineStockScreen>
     with SingleTickerProviderStateMixin {
+  static const _pageSize = 50;
   static const _green = Color(0xFF0F766E);
   static const _deepGreen = Color(0xFF064E3B);
   static const _freshGreen = Color(0xFF22A06B);
@@ -32,6 +33,22 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
   List<Map<String, dynamic>> _batches = [];
   List<Map<String, dynamic>> _movements = [];
   Map<String, dynamic> _valuation = {};
+  int _summaryPage = 1;
+  int _batchPage = 1;
+  int _movementPage = 1;
+  int _summaryTotal = 0;
+  int _lowStockCount = 0;
+  int _expiryAlertCount = 0;
+  num _totalAvailableQuantity = 0;
+  bool _summaryHasMore = false;
+  bool _batchesHasMore = false;
+  bool _movementsHasMore = false;
+  bool _loadingMoreSummary = false;
+  bool _loadingMoreBatches = false;
+  bool _loadingMoreMovements = false;
+  bool _batchesLoaded = false;
+  bool _movementsLoaded = false;
+  bool _mutationInProgress = false;
   int _lowStockThreshold = 10;
   int _expiringWithinDays = 90;
   bool _showingOfflineCache = false;
@@ -42,14 +59,25 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
+    _tabs.addListener(_onTabChanged);
     _load();
   }
 
   @override
   void dispose() {
+    _tabs.removeListener(_onTabChanged);
     _tabs.dispose();
     _search.dispose();
     super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (_tabs.indexIsChanging) return;
+    if (_tabs.index == 1 && !_batchesLoaded) {
+      _loadBatches(reset: true);
+    } else if (_tabs.index == 2 && !_movementsLoaded) {
+      _loadMovements(reset: true);
+    }
   }
 
   List<Map<String, dynamic>> _rows(dynamic response) {
@@ -68,34 +96,34 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
       _lowStockThreshold = prefs.getInt('stock_low_threshold') ?? 10;
       _expiringWithinDays = prefs.getInt('stock_expiry_days') ?? 90;
       final results = await Future.wait([
-        _api.allSummary(
+        _api.summary(
           search: _search.text.trim(),
+          page: 1,
+          pageSize: _pageSize,
           lowStockThreshold: _lowStockThreshold,
           expiringWithinDays: _expiringWithinDays,
         ),
-        _api.allBatches(),
-        _api.allMovements(),
         _api.valuation(),
       ]);
       if (!mounted) return;
+      final summaryResponse = Map<String, dynamic>.from(results[0]);
       setState(() {
-        _summary = _rows(results[0]);
-        _batches = _rows(results[1]);
-        _movements = _rows(results[2]);
-        _valuation = Map<String, dynamic>.from(results[3]);
+        _summary = _rows(summaryResponse);
+        _summaryPage = 1;
+        _summaryHasMore = summaryResponse['hasMore'] == true;
+        _summaryTotal = _id(summaryResponse['total']);
+        _lowStockCount = _id(summaryResponse['lowStockCount']);
+        _expiryAlertCount = _id(summaryResponse['expiryAlertCount']);
+        _totalAvailableQuantity =
+            _number(summaryResponse['totalAvailableQuantity']);
+        _valuation = Map<String, dynamic>.from(results[1]);
         _showingOfflineCache = false;
       });
       await prefs.setString('stock_summary_cache', jsonEncode(_summary));
-      await prefs.setString('stock_batches_cache', jsonEncode(_batches));
-      await prefs.setString('stock_movements_cache', jsonEncode(_movements));
       await prefs.setString('stock_valuation_cache', jsonEncode(_valuation));
-      final lowCount = _summary.where((x) => x['isLowStock'] == true).length;
-      final expiryCount = _summary
-          .where((x) => x['isExpired'] == true || x['isExpiringSoon'] == true)
-          .length;
       await LocalNotificationService.showDailyStockAlert(
-        lowStockCount: lowCount,
-        expiryAlertCount: expiryCount,
+        lowStockCount: _lowStockCount,
+        expiryAlertCount: _expiryAlertCount,
       );
     } catch (error) {
       if (!mounted) return;
@@ -115,6 +143,22 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                 .map((e) => Map<String, dynamic>.from(e))
                 .toList();
             _valuation = Map<String, dynamic>.from(valuation as Map);
+            _summaryTotal = _summary.length;
+            _lowStockCount =
+                _summary.where((x) => x['isLowStock'] == true).length;
+            _expiryAlertCount = _summary
+                .where((x) =>
+                    x['isExpired'] == true || x['isExpiringSoon'] == true)
+                .length;
+            _totalAvailableQuantity = _summary.fold<num>(
+              0,
+              (total, item) => total + _number(item['availableQuantity']),
+            );
+            _summaryHasMore = false;
+            _batchesHasMore = false;
+            _movementsHasMore = false;
+            _batchesLoaded = _batches.isNotEmpty;
+            _movementsLoaded = _movements.isNotEmpty;
             _showingOfflineCache = true;
             _error = null;
           });
@@ -129,12 +173,105 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     }
   }
 
+  Future<void> _loadMoreSummary() async {
+    if (_loadingMoreSummary || !_summaryHasMore || _showingOfflineCache) return;
+    setState(() => _loadingMoreSummary = true);
+    try {
+      final nextPage = _summaryPage + 1;
+      final response = await _api.summary(
+        search: _search.text.trim(),
+        page: nextPage,
+        pageSize: _pageSize,
+        lowStockThreshold: _lowStockThreshold,
+        expiringWithinDays: _expiringWithinDays,
+      );
+      if (!mounted) return;
+      setState(() {
+        _summary.addAll(_rows(response));
+        _summaryPage = nextPage;
+        _summaryHasMore = response['hasMore'] == true;
+      });
+    } catch (error) {
+      if (mounted) AppErrorUi.show(context, error, onRetry: _loadMoreSummary);
+    } finally {
+      if (mounted) setState(() => _loadingMoreSummary = false);
+    }
+  }
+
+  Future<void> _loadBatches({bool reset = false}) async {
+    if (_loadingMoreBatches || (!reset && !_batchesHasMore)) return;
+    setState(() => _loadingMoreBatches = true);
+    try {
+      final page = reset ? 1 : _batchPage + 1;
+      final response = await _api.batches(page: page, pageSize: _pageSize);
+      if (!mounted) return;
+      setState(() {
+        if (reset) _batches.clear();
+        _batches.addAll(_rows(response));
+        _batchPage = page;
+        _batchesHasMore = response['hasMore'] == true;
+        _batchesLoaded = true;
+        _showingOfflineCache = false;
+      });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('stock_batches_cache', jsonEncode(_batches));
+    } catch (error) {
+      if (mounted) {
+        AppErrorUi.show(
+          context,
+          error,
+          onRetry: () => _loadBatches(reset: reset),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingMoreBatches = false);
+    }
+  }
+
+  Future<void> _loadMovements({bool reset = false}) async {
+    if (_loadingMoreMovements || (!reset && !_movementsHasMore)) return;
+    setState(() => _loadingMoreMovements = true);
+    try {
+      final page = reset ? 1 : _movementPage + 1;
+      final response = await _api.movements(page: page, pageSize: _pageSize);
+      if (!mounted) return;
+      setState(() {
+        if (reset) _movements.clear();
+        _movements.addAll(_rows(response));
+        _movementPage = page;
+        _movementsHasMore = response['hasMore'] == true;
+        _movementsLoaded = true;
+        _showingOfflineCache = false;
+      });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('stock_movements_cache', jsonEncode(_movements));
+    } catch (error) {
+      if (mounted) {
+        AppErrorUi.show(
+          context,
+          error,
+          onRetry: () => _loadMovements(reset: reset),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingMoreMovements = false);
+    }
+  }
+
   num _number(dynamic value) =>
       value is num ? value : num.tryParse('$value') ?? 0;
   int _id(dynamic value) => _number(value).toInt();
   String _text(dynamic value) => value?.toString() ?? '';
 
   Future<void> _run(Future<void> Function() operation) async {
+    if (_mutationInProgress) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A stock update is already being processed.'),
+        ),
+      );
+      return;
+    }
     if (_showingOfflineCache) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -143,6 +280,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
       );
       return;
     }
+    setState(() => _mutationInProgress = true);
     try {
       await operation();
       if (!mounted) return;
@@ -150,9 +288,13 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
         const SnackBar(content: Text('Stock updated successfully.')),
       );
       await _load();
+      if (_tabs.index == 1) await _loadBatches(reset: true);
+      if (_tabs.index == 2) await _loadMovements(reset: true);
     } catch (error) {
       if (!mounted) return;
       AppErrorUi.show(context, error, onRetry: _load);
+    } finally {
+      if (mounted) setState(() => _mutationInProgress = false);
     }
   }
 
@@ -619,10 +761,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
   }
 
   Widget _stockHero(int low, int expiry) {
-    final totalQuantity = _summary.fold<num>(
-      0,
-      (sum, item) => sum + _number(item['availableQuantity']),
-    );
+    final totalQuantity = _totalAvailableQuantity;
     return Container(
       padding: const EdgeInsets.all(19),
       decoration: BoxDecoration(
@@ -686,13 +825,16 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
   }
 
   Widget _overview() {
-    final low = _summary.where((x) => x['isLowStock'] == true).length;
-    final expiry = _summary
-        .where((x) => x['isExpired'] == true || x['isExpiringSoon'] == true)
-        .length;
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
+    final low = _lowStockCount;
+    final expiry = _expiryAlertCount;
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification.metrics.extentAfter < 300) _loadMoreSummary();
+        return false;
+      },
+      child: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           if (_showingOfflineCache) ...[
@@ -735,7 +877,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                 children: [
                   SizedBox(
                     width: width < 104 ? constraints.maxWidth : width,
-                    child: _metric('Medicines', '${_summary.length}',
+                    child: _metric('Medicines', '$_summaryTotal',
                         Icons.medication, _green),
                   ),
                   SizedBox(
@@ -811,17 +953,41 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
               ),
             );
           }),
+          if (_loadingMoreSummary)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            ),
         ],
+      ),
       ),
     );
   }
 
-  Widget _batchList() => RefreshIndicator(
-        onRefresh: _load,
-        child: ListView.builder(
+  Widget _batchList() => NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.extentAfter < 300) _loadBatches();
+          return false;
+        },
+        child: RefreshIndicator(
+        onRefresh: () => _loadBatches(reset: true),
+        child: !_batchesLoaded && _loadingMoreBatches
+            ? ListView(
+                children: const [
+                  SizedBox(height: 220),
+                  Center(child: CircularProgressIndicator()),
+                ],
+              )
+            : ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: _batches.length,
+          itemCount: _batches.length + (_loadingMoreBatches ? 1 : 0),
           itemBuilder: (_, index) {
+            if (index == _batches.length) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
             final item = _batches[index];
             return Card(
               elevation: 0,
@@ -858,14 +1024,33 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
             );
           },
         ),
+        ),
       );
 
-  Widget _movementList() => RefreshIndicator(
-        onRefresh: _load,
-        child: ListView.builder(
+  Widget _movementList() => NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification.metrics.extentAfter < 300) _loadMovements();
+          return false;
+        },
+        child: RefreshIndicator(
+        onRefresh: () => _loadMovements(reset: true),
+        child: !_movementsLoaded && _loadingMoreMovements
+            ? ListView(
+                children: const [
+                  SizedBox(height: 220),
+                  Center(child: CircularProgressIndicator()),
+                ],
+              )
+            : ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: _movements.length,
+          itemCount: _movements.length + (_loadingMoreMovements ? 1 : 0),
           itemBuilder: (_, index) {
+            if (index == _movements.length) {
+              return const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
             final item = _movements[index];
             final quantity = _number(item['quantityChange']);
             final positive = quantity >= 0;
@@ -903,6 +1088,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
               ),
             );
           },
+        ),
         ),
       );
 
@@ -964,6 +1150,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
               icon: const Icon(Icons.tune),
             ),
             PopupMenuButton<String>(
+              enabled: !_mutationInProgress,
               onSelected: (value) {
                 if (value == 'dispense') _dispense();
                 if (value == 'reverse') _reverse();
@@ -997,11 +1184,20 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
           ),
         ),
         floatingActionButton: FloatingActionButton.extended(
-          onPressed: _receive,
+          onPressed: _mutationInProgress ? null : _receive,
           backgroundColor: _green,
           foregroundColor: Colors.white,
-          icon: const Icon(Icons.add_box_outlined),
-          label: const Text('Receive Stock'),
+          icon: _mutationInProgress
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.add_box_outlined),
+          label: Text(_mutationInProgress ? 'Updating...' : 'Receive Stock'),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())

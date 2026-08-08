@@ -30,6 +30,8 @@ import '../../license/screens/license_gate_screen.dart';
 import '../../license/data/license_service.dart';
 import '../../reception/screens/manage_reception_accounts_screen.dart';
 import '../../stock/screens/medicine_stock_screen.dart';
+import '../../lab/screens/laboratory_list_screen.dart';
+import '../../profile/screens/doctor_profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -443,6 +445,12 @@ class _HomeScreenState extends State<HomeScreen> {
         break;
       case 'Reception Accounts':
         screen = const ManageReceptionAccountsScreen();
+        break;
+      case 'Laboratories':
+        screen = const LaboratoryListScreen();
+        break;
+      case 'Doctor Profile':
+        screen = const DoctorProfileScreen();
         break;
     }
 
@@ -1650,6 +1658,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () {
                   Navigator.pop(context);
                   _navigate('Scan Prescription');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.science_outlined),
+                title: const Text('Laboratories'),
+                subtitle: const Text('Register and manage referral laboratories'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigate('Laboratories');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.account_circle_outlined),
+                title: const Text('Professional Profile'),
+                subtitle: const Text('Doctor and medical centre details'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigate('Doctor Profile');
                 },
               ),
               ListTile(

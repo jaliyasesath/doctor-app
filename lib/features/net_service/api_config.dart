@@ -1,9 +1,15 @@
+import 'package:flutter/foundation.dart';
+
 class ApiConfig {
-  // VPS API භාවිතා කිරීම
+  // VPS API 
   static String mode = 'cloud';
 
-  // Temporary HTTP VPS address
-  static const String cloudBaseUrl = 'http://169.58.40.160/api';
+  // Supply on production builds with:
+  // --dart-define=PP_CLOUD_API_URL=https://your-domain.example/api
+  static const String cloudBaseUrl = String.fromEnvironment(
+    'PP_CLOUD_API_URL',
+    defaultValue: 'http://169.58.40.160/api',
+  );
 
   // Local computer API
   static const String localWifiBaseUrl = 'http://192.168.8.91:5219/api';
@@ -18,7 +24,7 @@ class ApiConfig {
   static String get baseUrl {
     switch (mode) {
       case 'cloud':
-        return cloudBaseUrl;
+        return _secureCloudUrl;
 
       case 'wifi':
         return localWifiBaseUrl;
@@ -33,6 +39,14 @@ class ApiConfig {
       default:
         return _resolvedAutoBaseUrl;
     }
+  }
+
+  static String get _secureCloudUrl {
+    final value = cloudBaseUrl.trim();
+    if (kReleaseMode && !value.toLowerCase().startsWith('https://')) {
+      return '';
+    }
+    return value;
   }
 
   static void setMode(String newMode) {

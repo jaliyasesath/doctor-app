@@ -23,7 +23,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 35,
+      version: 36,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -226,7 +226,8 @@ is_favorite INTEGER DEFAULT 0,
         usage_count INTEGER DEFAULT 0,
         sync_status TEXT DEFAULT 'pending',
         created_at TEXT,
-        updated_at TEXT
+        updated_at TEXT,
+        is_deleted INTEGER DEFAULT 0
       )
     ''');
 
@@ -240,6 +241,7 @@ is_favorite INTEGER DEFAULT 0,
   )
 ''');
     await _createIndexes(db);
+    await _createDuplicateProtectionIndexes(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -620,6 +622,65 @@ is_favorite INTEGER DEFAULT 0,
         'CREATE INDEX IF NOT EXISTS idx_prescription_items_medicine '
         'ON prescription_items(medicine_id)',
       );
+    }
+
+    if (oldVersion < 36) {
+      try {
+        await db.execute(
+          'ALTER TABLE custom_instructions '
+          'ADD COLUMN is_deleted INTEGER DEFAULT 0',
+        );
+      } catch (_) {}
+
+      await db.execute(
+        "UPDATE templates SET name = trim(name) WHERE name IS NOT NULL",
+      );
+      await db.execute('''
+        DELETE FROM templates
+        WHERE id NOT IN (
+          SELECT MAX(id)
+          FROM templates
+          WHERE trim(COALESCE(name, '')) <> ''
+          GROUP BY lower(trim(name))
+        )
+        AND trim(COALESCE(name, '')) <> ''
+      ''');
+
+      await db.execute('''
+        UPDATE custom_instructions
+        SET instruction_text = trim(instruction_text)
+      ''');
+      await db.execute('''
+        UPDATE custom_instructions
+        SET usage_count = (
+          SELECT SUM(other.usage_count)
+          FROM custom_instructions other
+          WHERE other.doctor_id = custom_instructions.doctor_id
+            AND lower(trim(other.instruction_text)) =
+                lower(trim(custom_instructions.instruction_text))
+            AND COALESCE(other.is_deleted, 0) = 0
+        )
+        WHERE id IN (
+          SELECT MAX(id)
+          FROM custom_instructions
+          WHERE COALESCE(is_deleted, 0) = 0
+          GROUP BY doctor_id, lower(trim(instruction_text))
+        )
+      ''');
+      await db.execute('''
+        UPDATE custom_instructions
+        SET is_deleted = 1
+        WHERE COALESCE(is_deleted, 0) = 0
+          AND id NOT IN (
+            SELECT MAX(id)
+            FROM custom_instructions
+            WHERE COALESCE(is_deleted, 0) = 0
+            GROUP BY doctor_id, lower(trim(instruction_text))
+          )
+      ''');
+
+      await _createIndexes(db);
+      await _createDuplicateProtectionIndexes(db);
     }
 
     if (oldVersion < 29) {
@@ -1419,6 +1480,7 @@ is_favorite INTEGER DEFAULT 0,
 
   Future<int> insertTemplate(Map<String, dynamic> data) async {
     final db = await database;
+    data['name'] = data['name']?.toString().trim() ?? '';
     return db.insert('templates', data);
   }
 
@@ -1429,6 +1491,7 @@ is_favorite INTEGER DEFAULT 0,
 
   Future<int> updateTemplate(int id, Map<String, dynamic> data) async {
     final db = await database;
+    data['name'] = data['name']?.toString().trim() ?? '';
 
     return db.update(
       'templates',
@@ -1721,6 +1784,9 @@ is_favorite INTEGER DEFAULT 0,
   Future<int> insertCustomInstruction(Map<String, dynamic> data) async {
     final db = await database;
 
+    data['instruction_text'] =
+        data['instruction_text']?.toString().trim() ?? '';
+
     data['sync_status'] ??= 'pending';
     data['usage_count'] ??= 0;
     data['created_at'] ??= DateTime.now().toIso8601String();
@@ -1854,6 +1920,20 @@ is_favorite INTEGER DEFAULT 0,
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_prescription_items_medicine ON prescription_items(medicine_id)',
+    );
+  }
+
+  Future<void> _createDuplicateProtectionIndexes(Database db) async {
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_templates_unique_name '
+      'ON templates(lower(trim(name))) '
+      "WHERE trim(COALESCE(name, '')) <> ''",
+    );
+
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_custom_instructions_unique_text '
+      'ON custom_instructions(doctor_id, lower(trim(instruction_text))) '
+      'WHERE COALESCE(is_deleted, 0) = 0',
     );
   }
 

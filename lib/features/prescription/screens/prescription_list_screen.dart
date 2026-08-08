@@ -16,6 +16,7 @@ import '../models/prescription_item.dart';
 import '../widgets/smart_chips_section.dart';
 import 'print_preview_screen.dart';
 import '../../notifications/services/local_notification_service.dart';
+import '../../lab/screens/create_lab_order_screen.dart';
 
 class PrescriptionListScreen extends StatefulWidget {
   final bool isEditMode;
@@ -79,6 +80,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
   String _selectedGender = 'Male';
   String? _currentRxNo;
   int? _currentPatientId;
+  int? _currentPrescriptionId;
   bool _prescriptionSaved = false;
   final ApiPatientService _patientApi = ApiPatientService();
 
@@ -291,10 +293,18 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       return;
     }
 
-    await DatabaseHelper.instance.insertCustomInstruction({
-      'doctor_id': doctorId,
-      'instruction_text': value,
-    });
+    try {
+      await DatabaseHelper.instance.insertCustomInstruction({
+        'doctor_id': doctorId,
+        'instruction_text': value,
+      });
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Instruction already exists')),
+      );
+      return;
+    }
     unawaited(AutoSyncService.syncPendingChanges());
 
     await _loadCustomInstructions();
@@ -1387,6 +1397,8 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
             await DatabaseHelper.instance.insertPrescription(prescriptionData);
       }
 
+      _currentPrescriptionId = localPrescriptionId;
+
       final itemRows = items.map((item) {
         return {
           'medicine_id': item.medicineId,
@@ -1499,7 +1511,38 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       _prescriptionSaved = false;
       _currentRxNo = null;
       _currentPatientId = null;
+      _currentPrescriptionId = null;
     });
+  }
+
+  Future<void> _openLabInvestigations() async {
+    final localPatientId = _currentPatientId ?? widget.existingPatientId;
+    final localPrescriptionId = _currentPrescriptionId ?? widget.editingPrescriptionId;
+    if (localPatientId == null || localPrescriptionId == null || !_prescriptionSaved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Save and sync the prescription before adding lab investigations')),
+      );
+      return;
+    }
+
+    try {
+      if (await NetworkService.isOnline()) await SyncService().syncAll();
+      final patient = await DatabaseHelper.instance.getPatientById(localPatientId);
+      final prescription = await DatabaseHelper.instance.getPrescriptionByLocalId(localPrescriptionId);
+      final serverPatientId = int.tryParse(patient?['server_id']?.toString() ?? '');
+      final serverPrescriptionId = int.tryParse(prescription?['server_id']?.toString() ?? '');
+      if (serverPatientId == null || serverPrescriptionId == null) {
+        throw Exception('Prescription is waiting for cloud sync');
+      }
+      if (!mounted) return;
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => CreateLabOrderScreen(
+        patientId: serverPatientId,
+        prescriptionId: serverPrescriptionId,
+        patientName: _patientNameController.text.trim(),
+      )));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lab request unavailable: $e')));
+    }
   }
 
   Future<void> _saveAsTemplate() async {
@@ -1560,7 +1603,18 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       isFavorite: true,
     );
 
-    await TemplateService.saveTemplate(template);
+    try {
+      await TemplateService.saveTemplate(template);
+    } catch (error) {
+      if (!mounted) return;
+      final message = error
+          .toString()
+          .replaceFirst('Bad state: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+      return;
+    }
 
     if (!mounted) return;
 
@@ -3127,6 +3181,11 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
             style: const TextStyle(fontWeight: FontWeight.w800),
           ),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.science_outlined),
+              tooltip: 'Lab investigations',
+              onPressed: _openLabInvestigations,
+            ),
             IconButton(
               icon: const Icon(Icons.folder_copy_outlined),
               tooltip: 'Templates',

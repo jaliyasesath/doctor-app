@@ -6,6 +6,8 @@
 <plist version="1.0">
 
 <dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Your location is used only to save the medical centre map position.</string>
 
     <!-- App Name -->
     <key>CFBundleDisplayName</key>

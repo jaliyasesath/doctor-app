@@ -5,14 +5,42 @@ import '../models/template_model.dart';
 class TemplateService {
   static Future<void> saveTemplate(TemplateModel template) async {
     final db = await DatabaseHelper.instance.database;
-    await db.insert('templates', template.toMap());
+    final name = template.name.trim();
+    if (name.isEmpty) throw StateError('Template name is required');
+
+    final duplicate = await db.query(
+      'templates',
+      columns: ['id'],
+      where: 'lower(trim(name)) = lower(?)',
+      whereArgs: [name],
+      limit: 1,
+    );
+    if (duplicate.isNotEmpty) {
+      throw StateError('A template with this name already exists');
+    }
+
+    await db.insert('templates', {...template.toMap(), 'name': name});
   }
 
   static Future<void> updateTemplate(TemplateModel template) async {
     final db = await DatabaseHelper.instance.database;
+    final name = template.name.trim();
+    if (name.isEmpty) throw StateError('Template name is required');
+
+    final duplicate = await db.query(
+      'templates',
+      columns: ['id'],
+      where: 'lower(trim(name)) = lower(?) AND id <> ?',
+      whereArgs: [name, template.id],
+      limit: 1,
+    );
+    if (duplicate.isNotEmpty) {
+      throw StateError('A template with this name already exists');
+    }
+
     await db.update(
       'templates',
-      template.toMap(),
+      {...template.toMap(), 'name': name},
       where: 'id = ?',
       whereArgs: [template.id],
     );
