@@ -84,10 +84,10 @@ class ApiConfig {
 
   // Temporary cross-platform testing switch for a VPS that has no TLS yet.
   // Never enable this flag for a public production build.
-  static const bool allowInsecureCloudHttp = bool.fromEnvironment(
-    'PP_ALLOW_INSECURE_HTTP',
-    defaultValue: false,
-  );
+ static const bool allowInsecureCloudHttp = bool.fromEnvironment(
+  'PP_ALLOW_INSECURE_HTTP',
+  defaultValue: true,
+);
 
   // Local computer API
   static const String localWifiBaseUrl = 'http://192.168.8.91:5219/api';
