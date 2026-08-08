@@ -63,6 +63,9 @@
 
     <key>NSAppTransportSecurity</key>
     <dict>
+        <!-- Temporary VPS HTTP testing. Remove after HTTPS is enabled. -->
+        <key>NSAllowsArbitraryLoads</key>
+        <true/>
         <key>NSAllowsLocalNetworking</key>
         <true/>
     </dict>

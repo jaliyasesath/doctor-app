@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- Debug/testing only. Production continues to require HTTPS. -->
     <base-config cleartextTrafficPermitted="false" />
 
-    <!-- Local clinic Wi-Fi/hotspot endpoints only. Cloud traffic must use HTTPS. -->
     <domain-config cleartextTrafficPermitted="true">
-        <!-- Temporary VPS HTTP testing. Remove after HTTPS is enabled. -->
         <domain includeSubdomains="false">169.58.40.160</domain>
         <domain includeSubdomains="false">192.168.8.91</domain>
         <domain includeSubdomains="false">192.168.43.1</domain>
