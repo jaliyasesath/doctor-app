@@ -1630,16 +1630,22 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showMoreSheet() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+            ),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
               const Text(
                 'More Options',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
@@ -1697,7 +1703,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.account_circle_outlined),
-                title: const Text('Professional Profile'),
+                title: const Text('My Profile'),
                 subtitle: const Text('Doctor and medical centre details'),
                 onTap: () {
                   Navigator.pop(context);
@@ -1729,7 +1735,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   _showConnectionModeDialog();
                 },
               ),
-            ],
+                ],
+              ),
+            ),
           ),
         );
       },
