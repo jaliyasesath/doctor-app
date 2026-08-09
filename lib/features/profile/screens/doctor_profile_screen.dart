@@ -129,7 +129,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     if (updated == true) {
       setState(() => _loading = true);
       await _load();
-      if (mounted) _message('Profile updated');
+      if (mounted) _message('Professional profile updated');
     }
   }
 
@@ -164,7 +164,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FC),
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: const Text('Professional Profile'),
         actions: [
           IconButton(onPressed: _edit, tooltip: 'Edit profile', icon: const Icon(Icons.edit_outlined)),
         ],
@@ -437,7 +437,7 @@ class _DoctorProfileEditScreenState extends State<_DoctorProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Edit Profile'), actions: [TextButton(onPressed: _saving ? null : _save, child: const Text('SAVE'))]),
+        appBar: AppBar(title: const Text('Edit Professional Profile'), actions: [TextButton(onPressed: _saving ? null : _save, child: const Text('SAVE'))]),
         body: Form(
           key: _formKey,
           child: ListView(padding: const EdgeInsets.all(16), children: [
@@ -474,8 +474,42 @@ class _DoctorProfileEditScreenState extends State<_DoctorProfileEditScreen> {
         padding: const EdgeInsets.only(bottom: 12),
         child: TextFormField(
           controller: _c[key], maxLines: lines, keyboardType: keyboard,
-          validator: required ? (value) => value == null || value.trim().isEmpty ? '$label is required' : null : null,
+          validator: (value) => _validateField(key, label, value, required),
           decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
         ),
       );
+
+  String? _validateField(String key, String label, String? value, bool required) {
+    final text = value?.trim() ?? '';
+    if (required && text.isEmpty) return '$label is required';
+    if (text.isEmpty) return null;
+
+    final limits = <String, int>{
+      'doctorName': 200, 'contactNumber': 30, 'specialization': 200,
+      'medicalCenterName': 200, 'clinicAddress': 500, 'city': 100,
+      'qualifications': 500, 'profession': 200, 'affiliation': 500,
+      'professionalBio': 2000, 'languages': 500,
+      'specialInterests': 1000, 'clinicHours': 500, 'websiteUrl': 500,
+    };
+    final limit = limits[key];
+    if (limit != null && text.length > limit) {
+      return '$label must be $limit characters or fewer';
+    }
+    if (key == 'yearsOfExperience') {
+      final years = int.tryParse(text);
+      if (years == null || years < 0 || years > 80) {
+        return 'Enter a value between 0 and 80';
+      }
+    }
+    if (key == 'websiteUrl') {
+      final uri = Uri.tryParse(text);
+      if (uri == null ||
+          !uri.hasScheme ||
+          (uri.scheme != 'http' && uri.scheme != 'https') ||
+          uri.host.isEmpty) {
+        return 'Use a complete URL such as https://example.com';
+      }
+    }
+    return null;
+  }
 }
