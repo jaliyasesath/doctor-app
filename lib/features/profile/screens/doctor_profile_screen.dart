@@ -129,7 +129,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     if (updated == true) {
       setState(() => _loading = true);
       await _load();
-      if (mounted) _message('Professional profile updated');
+      if (mounted) _message('Profile updated');
     }
   }
 
@@ -164,7 +164,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FC),
       appBar: AppBar(
-        title: const Text('Professional Profile'),
+        title: const Text('Profile'),
         actions: [
           IconButton(onPressed: _edit, tooltip: 'Edit profile', icon: const Icon(Icons.edit_outlined)),
         ],
@@ -437,7 +437,7 @@ class _DoctorProfileEditScreenState extends State<_DoctorProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Edit Professional Profile'), actions: [TextButton(onPressed: _saving ? null : _save, child: const Text('SAVE'))]),
+        appBar: AppBar(title: const Text('Edit Profile'), actions: [TextButton(onPressed: _saving ? null : _save, child: const Text('SAVE'))]),
         body: Form(
           key: _formKey,
           child: ListView(padding: const EdgeInsets.all(16), children: [
