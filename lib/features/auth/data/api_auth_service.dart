@@ -31,6 +31,7 @@ class ApiAuthService {
     String affiliation = '',
     String linkedDoctorEmail = '',
     String signaturePath = '',
+    String medicalCenterLogoPath = '',
     String medicalCenterName = '',
     String city = '',
     String clinicAddress = '',
@@ -90,6 +91,13 @@ class ApiAuthService {
           slmcIdFront.path,
         ),
       );
+
+      if (signaturePath.isNotEmpty) {
+        request.files.add(await http.MultipartFile.fromPath('signatureImage', signaturePath));
+      }
+      if (medicalCenterLogoPath.isNotEmpty) {
+        request.files.add(await http.MultipartFile.fromPath('medicalCenterLogo', medicalCenterLogoPath));
+      }
       request.files.add(
         await http.MultipartFile.fromPath(
           'slmcIdBack',

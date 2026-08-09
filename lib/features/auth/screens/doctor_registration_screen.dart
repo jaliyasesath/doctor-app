@@ -36,6 +36,7 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
   final TextEditingController _affiliationController = TextEditingController();
 
   File? _signatureImage;
+  File? _medicalCenterLogo;
   File? _slmcIdFrontImage;
   File? _slmcIdBackImage;
 
@@ -95,6 +96,19 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     setState(() {
       _signatureImage = null;
     });
+  }
+
+  Future<void> _pickMedicalCenterLogo() async {
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+        maxWidth: 1200,
+      );
+      if (picked != null && mounted) setState(() => _medicalCenterLogo = File(picked.path));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Logo could not be selected: $error')));
+    }
   }
 
   Future<void> _showRegistrationConditions() async {
@@ -239,6 +253,7 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
         affiliation: _affiliationController.text.trim(),
         linkedDoctorEmail: '',
         signaturePath: _signatureImage?.path ?? '',
+        medicalCenterLogoPath: _medicalCenterLogo?.path ?? '',
         biometricEnabled: 0,
         slmcIdFront: _slmcIdFrontImage!,
         slmcIdBack: _slmcIdBackImage!,
@@ -435,6 +450,37 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _medicalCenterLogoPicker() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0FDFA),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF99F6E4)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Medical Centre Logo (Optional)', style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 6),
+        const Text('Reused on prescriptions, PDFs and laboratory emails.', style: TextStyle(fontSize: 12, color: Colors.black54)),
+        if (_medicalCenterLogo != null) ...[
+          const SizedBox(height: 12),
+          Center(child: Image.file(_medicalCenterLogo!, height: 100, fit: BoxFit.contain)),
+        ],
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: OutlinedButton.icon(
+            onPressed: _pickMedicalCenterLogo,
+            icon: const Icon(Icons.add_photo_alternate_outlined),
+            label: Text(_medicalCenterLogo == null ? 'Choose logo' : 'Change logo'),
+          )),
+          if (_medicalCenterLogo != null)
+            IconButton(onPressed: () => setState(() => _medicalCenterLogo = null), icon: const Icon(Icons.delete_outline), color: Colors.red),
+        ]),
+      ]),
     );
   }
 
@@ -702,9 +748,11 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
                   const SizedBox(height: 14),
                   _field(
                     controller: _medicalCenterNameController,
-                    label: 'Channeling Center Name',
+                    label: 'Medical Centre Name',
                     icon: Icons.local_hospital_outlined,
                   ),
+                  const SizedBox(height: 14),
+                  _medicalCenterLogoPicker(),
                   const SizedBox(height: 14),
                   _field(
                     controller: _specializationController,

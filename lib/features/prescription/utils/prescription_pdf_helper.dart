@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -25,10 +26,15 @@ class PrescriptionPdfHelper {
     String affiliation = '',
     String contactNumber = '',
     String signaturePath = '',
+    Uint8List? medicalCenterLogoBytes,
+    Uint8List? signatureBytes,
   }) async {
     final pdf = pw.Document();
 
     pw.Widget signatureWidget() {
+      if (signatureBytes != null && signatureBytes.isNotEmpty) {
+        return pw.Column(children: [pw.Center(child: pw.Image(pw.MemoryImage(signatureBytes), height: 60)), pw.SizedBox(height: 6)]);
+      }
       if (signaturePath.isEmpty) return pw.SizedBox();
 
       final file = File(signaturePath);
@@ -55,6 +61,8 @@ class PrescriptionPdfHelper {
           pw.Center(
             child: pw.Column(
               children: [
+                if (medicalCenterLogoBytes != null && medicalCenterLogoBytes.isNotEmpty)
+                  pw.Padding(padding: const pw.EdgeInsets.only(bottom: 8), child: pw.Image(pw.MemoryImage(medicalCenterLogoBytes), height: 64, fit: pw.BoxFit.contain)),
                 pw.Text(
                   medicalCenterName,
                   style: pw.TextStyle(

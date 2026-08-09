@@ -110,6 +110,51 @@ class ApiClient {
     );
   }
 
+  Future<dynamic> uploadFile(
+    String path, {
+    required String filePath,
+    String fieldName = 'file',
+    Map<String, String> fields = const {},
+  }) async {
+    Future<http.Response> send(bool retry) async {
+      final request = http.MultipartRequest('POST', _buildUri(path));
+      final headers = await _headers();
+      headers.remove('Content-Type');
+      request.headers.addAll(headers);
+      request.fields.addAll(fields);
+      request.files.add(await http.MultipartFile.fromPath(fieldName, filePath));
+      final streamed = await request.send().timeout(_requestTimeout);
+      final response = await http.Response.fromStream(streamed);
+      if (retry && response.statusCode == 401 && await _refreshAccessToken()) {
+        return send(false);
+      }
+      return response;
+    }
+
+    try {
+      return _handleResponse(await send(true));
+    } on TimeoutException catch (error) {
+      throw ApiErrorClassifier.timeout(operation: 'POST $path', cause: error);
+    } on SocketException catch (error) {
+      throw ApiErrorClassifier.network(operation: 'POST $path', cause: error);
+    }
+  }
+
+  Future<http.Response> download(String path) async {
+    var response = await http
+        .get(_buildUri(path), headers: await _headers())
+        .timeout(_requestTimeout);
+    if (response.statusCode == 401 && await _refreshAccessToken()) {
+      response = await http
+          .get(_buildUri(path), headers: await _headers())
+          .timeout(_requestTimeout);
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      _handleResponse(response);
+    }
+    return response;
+  }
+
   Future<dynamic> _send({
     required String method,
     required String path,

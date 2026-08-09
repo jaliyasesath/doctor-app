@@ -6,6 +6,7 @@ import '../data/prescription_store.dart';
 import '../models/prescription_item.dart';
 import 'prescription_list_screen.dart';
 import 'print_preview_screen.dart';
+import '../../lab/screens/patient_lab_reports_screen.dart';
 
 class PatientProfileScreen extends StatefulWidget {
   final int patientId;
@@ -454,6 +455,21 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     );
   }
 
+  Widget _buildLabReportsCard() {
+    final serverId = int.tryParse((_patient?['server_id'] ?? _patient?['serverId'] ?? '').toString());
+    return Card(
+      elevation: 0,
+      child: ListTile(
+        leading: const CircleAvatar(backgroundColor: Color(0xFFE6FFFB), child: Icon(Icons.science_outlined, color: Color(0xFF0F766E))),
+        title: const Text('Laboratory Reports', style: TextStyle(fontWeight: FontWeight.w800)),
+        subtitle: Text(serverId == null ? 'Sync this patient to view cloud lab reports' : 'View uploaded reports and mark them reviewed'),
+        trailing: const Icon(Icons.chevron_right),
+        enabled: serverId != null,
+        onTap: serverId == null ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => PatientLabReportsScreen(serverPatientId: serverId, patientName: _getPatientName()))),
+      ),
+    );
+  }
+
   Widget _buildPrescriptionCard(Map<String, dynamic> item) {
     final id = item['id'] as int;
     final rxNo = (item['prescription_no'] ?? '').toString();
@@ -606,6 +622,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                   _buildCompactMedicalAlerts(),
                   const SizedBox(height: 12),
                   _buildPatientTimelineCard(),
+                  const SizedBox(height: 12),
+                  _buildLabReportsCard(),
                   const SizedBox(height: 16),
                   const Text(
                     'Previous Visits',

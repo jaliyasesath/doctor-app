@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 //import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
 
 import '../../auth/data/doctor_session.dart';
 import '../data/prescription_store.dart';
@@ -16,6 +18,7 @@ import '../utils/prescription_pdf_helper.dart';
 import 'printer_settings_screen.dart';
 import '../../../data/local/database_helper.dart';
 import '../../sync/services/auto_sync_service.dart';
+import '../../profile/data/doctor_profile_api_service.dart';
 
 class PrintPreviewScreen extends StatefulWidget {
   final String? passedRxNo;
@@ -60,6 +63,10 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
   String affiliation = '';
   String contactNumber = '';
   String signaturePath = '';
+  String medicalCenterLogoUrl = '';
+  String signatureImageUrl = '';
+  Uint8List? _logoBytes;
+  Uint8List? _signatureBytes;
 
   @override
   void initState() {
@@ -89,6 +96,17 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
     final address = await DoctorSession.getClinicAddress();
     final stamp = await DoctorSession.getDoctorStamp();
 
+    Map<String, dynamic>? cloudProfile;
+    try {
+      cloudProfile = await DoctorProfileApiService().getProfile();
+      medicalCenterLogoUrl = cloudProfile['medicalCenterLogoUrl']?.toString() ?? '';
+      signatureImageUrl = cloudProfile['signatureImageUrl']?.toString() ?? '';
+      _logoBytes = await _downloadBrandImage(medicalCenterLogoUrl);
+      _signatureBytes = await _downloadBrandImage(signatureImageUrl);
+    } catch (_) {
+      // Offline print continues with cached doctor text and local signature.
+    }
+
     if (!mounted) return;
 
     setState(() {
@@ -106,6 +124,13 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
 
       _isLoadingDoctor = false;
     });
+  }
+
+  Future<Uint8List?> _downloadBrandImage(String url) async {
+    if (url.isEmpty) return null;
+    final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 8));
+    if (response.statusCode == 200 && response.bodyBytes.length <= 2 * 1024 * 1024) return response.bodyBytes;
+    return null;
   }
 
   Future<void> _loadPersistentRx() async {
@@ -198,6 +223,8 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
       affiliation: affiliation,
       contactNumber: contactNumber,
       signaturePath: signaturePath,
+      medicalCenterLogoBytes: _logoBytes,
+      signatureBytes: _signatureBytes,
     );
   }
 
@@ -658,6 +685,8 @@ GET WELL SOON
                     Center(
                       child: Column(
                         children: [
+                          if (medicalCenterLogoUrl.isNotEmpty)
+                            Padding(padding: const EdgeInsets.only(bottom: 8), child: Image.network(medicalCenterLogoUrl, height: 66, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox.shrink())),
                           Text(
                             medicalCenterName,
                             style: const TextStyle(

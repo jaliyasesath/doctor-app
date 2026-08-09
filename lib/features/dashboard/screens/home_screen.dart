@@ -31,6 +31,8 @@ import '../../license/data/license_service.dart';
 import '../../reception/screens/manage_reception_accounts_screen.dart';
 import '../../stock/screens/medicine_stock_screen.dart';
 import '../../lab/screens/laboratory_list_screen.dart';
+import '../../lab/screens/patient_lab_reports_screen.dart';
+import '../../lab/data/lab_report_api_service.dart';
 import '../../profile/screens/doctor_profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -84,6 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int _todayFollowUpCount = 0;
   int _pendingSyncCount = 0;
+  int _unreviewedLabReportCount = 0;
 
   List<Map<String, dynamic>> _recentPrescriptions = [];
 
@@ -115,6 +118,17 @@ class _HomeScreenState extends State<HomeScreen> {
     await _checkLicenseOnDashboard();
     await _loadQueueSummary();
     await _loadDashboardLocalData();
+    await _loadLabReportCount();
+  }
+
+  Future<void> _loadLabReportCount() async {
+    try {
+      final reports = await LabReportApiService().getReports();
+      final count = reports.where((x) => x['status']?.toString() == 'Uploaded').length;
+      if (mounted) setState(() => _unreviewedLabReportCount = count);
+    } catch (_) {
+      // Dashboard remains usable offline; the inbox refreshes when opened.
+    }
   }
 
   Future<void> _loadDoctorName() async {
@@ -448,6 +462,9 @@ class _HomeScreenState extends State<HomeScreen> {
         break;
       case 'Laboratories':
         screen = const LaboratoryListScreen();
+        break;
+      case 'Lab Reports':
+        screen = const PatientLabReportsScreen();
         break;
       case 'Doctor Profile':
         screen = const DoctorProfileScreen();
@@ -1667,6 +1684,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () {
                   Navigator.pop(context);
                   _navigate('Laboratories');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.assignment_turned_in_outlined),
+                title: const Text('Lab Reports'),
+                subtitle: Text(_unreviewedLabReportCount == 0 ? 'No reports awaiting review' : '$_unreviewedLabReportCount report(s) awaiting review'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _navigate('Lab Reports');
                 },
               ),
               ListTile(
