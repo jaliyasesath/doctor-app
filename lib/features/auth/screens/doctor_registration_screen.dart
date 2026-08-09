@@ -337,7 +337,21 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
-      validator: requiredField ? (v) => _required(v, label) : null,
+      validator: (value) {
+        final requiredError = requiredField ? _required(value, label) : null;
+        if (requiredError != null) return requiredError;
+        final text = value?.trim() ?? '';
+        if (text.isEmpty) return null;
+        if (controller == _emailController &&
+            !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(text)) {
+          return 'Enter a valid email address';
+        }
+        if (controller == _contactNumberController &&
+            !RegExp(r'^\+?[0-9 ()-]{7,30}$').hasMatch(text)) {
+          return 'Enter a valid contact number';
+        }
+        return null;
+      },
       decoration: InputDecoration(
         labelText: requiredField ? '$label *' : label,
         prefixIcon: Icon(icon),

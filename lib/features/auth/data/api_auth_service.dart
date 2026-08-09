@@ -140,9 +140,16 @@ class ApiAuthService {
         'code': 'REGISTRATION_NETWORK_ERROR',
       };
     } on AppException catch (error) {
+      final fieldErrors = error.validationErrors.entries
+          .expand((entry) => entry.value.map((message) {
+                final field = entry.key
+                    .replaceFirst(RegExp(r'^dto\.', caseSensitive: false), '');
+                return '$field: $message';
+              }))
+          .join('\n');
       return {
         'success': false,
-        'message': error.userMessage,
+        'message': fieldErrors.isEmpty ? error.userMessage : fieldErrors,
         'code': error.code,
       };
     } catch (e) {
