@@ -75,7 +75,9 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
 
       final picked = await picker.pickImage(
         source: ImageSource.gallery,
-        imageQuality: 90,
+        imageQuality: 75,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
 
       if (picked == null) return;
@@ -102,8 +104,9 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     try {
       final picked = await ImagePicker().pickImage(
         source: ImageSource.gallery,
-        imageQuality: 88,
+        imageQuality: 75,
         maxWidth: 1200,
+        maxHeight: 1200,
       );
       if (picked != null && mounted) setState(() => _medicalCenterLogo = File(picked.path));
     } catch (error) {
@@ -188,9 +191,9 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     try {
       final picked = await ImagePicker().pickImage(
         source: source,
-        imageQuality: 88,
-        maxWidth: 2200,
-        maxHeight: 2200,
+        imageQuality: 75,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
       if (picked == null || !mounted) return;
 

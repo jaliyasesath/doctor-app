@@ -63,6 +63,17 @@ class ApiAuthService {
         };
       }
 
+      const maxDocumentBytes = 5 * 1024 * 1024;
+      final frontBytes = await slmcIdFront.length();
+      final backBytes = await slmcIdBack.length();
+      if (frontBytes > maxDocumentBytes || backBytes > maxDocumentBytes) {
+        return {
+          'success': false,
+          'message': 'Each ID image must be smaller than 5 MB.',
+          'code': 'VERIFICATION_DOCUMENT_TOO_LARGE',
+        };
+      }
+
       final request = http.MultipartRequest(
         'POST',
         Uri.parse('$baseUrl/Auth/register'),
@@ -106,7 +117,7 @@ class ApiAuthService {
       );
 
       final streamed = await request.send().timeout(
-            const Duration(seconds: 30),
+            const Duration(seconds: 90),
           );
       final response = await http.Response.fromStream(streamed);
 
@@ -137,6 +148,13 @@ class ApiAuthService {
       return {
         'success': false,
         'message': 'The verification server could not be reached.',
+        'code': 'REGISTRATION_NETWORK_ERROR',
+      };
+    } on http.ClientException catch (error) {
+      return {
+        'success': false,
+        'message':
+            'The verification server could not be reached (${error.message}).',
         'code': 'REGISTRATION_NETWORK_ERROR',
       };
     } on AppException catch (error) {

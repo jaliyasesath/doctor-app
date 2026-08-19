@@ -120,7 +120,7 @@ class ApiConfig {
   }
 
   static String get _secureCloudUrl {
-    final value = cloudBaseUrl.trim();
+    final value = _normalize(cloudBaseUrl);
     if (kReleaseMode &&
         !allowInsecureCloudHttp &&
         !value.toLowerCase().startsWith('https://')) {
@@ -128,6 +128,9 @@ class ApiConfig {
     }
     return value;
   }
+
+  static String _normalize(String value) =>
+      value.trim().replaceFirst(RegExp(r'/+$'), '');
 
   static void setMode(String newMode) {
     mode = newMode;
