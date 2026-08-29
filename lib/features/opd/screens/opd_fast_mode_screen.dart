@@ -299,6 +299,7 @@ class _OPDFastModeScreenState extends State<OPDFastModeScreen> {
   }
 
   Future<void> _quickSave() async {
+    if (_isSaving) return;
     if (_doctorId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Doctor session not found. Login again.')),

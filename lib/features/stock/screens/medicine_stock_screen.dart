@@ -580,16 +580,12 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: Text(_text(item['medicineName'])),
-                      subtitle: Text('Quantity: ${selectedQuantities[medicineId] ?? 0}'),
-                      trailing: Checkbox(
-                        value: selectedQuantities.containsKey(medicineId),
-                        onChanged: (checked) => setDialogState(() {
-                          if (checked == true) {
-                            selectedQuantities[medicineId] = _number(item['quantity']);
-                          } else {
-                            selectedQuantities.remove(medicineId);
-                          }
-                        }),
+                      subtitle: Text(
+                        'Quantity: ${selectedQuantities[medicineId] ?? 0}',
+                      ),
+                      trailing: const Icon(
+                        Icons.check_circle,
+                        color: _green,
                       ),
                     );
                   })),
@@ -606,7 +602,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
               onPressed: selectedQuantities.isEmpty
                   ? null
                   : () => Navigator.pop(dialogContext, true),
-              child: const Text('Dispense All'),
+              child: const Text('Dispense All Stock Items'),
             ),
           ],
         ),

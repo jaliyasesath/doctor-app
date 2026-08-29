@@ -5,6 +5,10 @@ export 'package:http/http.dart' show Response;
 
 import 'api_client.dart';
 import 'token_storage.dart';
+import '../../core/concurrency/single_flight.dart';
+
+final SingleFlight _postSingleFlight = SingleFlight();
+int _postSequence = 0;
 
 Future<Map<String, String>> _freshHeaders(Map<String, String>? headers) async {
   final updated = <String, String>{...?headers};
@@ -37,16 +41,24 @@ Future<base.Response> post(
   Map<String, String>? headers,
   Object? body,
   Encoding? encoding,
-}) =>
-    _withRefresh(
+}) {
+  final requestHeaders = <String, String>{...?headers};
+  requestHeaders['Idempotency-Key'] ??=
+      'mobile-${DateTime.now().microsecondsSinceEpoch}-${++_postSequence}';
+  final key = 'POST|$url|${body?.toString() ?? ''}';
+  return _postSingleFlight.run<base.Response>(
+    key,
+    () => _withRefresh(
       (fresh) => base.post(
         url,
         headers: fresh,
         body: body,
         encoding: encoding,
       ),
-      headers,
-    );
+      requestHeaders,
+    ),
+  );
+}
 
 Future<base.Response> put(
   Uri url, {

@@ -67,18 +67,11 @@ class DoctorSession {
     SharedPreferences prefs,
     String email,
   ) async {
-    var password = await CredentialStorage.getPassword(email);
-    if (password != null && password.isNotEmpty) return password;
-
-    final legacyPassword =
-        prefs.getString(_passwordKey) ?? prefs.getString(_lastPasswordKey);
-    if (legacyPassword != null && legacyPassword.isNotEmpty) {
-      await CredentialStorage.savePassword(email, legacyPassword);
-      await prefs.remove(_passwordKey);
-      await prefs.remove(_lastPasswordKey);
-      password = legacyPassword;
-    }
-    return password;
+    // Never read or trust the old plaintext SharedPreferences values. Remove
+    // any remnants and use encrypted secure storage exclusively.
+    await prefs.remove(_passwordKey);
+    await prefs.remove(_lastPasswordKey);
+    return CredentialStorage.getPassword(email);
   }
 
   static Future<void> saveDoctorSession(

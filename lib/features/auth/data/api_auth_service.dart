@@ -14,6 +14,7 @@ import '../../net_service/api_config.dart';
 import 'credential_storage.dart';
 import 'doctor_session.dart';
 import 'login_error_policy.dart';
+import '../../prescription/data/prescription_store.dart';
 
 class ApiAuthService {
   final ApiClient _api = ApiClient();
@@ -245,7 +246,6 @@ class ApiAuthService {
           'slmc_reg_no': doctor['slmcRegNo'] ?? '',
           'affiliation': doctor['affiliation'] ?? '',
           'signature_path': doctor['signaturePath'] ?? '',
-          'password': '',
           'biometric_enabled': 0,
           'sync_status': 'synced',
           'updated_at': DateTime.now().toIso8601String(),
@@ -254,14 +254,6 @@ class ApiAuthService {
       } else {
         localDoctorId = existing['id'] as int;
       }
-
-      final localDb = await DatabaseHelper.instance.database;
-      await localDb.update(
-        'doctors',
-        {'password': ''},
-        where: 'id = ?',
-        whereArgs: [localDoctorId],
-      );
 
       await DoctorSession.saveDoctorSession({
         'id': localDoctorId,
@@ -307,24 +299,10 @@ class ApiAuthService {
       }
 
       final localDoctor = await DatabaseHelper.instance.getDoctorByEmail(email);
-      var credentialMatches = await CredentialStorage.matches(email, password);
-      final legacyPassword = localDoctor?['password']?.toString() ?? '';
-
-      if (!credentialMatches &&
-          legacyPassword.isNotEmpty &&
-          legacyPassword == password) {
-        await CredentialStorage.savePassword(email, password);
-        credentialMatches = true;
-      }
+      final credentialMatches =
+          await CredentialStorage.matches(email, password);
 
       if (localDoctor != null && credentialMatches) {
-        final localDb = await DatabaseHelper.instance.database;
-        await localDb.update(
-          'doctors',
-          {'password': ''},
-          where: 'id = ?',
-          whereArgs: [localDoctor['id']],
-        );
         await DoctorSession.saveDoctorSession({
           'id': localDoctor['id'],
           'doctor_name': localDoctor['doctor_name'] ?? '',
@@ -399,5 +377,6 @@ class ApiAuthService {
 
     await TokenStorage.clearToken();
     await DoctorSession.clearSession();
+    PrescriptionStore.clear();
   }
 }

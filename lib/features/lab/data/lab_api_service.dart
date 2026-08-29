@@ -21,8 +21,15 @@ class LabApiService {
   Future<void> sendTestEmail(int id) async =>
       _api.post('/Laboratories/$id/test-email', {});
 
-  Future<Map<String, dynamic>> createOrder(Map<String, dynamic> data) async =>
-      Map<String, dynamic>.from(await _api.post('/lab-orders', data) as Map);
+  Future<Map<String, dynamic>> createOrder(
+    Map<String, dynamic> data, {
+    String? idempotencyKey,
+  }) async =>
+      Map<String, dynamic>.from(await _api.post(
+        '/lab-orders',
+        data,
+        idempotencyKey: idempotencyKey,
+      ) as Map);
 
   Future<Map<String, dynamic>> sendOrder(int id, String key) async =>
       Map<String, dynamic>.from(

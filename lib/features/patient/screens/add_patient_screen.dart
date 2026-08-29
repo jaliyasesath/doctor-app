@@ -25,6 +25,10 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
 
   String _gender = 'Male';
   bool _saving = false;
+  late String _requestKey = _newRequestKey();
+
+  String _newRequestKey() =>
+      'patient-${DateTime.now().microsecondsSinceEpoch}-${identityHashCode(this)}';
 
   @override
   void dispose() {
@@ -46,6 +50,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   }
 
   Future<void> _savePatient() async {
+    if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
@@ -61,6 +66,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
         allergies: _allergiesController.text.trim(),
         chronicDiseases: _chronicController.text.trim(),
         importantAlerts: _alertsController.text.trim(),
+        idempotencyKey: _requestKey,
       );
 
       if (!mounted) return;
@@ -102,6 +108,7 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       _alertsController.clear();
 
       setState(() => _gender = 'Male');
+      _requestKey = _newRequestKey();
     } catch (e) {
       if (!mounted) return;
 

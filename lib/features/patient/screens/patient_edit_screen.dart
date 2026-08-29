@@ -108,6 +108,7 @@ class _PatientEditScreenState extends State<PatientEditScreen> {
   }
 
   Future<void> _savePatient() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);

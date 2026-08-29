@@ -7,7 +7,6 @@ class DoctorModel {
   final String specialization;
   final String medicalCenterName;
   final String clinicAddress;
-  final String password;
   final bool biometricEnabled;
   final String createdAt;
 
@@ -20,7 +19,6 @@ class DoctorModel {
     required this.specialization,
     required this.medicalCenterName,
     required this.clinicAddress,
-    required this.password,
     required this.biometricEnabled,
     required this.createdAt,
   });
@@ -35,7 +33,6 @@ class DoctorModel {
       'specialization': specialization,
       'medical_center_name': medicalCenterName,
       'clinic_address': clinicAddress,
-      'password': password,
       'biometric_enabled': biometricEnabled ? 1 : 0,
       'created_at': createdAt,
     };

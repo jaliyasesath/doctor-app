@@ -19,6 +19,7 @@ class ApiBillService {
     required String paymentStatus,
     required String notes,
     int? expectedVersion,
+    String? idempotencyKey,
   }) async {
     final response = await _api.post('/Bills/upsert', {
       'id': serverId,
@@ -36,7 +37,7 @@ class ApiBillService {
       'paymentStatus': paymentStatus,
       'notes': notes,
       'expectedVersion': expectedVersion,
-    });
+    }, idempotencyKey: idempotencyKey);
 
     return Map<String, dynamic>.from(response);
   }

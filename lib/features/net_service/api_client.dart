@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../../core/concurrency/single_flight.dart';
 import '../../core/errors/app_error_handler.dart';
 import '../../core/errors/api_error_classifier.dart';
 import '../../core/errors/app_exception.dart';
@@ -13,6 +14,8 @@ import 'token_storage.dart';
 class ApiClient {
   static const Duration _requestTimeout = Duration(seconds: 20);
   static Future<bool>? _refreshOperation;
+  static final SingleFlight _mutationSingleFlight = SingleFlight();
+  static int _requestSequence = 0;
 
   static Future<bool> refreshSession() => _refreshAccessToken();
 
@@ -71,17 +74,21 @@ class ApiClient {
     String path,
     Map<String, dynamic> body, {
     bool auth = true,
+    String? idempotencyKey,
   }) {
-    return _send(
+    final mutationKey = 'POST|$path|${jsonEncode(body)}';
+    final requestKey = idempotencyKey ?? _newIdempotencyKey();
+    return _singleFlightMutation(mutationKey, () => _send(
       method: 'POST',
       path: path,
       auth: auth,
+      idempotencyKey: requestKey,
       request: (url, headers) => http.post(
         url,
         headers: headers,
         body: jsonEncode(body),
       ),
-    );
+    ));
   }
 
   Future<dynamic> put(
@@ -89,7 +96,8 @@ class ApiClient {
     Map<String, dynamic> body, {
     bool auth = true,
   }) {
-    return _send(
+    final mutationKey = 'PUT|$path|${jsonEncode(body)}';
+    return _singleFlightMutation(mutationKey, () => _send(
       method: 'PUT',
       path: path,
       auth: auth,
@@ -98,16 +106,23 @@ class ApiClient {
         headers: headers,
         body: jsonEncode(body),
       ),
-    );
+    ));
   }
 
   Future<dynamic> delete(String path, {bool auth = true}) {
-    return _send(
+    return _singleFlightMutation('DELETE|$path', () => _send(
       method: 'DELETE',
       path: path,
       auth: auth,
       request: (url, headers) => http.delete(url, headers: headers),
-    );
+    ));
+  }
+
+  Future<dynamic> _singleFlightMutation(
+    String key,
+    Future<dynamic> Function() operation,
+  ) {
+    return _mutationSingleFlight.run<dynamic>(key, operation);
   }
 
   Future<dynamic> uploadFile(
@@ -159,6 +174,7 @@ class ApiClient {
     required String method,
     required String path,
     required bool auth,
+    String? idempotencyKey,
     required Future<http.Response> Function(
       Uri url,
       Map<String, String> headers,
@@ -166,18 +182,22 @@ class ApiClient {
   }) async {
     try {
       final url = _buildUri(path);
-      var response = await request(
-        url,
-        await _headers(auth: auth),
-      ).timeout(_requestTimeout);
+      final initialHeaders = await _headers(auth: auth);
+      if (idempotencyKey != null) {
+        initialHeaders['Idempotency-Key'] = idempotencyKey;
+      }
+      var response = await request(url, initialHeaders)
+          .timeout(_requestTimeout);
 
       if (auth && response.statusCode == 401) {
         final refreshed = await _refreshAccessToken();
         if (refreshed) {
-          response = await request(
-            url,
-            await _headers(auth: true),
-          ).timeout(_requestTimeout);
+          final retryHeaders = await _headers(auth: true);
+          if (idempotencyKey != null) {
+            retryHeaders['Idempotency-Key'] = idempotencyKey;
+          }
+          response = await request(url, retryHeaders)
+              .timeout(_requestTimeout);
         }
       }
 
@@ -253,6 +273,11 @@ class ApiClient {
       );
       throw exception;
     }
+  }
+
+  static String _newIdempotencyKey() {
+    _requestSequence++;
+    return 'mobile-${DateTime.now().microsecondsSinceEpoch}-$_requestSequence';
   }
 
   static Future<bool> _refreshAccessToken() async {

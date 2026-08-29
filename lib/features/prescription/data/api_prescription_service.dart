@@ -17,6 +17,7 @@ class ApiPrescriptionService {
     required String qrValue,
     required List<Map<String, dynamic>> items,
     int? expectedVersion,
+    String? idempotencyKey,
   }) async {
     final response = await _api.post('/Prescriptions/upsert', {
       'id': serverId,
@@ -29,7 +30,7 @@ class ApiPrescriptionService {
       'qrValue': qrValue,
       'items': items,
       'expectedVersion': expectedVersion,
-    });
+    }, idempotencyKey: idempotencyKey);
 
     return Map<String, dynamic>.from(response);
   }

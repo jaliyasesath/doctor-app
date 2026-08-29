@@ -5,6 +5,7 @@ import '../../../core/widgets/app_error_ui.dart';
 import '../../../data/local/database_helper.dart';
 
 import '../../auth/data/doctor_session.dart';
+import '../../auth/data/api_auth_service.dart';
 import '../../dashboard/screens/dashboard_analytics_screen.dart';
 import '../../license/data/license_api_service.dart';
 import '../../opd/screens/opd_fast_mode_screen.dart';
@@ -347,7 +348,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _logout() async {
     await QueueRealtimeService.instance.disconnect();
-    await DoctorSession.clearSession();
+    await ApiAuthService().logout();
 
     if (!mounted) return;
 

@@ -44,6 +44,7 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
   }
 
   Future<void> _save() async {
+    if (_isSaving) return;
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter template name')),

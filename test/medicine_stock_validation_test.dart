@@ -37,5 +37,19 @@ void main() {
         'Adjustment reason is required.',
       );
     });
+
+    test('rejects zero adjustment quantity', () {
+      expect(
+        StockValidation.adjustment(quantity: 0, reason: 'Physical count'),
+        'Quantity must be greater than zero.',
+      );
+    });
+
+    test('accepts a valid adjustment', () {
+      expect(
+        StockValidation.adjustment(quantity: 2, reason: 'Physical count'),
+        isNull,
+      );
+    });
   });
 }

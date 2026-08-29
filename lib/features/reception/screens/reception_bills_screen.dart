@@ -16,6 +16,7 @@ class _ReceptionBillsScreenState extends State<ReceptionBillsScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   bool _loading = true;
+  bool _refreshInProgress = false;
   List<Map<String, dynamic>> _allBills = [];
   List<Map<String, dynamic>> _filteredBills = [];
 
@@ -34,44 +35,53 @@ class _ReceptionBillsScreenState extends State<ReceptionBillsScreen> {
   }
 
   Future<void> _loadBills({bool showLoader = false}) async {
+    if (_refreshInProgress) return;
+    _refreshInProgress = true;
+
     if (showLoader && mounted) {
       setState(() => _loading = true);
     }
 
-    final doctorId = await DoctorSession.getDoctorId();
+    try {
+      final doctorId = await DoctorSession.getDoctorId();
 
-    if (doctorId == null) {
-      if (mounted) setState(() => _loading = false);
-      return;
-    }
-
-    final data = await DatabaseHelper.instance.getAllBills();
-
-    if (!mounted) return;
-
-    final currentSearch = _searchController.text.trim().toLowerCase();
-
-    setState(() {
-      _allBills = List<Map<String, dynamic>>.from(data);
-
-      if (currentSearch.isEmpty) {
-        _filteredBills = _allBills;
-      } else {
-        _filteredBills = _allBills.where((bill) {
-          final rx = bill['prescription_no']?.toString().toLowerCase() ?? '';
-
-          final patientId = bill['patient_id']?.toString().toLowerCase() ?? '';
-
-          final amount = bill['total_amount']?.toString().toLowerCase() ?? '';
-
-          return rx.contains(currentSearch) ||
-              patientId.contains(currentSearch) ||
-              amount.contains(currentSearch);
-        }).toList();
+      if (doctorId == null) {
+        if (mounted) setState(() => _loading = false);
+        return;
       }
 
-      _loading = false;
-    });
+      final data = await DatabaseHelper.instance.getAllBills();
+
+      if (!mounted) return;
+
+      final currentSearch = _searchController.text.trim().toLowerCase();
+
+      setState(() {
+        _allBills = List<Map<String, dynamic>>.from(data);
+
+        if (currentSearch.isEmpty) {
+          _filteredBills = _allBills;
+        } else {
+          _filteredBills = _allBills.where((bill) {
+            final rx = bill['prescription_no']?.toString().toLowerCase() ?? '';
+
+            final patientId =
+                bill['patient_id']?.toString().toLowerCase() ?? '';
+
+            final amount =
+                bill['total_amount']?.toString().toLowerCase() ?? '';
+
+            return rx.contains(currentSearch) ||
+                patientId.contains(currentSearch) ||
+                amount.contains(currentSearch);
+          }).toList();
+        }
+
+        _loading = false;
+      });
+    } finally {
+      _refreshInProgress = false;
+    }
   }
 
   void _filterBills(String value) {

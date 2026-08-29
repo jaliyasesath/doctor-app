@@ -82,6 +82,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
   int? _currentPatientId;
   int? _currentPrescriptionId;
   bool _prescriptionSaved = false;
+  bool _savingPrescription = false;
   final ApiPatientService _patientApi = ApiPatientService();
 
   final List<String> _selectedComplaintChips = [];
@@ -337,6 +338,10 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
     _pulseController.dispose();
     _temperatureController.dispose();
     _spo2Controller.dispose();
+
+    // A cancelled/back-navigation flow must not leave the previous patient's
+    // draft in process-wide static state for the next prescription screen.
+    PrescriptionStore.clear();
 
     super.dispose();
   }
@@ -1264,6 +1269,8 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
   }
 
   Future<void> _savePrescriptionToDb() async {
+    if (_savingPrescription) return;
+    if (mounted) setState(() => _savingPrescription = true);
     try {
       _savePatientDetailsToStore();
 
@@ -1472,6 +1479,8 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Save failed: $e')),
       );
+    } finally {
+      if (mounted) setState(() => _savingPrescription = false);
     }
   }
 
@@ -3453,12 +3462,25 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                       Expanded(
                         flex: 2,
                         child: FilledButton.icon(
-                          onPressed: _savePrescriptionToDb,
-                          icon: Icon(
-                            _isEditMode ? Icons.update : Icons.save_outlined,
-                          ),
+                          onPressed: _savingPrescription
+                              ? null
+                              : _savePrescriptionToDb,
+                          icon: _savingPrescription
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(
+                                  _isEditMode
+                                      ? Icons.update
+                                      : Icons.save_outlined,
+                                ),
                           label: Text(
-                            _isEditMode
+                            _savingPrescription
+                                ? 'Saving...'
+                                : _isEditMode
                                 ? 'Update Prescription'
                                 : 'Save Prescription',
                           ),

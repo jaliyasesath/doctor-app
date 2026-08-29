@@ -414,6 +414,7 @@ class _DoctorProfileEditScreenState extends State<_DoctorProfileEditScreen> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {

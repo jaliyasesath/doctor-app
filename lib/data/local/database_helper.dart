@@ -23,7 +23,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 36,
+      version: 38,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -46,7 +46,6 @@ class DatabaseHelper {
         profession TEXT,
         slmc_reg_no TEXT,
         affiliation TEXT,
-        password TEXT,
         biometric_enabled INTEGER DEFAULT 0,
         sync_status TEXT DEFAULT 'pending',
         updated_at TEXT,
@@ -78,7 +77,8 @@ queue_no INTEGER,
 queue_date TEXT,
 is_deleted INTEGER DEFAULT 0,
 server_version INTEGER DEFAULT 0,
-conflict_server_json TEXT
+conflict_server_json TEXT,
+client_request_id TEXT
       )
     ''');
 
@@ -754,6 +754,61 @@ is_favorite INTEGER DEFAULT 0,
         );
       } catch (_) {}
     }
+
+    if (oldVersion < 37) {
+      try {
+        await db.execute(
+          'ALTER TABLE patients ADD COLUMN client_request_id TEXT',
+        );
+      } catch (_) {}
+    }
+
+    if (oldVersion < 38) {
+      await _removeLegacyDoctorPasswordColumn(db);
+    }
+  }
+
+  Future<void> _removeLegacyDoctorPasswordColumn(Database db) async {
+    await db.execute('ALTER TABLE doctors RENAME TO doctors_legacy');
+    await db.execute('''
+      CREATE TABLE doctors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        server_id INTEGER,
+        doctor_name TEXT,
+        contact_number TEXT,
+        email TEXT,
+        city TEXT,
+        specialization TEXT,
+        role TEXT DEFAULT 'Doctor',
+        medical_center_name TEXT,
+        clinic_address TEXT,
+        qualifications TEXT,
+        profession TEXT,
+        slmc_reg_no TEXT,
+        affiliation TEXT,
+        biometric_enabled INTEGER DEFAULT 0,
+        sync_status TEXT DEFAULT 'pending',
+        updated_at TEXT,
+        created_at TEXT,
+        signature_path TEXT
+      )
+    ''');
+    await db.execute('''
+      INSERT INTO doctors (
+        id, server_id, doctor_name, contact_number, email, city,
+        specialization, role, medical_center_name, clinic_address,
+        qualifications, profession, slmc_reg_no, affiliation,
+        biometric_enabled, sync_status, updated_at, created_at, signature_path
+      )
+      SELECT
+        id, server_id, doctor_name, contact_number, email, city,
+        specialization, role, medical_center_name, clinic_address,
+        qualifications, profession, slmc_reg_no, affiliation,
+        biometric_enabled, sync_status, updated_at, created_at, signature_path
+      FROM doctors_legacy
+    ''');
+    await db.execute('DROP TABLE doctors_legacy');
+    await _createIndexes(db);
   }
 
   // =========================
@@ -763,17 +818,19 @@ is_favorite INTEGER DEFAULT 0,
   Future<int> insertDoctor(Map<String, dynamic> data) async {
     final db = await database;
 
-    data['sync_status'] ??= 'pending';
-    data['updated_at'] ??= DateTime.now().toIso8601String();
-    data['created_at'] ??= DateTime.now().toIso8601String();
+    final safeData = Map<String, dynamic>.from(data)..remove('password');
 
-    data['qualifications'] ??= '';
-    data['profession'] ??= '';
-    data['slmc_reg_no'] ??= '';
-    data['affiliation'] ??= '';
-    data['signature_path'] ??= '';
+    safeData['sync_status'] ??= 'pending';
+    safeData['updated_at'] ??= DateTime.now().toIso8601String();
+    safeData['created_at'] ??= DateTime.now().toIso8601String();
 
-    return db.insert('doctors', data);
+    safeData['qualifications'] ??= '';
+    safeData['profession'] ??= '';
+    safeData['slmc_reg_no'] ??= '';
+    safeData['affiliation'] ??= '';
+    safeData['signature_path'] ??= '';
+
+    return db.insert('doctors', safeData);
   }
 
   Future<int> updateDoctor(
@@ -782,11 +839,13 @@ is_favorite INTEGER DEFAULT 0,
   ) async {
     final db = await database;
 
-    data['updated_at'] = DateTime.now().toIso8601String();
+    final safeData = Map<String, dynamic>.from(data)..remove('password');
+
+    safeData['updated_at'] = DateTime.now().toIso8601String();
 
     return db.update(
       'doctors',
-      data,
+      safeData,
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -799,22 +858,6 @@ is_favorite INTEGER DEFAULT 0,
       'doctors',
       where: 'email = ?',
       whereArgs: [email],
-      limit: 1,
-    );
-
-    return result.isNotEmpty ? result.first : null;
-  }
-
-  Future<Map<String, dynamic>?> loginDoctor({
-    required String email,
-    required String password,
-  }) async {
-    final db = await database;
-
-    final result = await db.query(
-      'doctors',
-      where: 'email = ? AND password = ?',
-      whereArgs: [email, password],
       limit: 1,
     );
 
@@ -1197,7 +1240,30 @@ is_favorite INTEGER DEFAULT 0,
     data['sync_status'] = 'pending';
     data['updated_at'] = DateTime.now().toIso8601String();
 
-    return db.insert('prescriptions', data);
+    return db.transaction((txn) async {
+      final doctorId = data['doctor_id'];
+      final prescriptionNo = data['prescription_no']?.toString().trim() ?? '';
+      if (doctorId != null && prescriptionNo.isNotEmpty) {
+        final existing = await txn.query(
+          'prescriptions',
+          columns: ['id'],
+          where: 'doctor_id = ? AND prescription_no = ? AND is_deleted = 0',
+          whereArgs: [doctorId, prescriptionNo],
+          limit: 1,
+        );
+        if (existing.isNotEmpty) {
+          final id = existing.first['id'] as int;
+          await txn.update(
+            'prescriptions',
+            data,
+            where: 'id = ?',
+            whereArgs: [id],
+          );
+          return id;
+        }
+      }
+      return txn.insert('prescriptions', data);
+    });
   }
 
   Future<int> updatePrescription(int id, Map<String, dynamic> data) async {
@@ -2042,10 +2108,44 @@ is_favorite INTEGER DEFAULT 0,
 
     data['updated_at'] = DateTime.now().toIso8601String();
 
-    return db.insert(
-      'prescription_bills',
-      data,
-    );
+    return db.transaction((txn) async {
+      List<Map<String, Object?>> existing = const [];
+      final prescriptionId = data['prescription_id'];
+      if (prescriptionId != null) {
+        existing = await txn.query(
+          'prescription_bills',
+          columns: ['id'],
+          where: 'prescription_id = ? AND is_deleted = 0',
+          whereArgs: [prescriptionId],
+          limit: 1,
+        );
+      } else {
+        final doctorId = data['doctor_id'];
+        final rxNo = data['prescription_no']?.toString().trim() ?? '';
+        if (doctorId != null && rxNo.isNotEmpty) {
+          existing = await txn.query(
+            'prescription_bills',
+            columns: ['id'],
+            where: 'doctor_id = ? AND prescription_no = ? AND is_deleted = 0',
+            whereArgs: [doctorId, rxNo],
+            limit: 1,
+          );
+        }
+      }
+
+      if (existing.isNotEmpty) {
+        final id = existing.first['id'] as int;
+        await txn.update(
+          'prescription_bills',
+          data,
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        return id;
+      }
+
+      return txn.insert('prescription_bills', data);
+    });
   }
 
   Future<int> updatePrescriptionBill(

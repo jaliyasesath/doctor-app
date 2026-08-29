@@ -19,6 +19,7 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
   bool _deviceAuthorized = true;
   bool _subscriptionActive = false;
   bool _checkingSubscription = false;
+  bool _timerTickRunning = false;
 
   Duration _remaining = Duration.zero;
   Timer? _timer;
@@ -66,18 +67,24 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
     _timer = Timer.periodic(
       const Duration(seconds: 1),
       (_) async {
-        final expired = await LicenseService.isTrialExpired();
-        final remaining = await LicenseService.getRemainingTrialTime();
+        if (_timerTickRunning) return;
+        _timerTickRunning = true;
+        try {
+          final expired = await LicenseService.isTrialExpired();
+          final remaining = await LicenseService.getRemainingTrialTime();
 
-        if (!mounted) return;
+          if (!mounted) return;
 
-        setState(() {
-          _expired = expired;
-          _remaining = remaining ?? Duration.zero;
-        });
+          setState(() {
+            _expired = expired;
+            _remaining = remaining ?? Duration.zero;
+          });
 
-        if (expired) {
-          _timer?.cancel();
+          if (expired) {
+            _timer?.cancel();
+          }
+        } finally {
+          _timerTickRunning = false;
         }
       },
     );

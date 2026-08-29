@@ -982,6 +982,7 @@ class _MedicineFormScreenState extends State<MedicineFormScreen> {
   }
 
   Future<void> _saveMedicine() async {
+    if (saving) return;
     if (isReception && !isEdit) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

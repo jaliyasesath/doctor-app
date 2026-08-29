@@ -25,6 +25,8 @@ class _CreateLabOrderScreenState extends State<CreateLabOrderScreen> {
   final Set<String> _selected = {};
   int? _labId;
   bool _fasting = false, _consent = false, _saving = false;
+  late final String _createRequestKey =
+      'lab-${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}';
   String _priority = 'Routine';
   DateTime? _sampleDate;
 
@@ -36,6 +38,7 @@ class _CreateLabOrderScreenState extends State<CreateLabOrderScreen> {
   void _message(String value) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
 
   Future<void> _submit() async {
+    if (_saving) return;
     final custom = _custom.text.trim(); if (custom.isNotEmpty) _selected.add(custom);
     if (_labId == null) { _message('Register and select a laboratory first'); return; }
     if (_selected.isEmpty) { _message('Select at least one investigation'); return; }
@@ -45,7 +48,8 @@ class _CreateLabOrderScreenState extends State<CreateLabOrderScreen> {
       final result = await _api.createOrder({'patientId': widget.patientId, 'prescriptionId': widget.prescriptionId,
         'laboratoryId': _labId, 'clinicalNotes': _clinical.text.trim(), 'specialInstructions': _instructions.text.trim(),
         'priority': _priority, 'fastingRequired': _fasting, 'preferredSampleDate': _sampleDate?.toIso8601String(),
-        'consentConfirmed': true, 'items': _selected.map((x) => {'testName': x, 'notes': ''}).toList()});
+        'consentConfirmed': true, 'items': _selected.map((x) => {'testName': x, 'notes': ''}).toList()},
+        idempotencyKey: _createRequestKey);
       final id = result['serverId'] as int; final orderNo = result['orderNumber']?.toString() ?? '';
       if (!mounted) return;
       final send = await showDialog<bool>(context: context, builder: (_) => AlertDialog(title: const Text('Lab request saved'),

@@ -2,9 +2,8 @@
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
 
-    <!-- Local clinic Wi-Fi/hotspot endpoints only. Cloud traffic must use HTTPS. -->
+    <!-- Temporary public VPS HTTP allowance for testing before domain/HTTPS setup. -->
     <domain-config cleartextTrafficPermitted="true">
-        <!-- Temporary VPS HTTP testing. Remove after HTTPS is enabled. -->
         <domain includeSubdomains="false">169.58.40.160</domain>
         <domain includeSubdomains="false">192.168.8.91</domain>
         <domain includeSubdomains="false">192.168.43.1</domain>

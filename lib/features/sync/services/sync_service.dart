@@ -427,9 +427,7 @@ class SyncService {
     for (final doctor in pendingDoctors) {
       final localId = doctor['id'] as int;
       final email = doctor['email']?.toString() ?? '';
-      final password = await CredentialStorage.getPassword(email) ??
-          doctor['password']?.toString() ??
-          '';
+      final password = await CredentialStorage.getPassword(email) ?? '';
 
       if (password.isEmpty) {
         await _db.markDoctorSyncFailed(localId);
@@ -507,6 +505,10 @@ class SyncService {
           chronicDiseases: patient['chronic_diseases']?.toString() ?? '',
           importantAlerts: patient['important_alerts']?.toString() ?? '',
           expectedVersion: serverId == null ? null : expectedVersion,
+          idempotencyKey:
+              patient['client_request_id']?.toString().trim().isNotEmpty == true
+                  ? patient['client_request_id'].toString()
+                  : 'patient-sync-$localId',
         );
 
         if (apiResult['success'] == true && apiResult['serverId'] != null) {
@@ -604,6 +606,7 @@ class SyncService {
           qrValue: rx['prescription_no']?.toString() ?? '',
           items: items,
           expectedVersion: serverId == null ? null : expectedVersion,
+          idempotencyKey: 'prescription-sync-$localRxId',
         );
 
         if (apiResult['success'] == true && apiResult['serverId'] != null) {
@@ -691,6 +694,7 @@ class SyncService {
           paymentStatus: bill['payment_status']?.toString() ?? '',
           notes: bill['notes']?.toString() ?? '',
           expectedVersion: serverId == null ? null : version,
+          idempotencyKey: 'bill-sync-$localId',
         );
 
         final newServerId = apiResult['serverId'] as int?;

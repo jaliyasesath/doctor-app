@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../auth/data/doctor_session.dart';
+import '../../auth/data/api_auth_service.dart';
 import '../../local_server/screens/reception_hotspot_connect_screen.dart';
 import '../../medicines/screens/medicine_screen.dart';
 import '../../patient/screens/add_patient_screen.dart' as patient_screen;
@@ -89,7 +90,7 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
             icon: const Icon(Icons.logout),
             onPressed: () async {
               await QueueRealtimeService.instance.disconnect();
-              await DoctorSession.clearSession();
+              await ApiAuthService().logout();
 
               if (!mounted) return;
               Navigator.pushNamedAndRemoveUntil(

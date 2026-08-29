@@ -127,10 +127,11 @@ class ApiPatientService {
     return TokenStorage.getToken();
   }
 
-  Map<String, String> _headers(String token) {
+  Map<String, String> _headers(String token, {String? idempotencyKey}) {
     return {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',
+      if (idempotencyKey != null) 'Idempotency-Key': idempotencyKey,
     };
   }
 
@@ -272,24 +273,30 @@ class ApiPatientService {
     required String allergies,
     required String chronicDiseases,
     required String importantAlerts,
+    required String idempotencyKey,
   }) async {
     try {
       final token = await _getToken();
 
       final response = await http
           .post(
-            _uri('/Patients'),
-            headers: _headers(token ?? ''),
+            _uri('/Patients/upsert'),
+            headers: _headers(
+              token ?? '',
+              idempotencyKey: idempotencyKey,
+            ),
             body: jsonEncode({
+              'id': null,
               'patientName': name,
-              'age': int.tryParse(age) ?? 0,
-              'gender': gender,
+              'patientAge': age,
+              'patientGender': gender,
               'phoneNumber': phone,
               'address': address,
               'notes': notes,
               'allergies': allergies,
               'chronicDiseases': chronicDiseases,
               'importantAlerts': importantAlerts,
+              'expectedVersion': null,
             }),
           )
           .timeout(const Duration(seconds: 15));
@@ -316,6 +323,7 @@ class ApiPatientService {
         'allergies': allergies,
         'chronic_diseases': chronicDiseases,
         'important_alerts': importantAlerts,
+        'client_request_id': idempotencyKey,
       });
 
       return {
@@ -377,13 +385,17 @@ class ApiPatientService {
     required String chronicDiseases,
     required String importantAlerts,
     int? expectedVersion,
+    String? idempotencyKey,
   }) async {
     final token = await _getToken();
 
     final response = await http
         .post(
           _uri('/Patients/upsert'),
-          headers: _headers(token ?? ''),
+          headers: _headers(
+            token ?? '',
+            idempotencyKey: idempotencyKey,
+          ),
           body: jsonEncode({
             'id': serverId,
             'patientName': name,

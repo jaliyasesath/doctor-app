@@ -42,6 +42,7 @@ class _ReceptionPrescriptionEditScreenState
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     setState(() => _saving = true);
 
     await DatabaseHelper.instance.replacePrescriptionItems(

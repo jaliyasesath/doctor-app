@@ -27,6 +27,7 @@ class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
   bool _isLoading = true;
   bool _isLoadingMore = false;
   bool _hasMore = true;
+  bool _refreshInProgress = false;
 
   int? _doctorId;
 
@@ -80,7 +81,8 @@ class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
   }
 
   Future<void> _loadPrescriptions({bool showLoader = false}) async {
-    if (_doctorId == null) return;
+    if (_doctorId == null || _refreshInProgress) return;
+    _refreshInProgress = true;
 
     if (showLoader && mounted) {
       setState(() {
@@ -113,6 +115,8 @@ class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Load failed: $e')),
       );
+    } finally {
+      _refreshInProgress = false;
     }
   }
 

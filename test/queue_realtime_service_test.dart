@@ -3,12 +3,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Queue realtime hub URL', () {
-    test('uses the VPS IP API base path', () {
+    test('uses the production HTTPS API base path', () {
       expect(
         QueueRealtimeService.hubUrlFor(
-          'http://169.58.40.160/api',
+          'https://api.example.com/api',
         ),
-        'http://169.58.40.160/api/hubs/queue',
+        'https://api.example.com/api/hubs/queue',
       );
     });
 
