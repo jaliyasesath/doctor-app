@@ -1,31 +1,32 @@
 import 'package:flutter/foundation.dart';
 
 class ApiConfig {
-  // VPS API 
+  // Current connection mode
   static String mode = 'cloud';
 
-  // Temporary default for VPS testing before the HTTPS domain is configured.
-  // Remove this HTTP default before the public production release.
+  // VPS API URL
+  // Temporary HTTP configuration until HTTPS is available.
   static const String cloudBaseUrl = String.fromEnvironment(
     'PP_CLOUD_API_URL',
     defaultValue: 'http://169.58.40.160/api',
   );
 
-  // Temporary cross-platform testing switch for a VPS that has no TLS yet.
-  // Never enable this flag for a public production build.
- static const bool allowInsecureCloudHttp = bool.fromEnvironment(
-  'PP_ALLOW_INSECURE_HTTP',
-  defaultValue: true,
-);
+  // Temporary testing setting.
+  // Change the default value to false after HTTPS is configured.
+  static const bool allowInsecureCloudHttp = bool.fromEnvironment(
+    'PP_ALLOW_INSECURE_HTTP',
+    defaultValue: true,
+  );
 
   // Local computer API
-  static const String localWifiBaseUrl = 'http://192.168.8.91:5219/api';
+  static const String localWifiBaseUrl =
+      'http://192.168.8.91:5219/api';
 
-  // Doctor phone hotspot server
-  static const String hotspotBaseUrl = 'http://192.168.43.1:8080/api';
+  // Doctor phone hotspot API
+  static const String hotspotBaseUrl =
+      'http://192.168.43.1:8080/api';
 
   static String customHotspotBaseUrl = hotspotBaseUrl;
-
   static String _resolvedAutoBaseUrl = cloudBaseUrl;
 
   static String get baseUrl {
@@ -34,43 +35,74 @@ class ApiConfig {
         return _secureCloudUrl;
 
       case 'wifi':
-        return localWifiBaseUrl;
+        return _normalize(localWifiBaseUrl);
 
       case 'hotspot':
-        return customHotspotBaseUrl;
+        return _normalize(customHotspotBaseUrl);
 
       case 'offline':
         return '';
 
       case 'auto':
+        return _normalize(_resolvedAutoBaseUrl);
+
       default:
-        return _resolvedAutoBaseUrl;
+        return _secureCloudUrl;
     }
   }
 
   static String get _secureCloudUrl {
-    final value = _normalize(cloudBaseUrl);
-    if (kReleaseMode &&
-        !allowInsecureCloudHttp &&
-        !value.toLowerCase().startsWith('https://')) {
+    final String value = _normalize(cloudBaseUrl);
+
+    if (value.isEmpty) {
       return '';
     }
+
+    final Uri? uri = Uri.tryParse(value);
+
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      return '';
+    }
+
+    final bool isHttps = uri.scheme.toLowerCase() == 'https';
+    final bool isHttp = uri.scheme.toLowerCase() == 'http';
+
+    if (!isHttps && !isHttp) {
+      return '';
+    }
+
+    if (kReleaseMode && !allowInsecureCloudHttp && !isHttps) {
+      return '';
+    }
+
     return value;
   }
 
-  static String _normalize(String value) =>
-      value.trim().replaceFirst(RegExp(r'/+$'), '');
+  static String _normalize(String value) {
+    return value.trim().replaceFirst(RegExp(r'/+$'), '');
+  }
 
   static void setMode(String newMode) {
-    mode = newMode;
+    switch (newMode) {
+      case 'cloud':
+      case 'wifi':
+      case 'hotspot':
+      case 'offline':
+      case 'auto':
+        mode = newMode;
+        break;
+
+      default:
+        mode = 'cloud';
+    }
   }
 
   static void setResolvedAutoBaseUrl(String url) {
-    _resolvedAutoBaseUrl = url;
+    _resolvedAutoBaseUrl = _normalize(url);
   }
 
   static void setHotspotBaseUrl(String url) {
-    customHotspotBaseUrl = url;
+    customHotspotBaseUrl = _normalize(url);
   }
 
   static bool get isOffline => mode == 'offline';
@@ -79,4 +111,3 @@ class ApiConfig {
   static bool get isHotspot => mode == 'hotspot';
   static bool get isAuto => mode == 'auto';
 }
-
