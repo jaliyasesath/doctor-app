@@ -359,8 +359,8 @@ class _ReceptionQueueScreenState extends State<ReceptionQueueScreen>
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
           color: isPreviousPending
-              ? Colors.deepOrange.withOpacity(0.35)
-              : Colors.black.withOpacity(0.07),
+              ? Colors.deepOrange.withValues(alpha: 0.35)
+              : Colors.black.withValues(alpha: 0.07),
         ),
       ),
       color: isPreviousPending
@@ -493,7 +493,7 @@ class _ReceptionQueueScreenState extends State<ReceptionQueueScreen>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.12),
+            color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(

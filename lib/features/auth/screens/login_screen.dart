@@ -173,6 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final data = await LicenseCacheService.getCachedLicense();
     final days = data['daysRemaining']?.toString() ?? '0';
+    if (!mounted) return false;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -468,7 +469,7 @@ class _LoginScreenState extends State<LoginScreen> {
               height: 210,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.06),
+                color: Colors.white.withValues(alpha: 0.06),
               ),
             ),
           ),
@@ -480,7 +481,7 @@ class _LoginScreenState extends State<LoginScreen> {
               height: 160,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
               ),
             ),
           ),
@@ -509,7 +510,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: Colors.white,
                                 borderRadius: BorderRadius.circular(34),
                                 border: Border.all(
-                                  color: Colors.white.withOpacity(0.72),
+                                  color: Colors.white.withValues(alpha: 0.72),
                                   width: 2,
                                 ),
                                 boxShadow: const [
@@ -860,7 +861,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 vertical: 8,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.88),
+                                color: Colors.white.withValues(alpha: 0.88),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: const Row(

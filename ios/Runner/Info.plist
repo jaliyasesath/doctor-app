@@ -64,13 +64,13 @@
     <string>Bluetooth access is required to send prescriptions and bills to the thermal printer.</string>
 
     <!--
-      Temporary HTTP permission for VPS testing.
-      Remove NSAllowsArbitraryLoads after HTTPS is configured.
+      Production policy: public cloud traffic must use HTTPS. Local clinic
+      networking remains available for the paired hotspot workflow.
     -->
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>
-        <true/>
+        <false/>
 
         <key>NSAllowsLocalNetworking</key>
         <true/>

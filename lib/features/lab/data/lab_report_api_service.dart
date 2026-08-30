@@ -7,8 +7,18 @@ import '../../net_service/api_client.dart';
 class LabReportApiService {
   final ApiClient _api = ApiClient();
 
-  Future<List<Map<String, dynamic>>> getReports({int? patientId}) async {
-    final response = await _api.get(patientId == null ? '/lab-reports' : '/lab-reports?patientId=$patientId');
+  Future<List<Map<String, dynamic>>> getReports({
+    int? patientId,
+    int page = 1,
+    int pageSize = 30,
+  }) async {
+    final parameters = <String, String>{
+      if (patientId != null) 'patientId': patientId.toString(),
+      'page': page.toString(),
+      'pageSize': pageSize.toString(),
+    };
+    final uri = Uri(path: '/lab-reports', queryParameters: parameters);
+    final response = await _api.get(uri.toString());
     return (response as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../local_clinic_server.dart';
@@ -32,6 +33,9 @@ class _DoctorHotspotQrScreenState extends State<DoctorHotspotQrScreen> {
     });
 
     try {
+      if (LocalClinicServer.isRunning) {
+        await LocalClinicServer.stop();
+      }
       await LocalClinicServer.start(port: 8080);
 
       final localUrl = await LocalIpService.getLocalApiUrl();
@@ -193,7 +197,13 @@ class _DoctorHotspotQrScreenState extends State<DoctorHotspotQrScreen> {
                     ],
                   ),
                   child: QrImageView(
-                    data: _serverUrl,
+                    data: jsonEncode({
+                      'version': 1,
+                      'url': _serverUrl,
+                      'token': LocalClinicServer.pairingToken,
+                      'expiresAt': LocalClinicServer.pairingExpiresAt
+                          ?.toIso8601String(),
+                    }),
                     version: QrVersions.auto,
                     size: 240,
                   ),

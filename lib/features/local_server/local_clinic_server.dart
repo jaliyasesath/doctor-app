@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -12,13 +13,21 @@ import '../sync/services/auto_sync_service.dart';
 class LocalClinicServer {
   static HttpServer? _server;
   static bool _running = false;
+  static String _pairingToken = '';
+  static DateTime? _pairingExpiresAt;
+  static const Duration _pairingLifetime = Duration(hours: 8);
 
   static bool get isRunning => _running;
+  static String get pairingToken => _pairingToken;
+  static DateTime? get pairingExpiresAt => _pairingExpiresAt;
 
   static String get _today => DateTime.now().toIso8601String().split('T').first;
 
   static Future<void> start({int port = 8080}) async {
     if (_running) return;
+
+    _pairingToken = _createPairingToken();
+    _pairingExpiresAt = DateTime.now().toUtc().add(_pairingLifetime);
 
     final router = Router();
 
@@ -191,6 +200,7 @@ class LocalClinicServer {
     final handler = const Pipeline()
         .addMiddleware(logRequests())
         .addMiddleware(_corsMiddleware())
+        .addMiddleware(_pairingMiddleware())
         .addHandler(router.call);
 
     _server = await shelf_io.serve(handler, '0.0.0.0', port);
@@ -206,6 +216,8 @@ class LocalClinicServer {
     await _server?.close(force: true);
     _server = null;
     _running = false;
+    _pairingToken = '';
+    _pairingExpiresAt = null;
   }
 
   static Future<List<Map<String, dynamic>>> _todayPatientsByStatuses(
@@ -311,9 +323,36 @@ class LocalClinicServer {
 
   static Map<String, String> _corsHeaders() {
     return {
-      'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Origin, Content-Type, Authorization',
+      'Access-Control-Allow-Headers':
+          'Content-Type, Authorization, X-Clinic-Pairing-Token',
     };
+  }
+
+  static Middleware _pairingMiddleware() {
+    return (Handler innerHandler) {
+      return (Request request) async {
+        if (request.method == 'OPTIONS') {
+          return innerHandler(request);
+        }
+        final supplied = request.headers['x-clinic-pairing-token'] ?? '';
+        final expired = _pairingExpiresAt == null ||
+            !_pairingExpiresAt!.isAfter(DateTime.now().toUtc());
+        if (expired || _pairingToken.isEmpty || supplied != _pairingToken) {
+          return _json({
+            'success': false,
+            'message': 'Clinic pairing authentication is required.',
+            'code': 'HOTSPOT_PAIRING_REQUIRED',
+          }, statusCode: 401);
+        }
+        return innerHandler(request);
+      };
+    };
+  }
+
+  static String _createPairingToken() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(32, (_) => random.nextInt(256));
+    return base64UrlEncode(bytes).replaceAll('=', '');
   }
 }

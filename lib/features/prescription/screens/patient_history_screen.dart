@@ -17,20 +17,37 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _results = [];
   bool _isLoading = false;
+  bool _isLoadingMore = false;
+  bool _hasMore = false;
   int? _doctorId;
   Timer? _searchDebounce;
+  final ScrollController _scrollController = ScrollController();
+  static const int _limit = 30;
+  int _offset = 0;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _initDoctor();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     _searchDebounce?.cancel();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 240 &&
+        !_isLoading &&
+        !_isLoadingMore &&
+        _hasMore) {
+      _loadMore();
+    }
   }
 
   Future<void> _initDoctor() async {
@@ -57,20 +74,30 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
     }
 
     if (query.isEmpty) {
-      if (mounted) setState(() => _results = []);
+      if (mounted) {
+        setState(() {
+          _results = [];
+          _offset = 0;
+          _hasMore = false;
+        });
+      }
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      final data = await DatabaseHelper.instance.searchPatientsByDoctor(
+      final data = await DatabaseHelper.instance.searchPatientsByDoctorPaged(
         _doctorId!,
         query,
+        limit: _limit,
+        offset: 0,
       );
-      if (!mounted) return;
+      if (!mounted || query != _searchController.text.trim()) return;
       setState(() {
         _results = data;
+        _offset = data.length;
+        _hasMore = data.length == _limit;
         _isLoading = false;
       });
     } catch (e) {
@@ -79,6 +106,36 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Search failed: $e')),
       );
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final query = _searchController.text.trim();
+    if (_doctorId == null || query.isEmpty || !_hasMore || _isLoadingMore) {
+      return;
+    }
+    setState(() => _isLoadingMore = true);
+    try {
+      final data = await DatabaseHelper.instance.searchPatientsByDoctorPaged(
+        _doctorId!,
+        query,
+        limit: _limit,
+        offset: _offset,
+      );
+      if (!mounted || query != _searchController.text.trim()) return;
+      setState(() {
+        _results.addAll(data);
+        _offset += data.length;
+        _hasMore = data.length == _limit;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to load more patients: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -345,7 +402,11 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
                         : IconButton(
                             onPressed: () {
                               _searchController.clear();
-                              setState(() => _results = []);
+                              setState(() {
+                                _results = [];
+                                _offset = 0;
+                                _hasMore = false;
+                              });
                             },
                             icon: const Icon(Icons.close_rounded),
                           ),
@@ -390,10 +451,19 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
               child: _results.isEmpty
                   ? _emptyState()
                   : ListView.builder(
+                      controller: _scrollController,
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                      itemCount: _results.length,
-                      itemBuilder: (_, index) => _patientCard(_results[index]),
+                      itemCount: _results.length + (_isLoadingMore ? 1 : 0),
+                      itemBuilder: (_, index) {
+                        if (index == _results.length) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        return _patientCard(_results[index]);
+                      },
                     ),
             ),
           ),

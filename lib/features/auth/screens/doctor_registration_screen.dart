@@ -407,9 +407,9 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.08),
+        color: Colors.grey.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.grey.withOpacity(0.25)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.25)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -510,11 +510,11 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F766E).withOpacity(0.055),
+        color: const Color(0xFF0F766E).withValues(alpha: 0.055),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: image == null
-              ? const Color(0xFF0F766E).withOpacity(0.20)
+              ? const Color(0xFF0F766E).withValues(alpha: 0.20)
               : const Color(0xFF22A06B),
         ),
       ),
@@ -572,7 +572,7 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
         border: Border.all(color: const Color(0xFFDDE9E5)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF064E3B).withOpacity(0.05),
+            color: const Color(0xFF064E3B).withValues(alpha: 0.05),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -671,9 +671,9 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.06),
+        color: Colors.blue.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

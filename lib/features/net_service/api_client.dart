@@ -51,6 +51,10 @@ class ApiClient {
       'Accept': 'application/json',
     };
 
+    if (ApiConfig.isHotspot && ApiConfig.hasValidHotspotPairing) {
+      headers['X-Clinic-Pairing-Token'] = ApiConfig.hotspotPairingToken;
+    }
+
     if (auth) {
       final token = await TokenStorage.getToken();
       if (token != null && token.isNotEmpty) {

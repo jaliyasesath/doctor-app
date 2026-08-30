@@ -4,15 +4,14 @@ class ApiConfig {
   // Current connection mode
   static String mode = 'cloud';
 
-  // VPS API URL
-  // Temporary HTTP configuration until HTTPS is available.
+  // Temporary VPS HTTP configuration for UAT testing.
+  // Replace with HTTPS and set allowInsecureCloudHttp to false
+  // before the public production release.
   static const String cloudBaseUrl = String.fromEnvironment(
     'PP_CLOUD_API_URL',
     defaultValue: 'http://169.58.40.160/api',
   );
 
-  // Temporary testing setting.
-  // Change the default value to false after HTTPS is configured.
   static const bool allowInsecureCloudHttp = bool.fromEnvironment(
     'PP_ALLOW_INSECURE_HTTP',
     defaultValue: true,
@@ -27,6 +26,8 @@ class ApiConfig {
       'http://192.168.43.1:8080/api';
 
   static String customHotspotBaseUrl = hotspotBaseUrl;
+  static String hotspotPairingToken = '';
+  static DateTime? hotspotPairingExpiresAt;
   static String _resolvedAutoBaseUrl = cloudBaseUrl;
 
   static String get baseUrl {
@@ -52,20 +53,20 @@ class ApiConfig {
   }
 
   static String get _secureCloudUrl {
-    final String value = _normalize(cloudBaseUrl);
+    final value = _normalize(cloudBaseUrl);
 
     if (value.isEmpty) {
       return '';
     }
 
-    final Uri? uri = Uri.tryParse(value);
+    final uri = Uri.tryParse(value);
 
     if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
       return '';
     }
 
-    final bool isHttps = uri.scheme.toLowerCase() == 'https';
-    final bool isHttp = uri.scheme.toLowerCase() == 'http';
+    final isHttps = uri.scheme.toLowerCase() == 'https';
+    final isHttp = uri.scheme.toLowerCase() == 'http';
 
     if (!isHttps && !isHttp) {
       return '';
@@ -103,6 +104,26 @@ class ApiConfig {
 
   static void setHotspotBaseUrl(String url) {
     customHotspotBaseUrl = _normalize(url);
+  }
+
+  static void setHotspotPairingToken(
+    String token, {
+    DateTime? expiresAt,
+  }) {
+    hotspotPairingToken = token.trim();
+    hotspotPairingExpiresAt = expiresAt;
+  }
+
+  static bool get hasValidHotspotPairing {
+    return hotspotPairingToken.isNotEmpty &&
+        hotspotPairingExpiresAt != null &&
+        hotspotPairingExpiresAt!.isAfter(DateTime.now().toUtc());
+  }
+
+  static void clearHotspotPairing() {
+    hotspotPairingToken = '';
+    hotspotPairingExpiresAt = null;
+    customHotspotBaseUrl = hotspotBaseUrl;
   }
 
   static bool get isOffline => mode == 'offline';

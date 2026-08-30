@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../net_service/api_config.dart';
 import '../../net_service/connection_mode_service.dart';
+import '../../net_service/hotspot_pairing_storage.dart';
 
 import 'package:http/http.dart' as http;
 
@@ -27,23 +29,45 @@ class _ReceptionHotspotConnectScreenState
       _message = 'Searching Doctor local server...';
     });
 
-    final possibleUrls = [
-      value,
-      'http://192.168.43.1:8080/api',
-      'http://192.168.232.1:8080/api',
-      'http://192.168.137.1:8080/api',
-    ];
+    String scannedUrl;
+    String pairingToken;
+    DateTime? expiresAt;
+    try {
+      final payload = jsonDecode(value) as Map<String, dynamic>;
+      scannedUrl = payload['url']?.toString().trim() ?? '';
+      pairingToken = payload['token']?.toString().trim() ?? '';
+      expiresAt = DateTime.tryParse(
+        payload['expiresAt']?.toString() ?? '',
+      )?.toUtc();
+    } catch (_) {
+      scannedUrl = '';
+      pairingToken = '';
+      expiresAt = null;
+    }
+    if (scannedUrl.isEmpty || pairingToken.length < 32 ||
+        expiresAt == null || !expiresAt.isAfter(DateTime.now().toUtc())) {
+      setState(() { _scanned = false; _message = 'Invalid or old pairing QR'; });
+      return;
+    }
+
+    final possibleUrls = [scannedUrl];
 
     for (final url in possibleUrls) {
       try {
-        final alive = await _isServerAlive(url);
+        final alive = await _isServerAlive(url, pairingToken);
 
         if (!alive) {
           continue;
         }
 
         ApiConfig.setHotspotBaseUrl(url);
-        await ConnectionModeService.setHotspotMode();
+        ApiConfig.setHotspotPairingToken(pairingToken, expiresAt: expiresAt);
+        await HotspotPairingStorage.save(
+          url: url,
+          token: pairingToken,
+          expiresAt: expiresAt,
+        );
+        await ConnectionModeService.setReceptionHotspotMode();
 
         if (!mounted) return;
 
@@ -73,12 +97,14 @@ class _ReceptionHotspotConnectScreenState
     });
   }
 
-  Future<bool> _isServerAlive(String url) async {
+  Future<bool> _isServerAlive(String url, String pairingToken) async {
     try {
       final root = url.replaceAll('/api', '');
 
       final response = await http
-          .get(Uri.parse('$root/api/Health'))
+          .get(Uri.parse('$root/api/Health'), headers: {
+            'X-Clinic-Pairing-Token': pairingToken,
+          })
           .timeout(const Duration(seconds: 2));
 
       return response.statusCode == 200;

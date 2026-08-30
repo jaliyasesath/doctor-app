@@ -27,12 +27,35 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   List<Map<String, dynamic>> _lastMedicines = [];
 
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = false;
   int? _doctorId;
+  int _totalVisits = 0;
+  int _offset = 0;
+  static const int _limit = 30;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _initAndLoad();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 300 &&
+        !_isLoading &&
+        !_isLoadingMore &&
+        _hasMore) {
+      _loadMoreVisits();
+    }
   }
 
   Future<void> _initAndLoad() async {
@@ -80,11 +103,15 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         return;
       }
 
-      final prescriptions =
-          await DatabaseHelper.instance.getPrescriptionsByPatientAndDoctor(
+      final prescriptions = await DatabaseHelper.instance
+          .getPrescriptionsByPatientAndDoctorPaged(
         widget.patientId,
         _doctorId!,
+        limit: _limit,
+        offset: 0,
       );
+      final totalVisits = await DatabaseHelper.instance
+          .countPrescriptionsByPatientAndDoctor(widget.patientId, _doctorId!);
       Map<String, dynamic>? lastPrescription;
       List<Map<String, dynamic>> lastMedicines = [];
 
@@ -102,6 +129,9 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       setState(() {
         _patient = patient;
         _prescriptions = prescriptions;
+        _totalVisits = totalVisits;
+        _offset = prescriptions.length;
+        _hasMore = prescriptions.length < totalVisits;
         _lastPrescription = lastPrescription;
         _lastMedicines = lastMedicines;
         _isLoading = false;
@@ -114,6 +144,34 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Load failed: $e')),
       );
+    }
+  }
+
+  Future<void> _loadMoreVisits() async {
+    if (_doctorId == null || !_hasMore || _isLoadingMore) return;
+    setState(() => _isLoadingMore = true);
+    try {
+      final data = await DatabaseHelper.instance
+          .getPrescriptionsByPatientAndDoctorPaged(
+        widget.patientId,
+        _doctorId!,
+        limit: _limit,
+        offset: _offset,
+      );
+      if (!mounted) return;
+      setState(() {
+        _prescriptions.addAll(data);
+        _offset += data.length;
+        _hasMore = _offset < _totalVisits;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to load more visits: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -289,7 +347,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F766E).withOpacity(0.18),
+            color: const Color(0xFF0F766E).withValues(alpha: 0.18),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -319,7 +377,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _chip('Visits', '${_prescriptions.length}'),
+              _chip('Visits', '$_totalVisits'),
               if (phone.isNotEmpty) _chip('Phone', phone),
               if (blood.isNotEmpty) _chip('Blood', blood),
               if (address.isNotEmpty) _chip('Address', address),
@@ -615,6 +673,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
           : RefreshIndicator(
               onRefresh: _refresh,
               child: ListView(
+                controller: _scrollController,
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
                 children: [
                   _buildCompactHeader(),
@@ -645,6 +704,11 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                       children: _prescriptions
                           .map((item) => _buildPrescriptionCard(item))
                           .toList(),
+                    ),
+                  if (_isLoadingMore)
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(child: CircularProgressIndicator()),
                     ),
                 ],
               ),

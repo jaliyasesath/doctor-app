@@ -70,6 +70,7 @@ class _SmartChipsSectionState extends State<SmartChipsSection> {
   Future<void> _loadSavedClinicalChips() async {
     final doctorId = await DoctorSession.getDoctorId();
     if (doctorId == null) return;
+    if (!mounted) return;
 
     final allergies = await DatabaseHelper.instance.getClinicalChips(
       doctorId: doctorId,
@@ -171,23 +172,24 @@ class _SmartChipsSectionState extends State<SmartChipsSection> {
   }) async {
     final doctorId = await DoctorSession.getDoctorId();
     if (doctorId == null) return;
+    if (!mounted) return;
 
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Delete Chip'),
           content: Text('Delete "$value" from $title?'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
               ),
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(dialogContext, true),
               child: const Text('Delete'),
             ),
           ],
@@ -333,7 +335,7 @@ class _SmartChipsSectionState extends State<SmartChipsSection> {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: const Color(0xFF0F766E).withOpacity(0.04),
+      color: const Color(0xFF0F766E).withValues(alpha: 0.04),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
       ),

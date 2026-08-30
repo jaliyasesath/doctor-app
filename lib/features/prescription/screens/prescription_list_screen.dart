@@ -261,6 +261,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
     });
   }
 
+  // ignore: unused_element
   List<String> _allInstructionSuggestions() {
     final defaults = defaultInstructions.values.toSet().toList();
 
@@ -273,6 +274,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
     return [...defaults, ...customs];
   }
 
+  // ignore: unused_element
   Future<void> _saveCustomInstruction(String text) async {
     final value = text.trim();
 
@@ -280,6 +282,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
 
     final doctorId = await DoctorSession.getDoctorId();
     if (doctorId == null) return;
+    if (!mounted) return;
 
     final exists = customInstructions.any(
       (e) =>
@@ -383,6 +386,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
         .toList();
   }
 
+  // ignore: unused_element
   List<String> _getSuggestions(
     String value,
     List<String> options,
@@ -496,6 +500,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
     });
   }
 
+  // ignore: unused_element
   String _patientAllergyText() {
     final allergyFromChips = selectedAllergies.join(', ');
     return allergyFromChips.toLowerCase();
@@ -669,15 +674,6 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final instructionValue = instructionsController.text.trim();
-
-            final instructionSuggestions = _allInstructionSuggestions();
-
-            final dropdownValue =
-                instructionSuggestions.contains(instructionValue)
-                    ? instructionValue
-                    : null;
-
             return AlertDialog(
               backgroundColor: const Color(0xFFF8FAFC),
               surfaceTintColor: Colors.transparent,
@@ -750,13 +746,13 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: selectedAllergies.isEmpty
-                              ? Colors.green.withOpacity(0.08)
-                              : Colors.red.withOpacity(0.08),
+                              ? Colors.green.withValues(alpha: 0.08)
+                              : Colors.red.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: selectedAllergies.isEmpty
-                                ? Colors.green.withOpacity(0.30)
-                                : Colors.red.withOpacity(0.35),
+                                ? Colors.green.withValues(alpha: 0.30)
+                                : Colors.red.withValues(alpha: 0.35),
                           ),
                         ),
                         child: Row(
@@ -931,7 +927,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: hasAllergyRisk
-                                          ? Colors.red.withOpacity(0.05)
+                                          ? Colors.red.withValues(alpha: 0.05)
                                           : isSelected
                                               ? const Color(0xFFE6FFFB)
                                               : const Color(0xFFF8FAFC),
@@ -947,7 +943,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                                     child: ListTile(
                                       selected: isSelected,
                                       selectedTileColor: const Color(0xFF0F766E)
-                                          .withOpacity(0.12),
+                                          .withValues(alpha: 0.12),
                                       leading: Icon(
                                         isFav
                                             ? Icons.star
@@ -1277,6 +1273,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       final doctorId = await DoctorSession.getDoctorId();
 
       if (doctorId == null) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Doctor session not found. Login again.'),
@@ -1484,6 +1481,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
     }
   }
 
+  // ignore: unused_element
   void _resetFormAfterSave() {
     setState(() {
       _followUpNoteController.clear();
@@ -2684,10 +2682,10 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.amber.withOpacity(0.08),
+        color: Colors.amber.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.amber.withOpacity(0.30),
+          color: Colors.amber.withValues(alpha: 0.30),
         ),
       ),
       child: Column(
@@ -2736,7 +2734,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
         border: Border.all(color: const Color(0xFFE7ECF4)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withOpacity(0.055),
+            color: const Color(0xFF0F172A).withValues(alpha: 0.055),
             blurRadius: 18,
             offset: const Offset(0, 7),
           ),
@@ -2760,7 +2758,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.10),
+            color: color.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(13),
           ),
           child: Icon(icon, color: color, size: 22),
@@ -2824,7 +2822,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.16),
+                  color: Colors.white.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(15),
                   border: Border.all(color: Colors.white24),
                 ),
@@ -2869,7 +2867,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(30),
                 ),
                 child: Text(
@@ -2909,7 +2907,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.13),
+        color: Colors.white.withValues(alpha: 0.13),
         borderRadius: BorderRadius.circular(30),
         border: Border.all(color: Colors.white24),
       ),
@@ -3008,7 +3006,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F766E).withOpacity(0.10),
+                  color: const Color(0xFF0F766E).withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(13),
                 ),
                 child: const Icon(
@@ -3040,7 +3038,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.12),
+                              color: Colors.orange.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: const Text(
@@ -3391,13 +3389,13 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            const Color(0xFF0F766E).withOpacity(0.10),
-                            const Color(0xFF22A06B).withOpacity(0.08),
+                            const Color(0xFF0F766E).withValues(alpha: 0.10),
+                            const Color(0xFF22A06B).withValues(alpha: 0.08),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: const Color(0xFF0F766E).withOpacity(0.18),
+                          color: const Color(0xFF0F766E).withValues(alpha: 0.18),
                         ),
                       ),
                       child: Column(
@@ -3436,7 +3434,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.07),
+                        color: Colors.black.withValues(alpha: 0.07),
                         blurRadius: 18,
                         offset: const Offset(0, -5),
                       ),

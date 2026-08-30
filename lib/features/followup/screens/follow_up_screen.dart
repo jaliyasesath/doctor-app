@@ -296,7 +296,7 @@ class _FollowUpScreenState extends State<FollowUpScreen>
                 ),
                 Chip(
                   label: Text(date),
-                  backgroundColor: color.withOpacity(0.12),
+                  backgroundColor: color.withValues(alpha: 0.12),
                 ),
               ],
             ),

@@ -5,6 +5,7 @@ export 'package:http/http.dart' show Response;
 
 import 'api_client.dart';
 import 'token_storage.dart';
+import 'api_config.dart';
 import '../../core/concurrency/single_flight.dart';
 
 final SingleFlight _postSingleFlight = SingleFlight();
@@ -12,6 +13,9 @@ int _postSequence = 0;
 
 Future<Map<String, String>> _freshHeaders(Map<String, String>? headers) async {
   final updated = <String, String>{...?headers};
+  if (ApiConfig.isHotspot && ApiConfig.hasValidHotspotPairing) {
+    updated['X-Clinic-Pairing-Token'] = ApiConfig.hotspotPairingToken;
+  }
   final token = await TokenStorage.getToken();
   if (token != null && token.isNotEmpty) {
     updated['Authorization'] = 'Bearer $token';

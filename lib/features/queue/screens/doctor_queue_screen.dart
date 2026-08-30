@@ -449,7 +449,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen>
         side: BorderSide(
           color: isPreviousPending
               ? const Color(0xFFFED7AA)
-              : statusColor.withOpacity(0.16),
+              : statusColor.withValues(alpha: 0.16),
         ),
       ),
       color: isPreviousPending
@@ -517,7 +517,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen>
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.72),
+                color: Colors.white.withValues(alpha: 0.72),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Wrap(
@@ -800,7 +800,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen>
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.10),
+              color: color.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 21),
@@ -819,7 +819,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.10),
+              color: color.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -923,7 +923,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen>
                 border: Border.all(color: const Color(0xFFDCE9E5)),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF0F766E).withOpacity(0.08),
+                    color: const Color(0xFF0F766E).withValues(alpha: 0.08),
                     blurRadius: 18,
                     offset: const Offset(0, 7),
                   ),

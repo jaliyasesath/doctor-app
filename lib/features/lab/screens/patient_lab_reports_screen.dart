@@ -16,19 +16,78 @@ class _PatientLabReportsScreenState extends State<PatientLabReportsScreen> {
   final _api = LabReportApiService();
   List<Map<String, dynamic>> _reports = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
   int? _openingId;
+  int _page = 1;
+  static const int _pageSize = 30;
+  final ScrollController _scrollController = ScrollController();
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 240 &&
+        !_loading &&
+        !_loadingMore &&
+        _hasMore) {
+      _loadMore();
+    }
+  }
 
   Future<void> _load() async {
+    if (mounted) setState(() => _loading = true);
     try {
-      final reports = await _api.getReports(patientId: widget.serverPatientId);
-      if (mounted) setState(() => _reports = reports);
+      final reports = await _api.getReports(
+        patientId: widget.serverPatientId,
+        page: 1,
+        pageSize: _pageSize,
+      );
+      if (mounted) {
+        setState(() {
+          _reports = reports;
+          _page = 1;
+          _hasMore = reports.length == _pageSize;
+        });
+      }
     } catch (error) {
       if (mounted) _message('Unable to load lab reports: $error');
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final nextPage = _page + 1;
+      final reports = await _api.getReports(
+        patientId: widget.serverPatientId,
+        page: nextPage,
+        pageSize: _pageSize,
+      );
+      if (!mounted) return;
+      setState(() {
+        _reports.addAll(reports);
+        _page = nextPage;
+        _hasMore = reports.length == _pageSize;
+      });
+    } catch (error) {
+      if (mounted) _message('Unable to load more lab reports: $error');
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -73,8 +132,16 @@ class _PatientLabReportsScreenState extends State<PatientLabReportsScreen> {
       child: _reports.isEmpty
           ? ListView(children: const [SizedBox(height: 180), Icon(Icons.science_outlined, size: 58, color: Colors.black38), SizedBox(height: 12), Center(child: Text('No laboratory reports received yet'))])
           : ListView.builder(
-              padding: const EdgeInsets.all(16), itemCount: _reports.length,
+              controller: _scrollController,
+              padding: const EdgeInsets.all(16),
+              itemCount: _reports.length + (_loadingMore ? 1 : 0),
               itemBuilder: (context, index) {
+                if (index == _reports.length) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
                 final report = _reports[index];
                 final status = report['status']?.toString() ?? 'Uploaded';
                 return Card(margin: const EdgeInsets.only(bottom: 12), child: Padding(

@@ -1330,6 +1330,37 @@ is_favorite INTEGER DEFAULT 0,
     );
   }
 
+  Future<List<Map<String, dynamic>>> getPrescriptionsByPatientAndDoctorPaged(
+    int patientId,
+    int doctorId, {
+    int limit = 30,
+    int offset = 0,
+  }) async {
+    final db = await database;
+
+    return db.query(
+      'prescriptions',
+      where: 'patient_id = ? AND doctor_id = ? AND is_deleted = 0',
+      whereArgs: [patientId, doctorId],
+      orderBy: 'id DESC',
+      limit: limit,
+      offset: offset,
+    );
+  }
+
+  Future<int> countPrescriptionsByPatientAndDoctor(
+    int patientId,
+    int doctorId,
+  ) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) AS total FROM prescriptions '
+      'WHERE patient_id = ? AND doctor_id = ? AND is_deleted = 0',
+      [patientId, doctorId],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
   Future<Map<String, dynamic>?> getPrescriptionByNo(String rxNo) async {
     final db = await database;
     final doctorId = await DoctorSession.getActiveDoctorIdForData();

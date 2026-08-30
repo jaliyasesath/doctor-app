@@ -236,11 +236,11 @@ class _AdminSubscriptionScreenState extends State<AdminSubscriptionScreen> {
                                   width: double.infinity,
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: _statusColor(sub).withOpacity(0.08),
+                                    color: _statusColor(sub).withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
                                       color:
-                                          _statusColor(sub).withOpacity(0.35),
+                                          _statusColor(sub).withValues(alpha: 0.35),
                                     ),
                                   ),
                                   child: Text(

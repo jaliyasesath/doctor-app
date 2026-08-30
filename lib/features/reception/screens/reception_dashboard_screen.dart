@@ -51,13 +51,13 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.black.withOpacity(0.06)),
+        side: BorderSide(color: Colors.black.withValues(alpha: 0.06)),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
         leading: CircleAvatar(
           radius: 24,
-          backgroundColor: Colors.blue.withOpacity(0.10),
+          backgroundColor: Colors.blue.withValues(alpha: 0.10),
           child: Icon(icon, color: Colors.blue.shade700),
         ),
         title: Text(

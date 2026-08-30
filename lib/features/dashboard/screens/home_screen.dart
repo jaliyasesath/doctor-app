@@ -21,7 +21,6 @@ import '../../sync/services/network_service.dart';
 import '../../sync/services/sync_service.dart';
 import '../../medicines/screens/medicine_screen.dart';
 import '../../net_service/connection_mode_service.dart';
-import '../../net_service/api_config.dart';
 import '../../net_service/auto_api_resolver.dart';
 import '../../local_server/screens/doctor_hotspot_qr_screen.dart';
 import '../../patient/data/api_patient_service.dart';
@@ -62,7 +61,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int _daysRemaining = 0;
 
   bool _connectionOnline = false;
-  String _connectionMode = '';
 
   String _doctorName = 'Doctor';
 
@@ -497,6 +495,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       groupValue: currentMode,
                       onChanged: (v) async {
                         await ConnectionModeService.setAutoMode();
+                        if (!context.mounted) return;
                         setStateDialog(() => currentMode = 'auto');
                       },
                     ),
@@ -506,6 +505,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       groupValue: currentMode,
                       onChanged: (v) async {
                         await ConnectionModeService.setCloudMode();
+                        if (!context.mounted) return;
                         setStateDialog(() => currentMode = 'cloud');
                       },
                     ),
@@ -515,6 +515,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       groupValue: currentMode,
                       onChanged: (v) async {
                         await ConnectionModeService.setLocalWifiMode();
+                        if (!context.mounted) return;
                         setStateDialog(() => currentMode = 'wifi');
                       },
                     ),
@@ -524,6 +525,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       groupValue: currentMode,
                       onChanged: (v) async {
                         await ConnectionModeService.setHotspotMode();
+                        if (!context.mounted) return;
                         setStateDialog(() => currentMode = 'hotspot');
                       },
                     ),
@@ -533,6 +535,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       groupValue: currentMode,
                       onChanged: (v) async {
                         await ConnectionModeService.setOfflineMode();
+                        if (!context.mounted) return;
                         setStateDialog(() => currentMode = 'offline');
                       },
                     ),
@@ -548,6 +551,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         await ConnectionModeService.setAutoMode();
                         await AutoApiResolver.resolve();
 
+                        if (!context.mounted) return;
                         setStateDialog(() => currentMode = 'auto');
 
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -588,7 +592,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _connectionOnline = online;
-      _connectionMode = ConnectionModeService.getCurrentMode();
     });
   }
 
@@ -664,7 +667,7 @@ class _HomeScreenState extends State<HomeScreen> {
       border: Border.all(color: const Color(0xFFE4ECE9)),
       boxShadow: [
         BoxShadow(
-          color: _deepGreen.withOpacity(0.055),
+          color: _deepGreen.withValues(alpha: 0.055),
           blurRadius: 24,
           offset: const Offset(0, 10),
         ),
@@ -740,9 +743,9 @@ class _HomeScreenState extends State<HomeScreen> {
               height: 210,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.06),
+                color: Colors.white.withValues(alpha: 0.06),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.10),
+                  color: Colors.white.withValues(alpha: 0.10),
                 ),
               ),
             ),
@@ -755,9 +758,9 @@ class _HomeScreenState extends State<HomeScreen> {
               height: 165,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.08),
+                  color: Colors.white.withValues(alpha: 0.08),
                 ),
               ),
             ),
@@ -777,7 +780,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         borderRadius: BorderRadius.circular(18),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.10),
+                            color: Colors.black.withValues(alpha: 0.10),
                             blurRadius: 14,
                             offset: const Offset(0, 6),
                           ),
@@ -904,9 +907,9 @@ class _HomeScreenState extends State<HomeScreen> {
           width: 42,
           height: 42,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.13),
+            color: Colors.white.withValues(alpha: 0.13),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withOpacity(0.16)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
           ),
           child: Icon(icon, color: Colors.white, size: 21),
         ),
@@ -922,9 +925,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.16)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
       ),
       child: Row(
         children: [
@@ -964,10 +967,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.white.withOpacity(0.14)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0F766E).withOpacity(0.25),
+              color: const Color(0xFF0F766E).withValues(alpha: 0.25),
               blurRadius: 22,
               offset: const Offset(0, 10),
             ),
@@ -1081,7 +1084,7 @@ class _HomeScreenState extends State<HomeScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 3),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.075),
+          color: color.withValues(alpha: 0.075),
           borderRadius: BorderRadius.circular(15),
         ),
         child: Column(
@@ -1125,7 +1128,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.10),
+                  color: color.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, color: color, size: 20),
@@ -1178,7 +1181,6 @@ class _HomeScreenState extends State<HomeScreen> {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
-    bool compact = false,
   }) {
     return InkWell(
       onTap: onTap,
@@ -1189,10 +1191,10 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: color.withOpacity(0.18)),
+          border: Border.all(color: color.withValues(alpha: 0.18)),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.055),
+              color: color.withValues(alpha: 0.055),
               blurRadius: 14,
               offset: const Offset(0, 6),
             ),
@@ -1202,7 +1204,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             CircleAvatar(
               radius: 30,
-              backgroundColor: color.withOpacity(0.11),
+              backgroundColor: color.withValues(alpha: 0.11),
               child: Icon(icon, color: color, size: 30),
             ),
             const SizedBox(width: 16),
@@ -1360,7 +1362,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: const Color(0xFFF8FAFC),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: _primaryGreen.withOpacity(0.09),
+                      color: _primaryGreen.withValues(alpha: 0.09),
                     ),
                   ),
                   child: Row(
@@ -1369,7 +1371,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: _primaryGreen.withOpacity(0.10),
+                          color: _primaryGreen.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: const Icon(

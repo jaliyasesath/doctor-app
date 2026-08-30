@@ -2,6 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../local_server/local_clinic_server.dart';
 import 'api_config.dart';
+import 'hotspot_pairing_storage.dart';
 
 class ConnectionModeService {
   static const String _key = 'connection_mode';
@@ -19,9 +20,10 @@ class ConnectionModeService {
 
     // restore local server if hotspot mode
     if (savedMode == 'hotspot') {
-      await LocalClinicServer.start(
-        port: 8080,
-      );
+      final restoredClientPairing = await HotspotPairingStorage.restore();
+      if (!restoredClientPairing) {
+        await LocalClinicServer.start(port: 8080);
+      }
     }
   }
 
@@ -45,17 +47,20 @@ class ConnectionModeService {
 
   static Future<void> setCloudMode() async {
     await LocalClinicServer.stop();
+    await HotspotPairingStorage.clear();
 
     await _saveMode('cloud');
   }
 
   static Future<void> setLocalWifiMode() async {
     await LocalClinicServer.stop();
+    await HotspotPairingStorage.clear();
 
     await _saveMode('wifi');
   }
 
   static Future<void> setHotspotMode() async {
+    await HotspotPairingStorage.clear();
     await _saveMode('hotspot');
 
     await LocalClinicServer.start(
@@ -63,14 +68,21 @@ class ConnectionModeService {
     );
   }
 
+  static Future<void> setReceptionHotspotMode() async {
+    await LocalClinicServer.stop();
+    await _saveMode('hotspot');
+  }
+
   static Future<void> setOfflineMode() async {
     await LocalClinicServer.stop();
+    await HotspotPairingStorage.clear();
 
     await _saveMode('offline');
   }
 
   static Future<void> setAutoMode() async {
     await LocalClinicServer.stop();
+    await HotspotPairingStorage.clear();
 
     await _saveMode('auto');
   }

@@ -109,7 +109,6 @@ class _BillingReportScreenState extends State<BillingReportScreen> {
     final totalIncome = _toDouble(_summary['total_income']);
     final consultationIncome = _toDouble(_summary['consultation_income']);
     final medicineIncome = _toDouble(_summary['medicine_income']);
-    final paidTotal = _toDouble(_summary['paid_total']);
 
     return Scaffold(
       backgroundColor: _surface,
