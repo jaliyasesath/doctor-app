@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC
-    "-//Apple//DTD PLIST 1.0//EN"
-    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 
 <plist version="1.0">
-
 <dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Your location is used only to save the medical centre map position.</string>
+    <!-- Location -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Your location is used only to save the medical centre map position.</string>
 
     <!-- App Name -->
     <key>CFBundleDisplayName</key>
@@ -45,27 +44,34 @@
     <key>NSFaceIDUsageDescription</key>
     <string>Face ID is used to securely access Private Practice.</string>
 
-    <!-- Camera / QR Scanner -->
+    <!-- Camera and QR Scanner -->
     <key>NSCameraUsageDescription</key>
     <string>Camera access is required to scan QR codes and capture doctor verification documents.</string>
 
+    <!-- Photo Library -->
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Photo library access is required to select doctor verification documents and signature images.</string>
 
+    <!-- Local Network -->
     <key>NSLocalNetworkUsageDescription</key>
     <string>Local network access is required to connect the doctor and reception devices through the clinic hotspot.</string>
 
+    <!-- Bluetooth -->
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>Bluetooth access is required to connect and print with the BT-58D thermal printer.</string>
 
     <key>NSBluetoothPeripheralUsageDescription</key>
     <string>Bluetooth access is required to send prescriptions and bills to the thermal printer.</string>
 
+    <!--
+      Temporary HTTP permission for VPS testing.
+      Remove NSAllowsArbitraryLoads after HTTPS is configured.
+    -->
     <key>NSAppTransportSecurity</key>
     <dict>
-        <!-- Temporary VPS HTTP testing. Remove after HTTPS is enabled. -->
         <key>NSAllowsArbitraryLoads</key>
         <true/>
+
         <key>NSAllowsLocalNetworking</key>
         <true/>
     </dict>
@@ -74,7 +80,7 @@
     <key>CADisableMinimumFrameDurationOnPhone</key>
     <true/>
 
-    <!-- iPhone requirement -->
+    <!-- iPhone Requirement -->
     <key>LSRequiresIPhoneOS</key>
     <true/>
 
@@ -115,7 +121,7 @@
     <key>UIMainStoryboardFile</key>
     <string>Main</string>
 
-    <!-- iPhone orientations -->
+    <!-- iPhone Orientations -->
     <key>UISupportedInterfaceOrientations</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
@@ -123,7 +129,7 @@
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
 
-    <!-- iPad orientations -->
+    <!-- iPad Orientations -->
     <key>UISupportedInterfaceOrientations~ipad</key>
     <array>
         <string>UIInterfaceOrientationPortrait</string>
@@ -131,7 +137,5 @@
         <string>UIInterfaceOrientationLandscapeLeft</string>
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
-
 </dict>
-
 </plist>
