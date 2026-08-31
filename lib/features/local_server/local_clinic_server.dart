@@ -8,6 +8,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import 'package:shelf_router/shelf_router.dart';
 
 import '../../data/local/database_helper.dart';
+import '../auth/data/doctor_session.dart';
 import '../sync/services/auto_sync_service.dart';
 
 class LocalClinicServer {
@@ -93,55 +94,10 @@ class LocalClinicServer {
       return _json(await _previousPendingPatients());
     });
 
-    router.post('/api/Patients', (Request request) async {
-      final body = await request.readAsString();
-      final data = jsonDecode(body) as Map<String, dynamic>;
-      final db = await DatabaseHelper.instance.database;
-
-      final result = await db.rawQuery(
-        '''
-        SELECT MAX(queue_no) AS max_no
-        FROM patients
-        WHERE date(queue_date) = date(?)
-        ''',
-        [_today],
-      );
-
-      final nextQueueNo = ((result.first['max_no'] as num?)?.toInt() ?? 0) + 1;
-
-      final localId = await DatabaseHelper.instance.insertPatient({
-        'doctor_id': data['doctorId'] ?? 0,
-        'patient_name': data['patientName']?.toString() ?? '',
-        'patient_age':
-            data['age']?.toString() ?? data['patientAge']?.toString() ?? '',
-        'patient_gender': data['gender']?.toString() ??
-            data['patientGender']?.toString() ??
-            '',
-        'phone_number': data['phoneNumber']?.toString() ?? '',
-        'address': data['address']?.toString() ?? '',
-        'notes': data['notes']?.toString() ?? '',
-        'allergies': data['allergies']?.toString() ?? '',
-        'chronic_diseases': data['chronicDiseases']?.toString() ?? '',
-        'important_alerts': data['importantAlerts']?.toString() ?? '',
-        'queue_status': 'Waiting',
-        'queue_no': nextQueueNo,
-        'queue_date': _today,
-        'sync_status': 'pending',
-      });
-      unawaited(AutoSyncService.syncPendingChanges());
-
-      return _json({
-        'success': true,
-        'offline': true,
-        'localServer': true,
-        'id': localId,
-        'serverId': localId,
-        'patientCode': 'OFF-$localId',
-        'queueNo': nextQueueNo,
-        'queueStatus': 'Waiting',
-        'queueDate': _today,
-      });
-    });
+    // Keep the legacy route for older reception builds. Current cloud and
+    // hotspot clients both use /upsert.
+    router.post('/api/Patients', _createOrReplayPatient);
+    router.post('/api/Patients/upsert', _createOrReplayPatient);
 
     router.post('/api/Patients/<id|[0-9]+>/move-to-today',
         (Request request, String id) async {
@@ -218,6 +174,124 @@ class LocalClinicServer {
     _running = false;
     _pairingToken = '';
     _pairingExpiresAt = null;
+  }
+
+  static Future<Response> _createOrReplayPatient(Request request) async {
+    final doctorId = await DoctorSession.getActiveDoctorIdForData();
+    if (doctorId == null || doctorId <= 0) {
+      return _json({
+        'success': false,
+        'message': 'Doctor session is unavailable on the clinic phone.',
+        'code': 'DOCTOR_SESSION_REQUIRED',
+      }, statusCode: 409);
+    }
+
+    Map<String, dynamic> data;
+    try {
+      final decoded = jsonDecode(await request.readAsString());
+      if (decoded is! Map) throw const FormatException('Expected an object');
+      data = Map<String, dynamic>.from(decoded);
+    } catch (_) {
+      return _json({
+        'success': false,
+        'message': 'The patient request is invalid.',
+        'code': 'INVALID_PATIENT_REQUEST',
+      }, statusCode: 400);
+    }
+
+    final patientName = data['patientName']?.toString().trim() ?? '';
+    if (patientName.isEmpty) {
+      return _json({
+        'success': false,
+        'message': 'Patient name is required.',
+        'code': 'PATIENT_NAME_REQUIRED',
+      }, statusCode: 400);
+    }
+
+    final suppliedRequestId =
+        request.headers['idempotency-key']?.trim() ?? '';
+    final bodyRequestId = data['clientRequestId']?.toString().trim() ?? '';
+    final requestId = suppliedRequestId.isNotEmpty
+        ? suppliedRequestId
+        : bodyRequestId.isNotEmpty
+            ? bodyRequestId
+            : 'hotspot-${DateTime.now().microsecondsSinceEpoch}-${_createPairingToken()}';
+
+    final db = await DatabaseHelper.instance.database;
+    late Map<String, dynamic> patient;
+    var replayed = false;
+
+    await db.transaction((txn) async {
+      final existing = await txn.query(
+        'patients',
+        where: 'doctor_id = ? AND client_request_id = ?',
+        whereArgs: [doctorId, requestId],
+        limit: 1,
+      );
+      if (existing.isNotEmpty) {
+        patient = existing.first;
+        replayed = true;
+        return;
+      }
+
+      final result = await txn.rawQuery(
+        '''
+        SELECT MAX(queue_no) AS max_no
+        FROM patients
+        WHERE doctor_id = ? AND date(queue_date) = date(?)
+        ''',
+        [doctorId, _today],
+      );
+      final nextQueueNo =
+          ((result.first['max_no'] as num?)?.toInt() ?? 0) + 1;
+      final now = DateTime.now().toIso8601String();
+
+      final localId = await txn.insert('patients', {
+        'doctor_id': doctorId,
+        'patient_name': patientName,
+        'patient_age':
+            data['age']?.toString() ?? data['patientAge']?.toString() ?? '',
+        'patient_gender': data['gender']?.toString() ??
+            data['patientGender']?.toString() ??
+            '',
+        'phone_number': data['phoneNumber']?.toString() ?? '',
+        'address': data['address']?.toString() ?? '',
+        'notes': data['notes']?.toString() ?? '',
+        'allergies': data['allergies']?.toString() ?? '',
+        'chronic_diseases': data['chronicDiseases']?.toString() ?? '',
+        'important_alerts': data['importantAlerts']?.toString() ?? '',
+        'queue_status': 'Waiting',
+        'queue_no': nextQueueNo,
+        'queue_date': _today,
+        'sync_status': 'pending',
+        'client_request_id': requestId,
+        'updated_at': now,
+        'created_at': now,
+      });
+      patient = (await txn.query(
+        'patients',
+        where: 'id = ?',
+        whereArgs: [localId],
+        limit: 1,
+      )).first;
+    });
+
+    unawaited(AutoSyncService.syncPendingChanges());
+    final localId = patient['id'] as int;
+    return _json({
+      'success': true,
+      'offline': true,
+      'localServer': true,
+      'id': localId,
+      'serverId': patient['server_id'],
+      'patientCode': patient['server_id'] == null
+          ? 'OFF-$localId'
+          : 'P${patient['server_id']}',
+      'queueNo': patient['queue_no'],
+      'queueStatus': patient['queue_status'] ?? 'Waiting',
+      'queueDate': patient['queue_date'] ?? _today,
+      'idempotencyReplayed': replayed,
+    });
   }
 
   static Future<List<Map<String, dynamic>>> _todayPatientsByStatuses(

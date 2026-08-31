@@ -34,6 +34,7 @@ class DoctorSession {
   static const String _lastBiometricEnabledKey = 'last_biometric_enabled';
 
   static const String _signaturePathKey = 'logged_in_signature_path';
+  static const String _profilePhotoUrlKey = 'logged_in_profile_photo_url';
 
   static int _parseId(dynamic value) {
     if (value is int) return value;
@@ -443,6 +444,21 @@ class DoctorSession {
     return prefs.getString(_affiliationKey) ?? '';
   }
 
+  static Future<void> saveProfilePhotoUrl(String url) async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = url.trim();
+    if (value.isEmpty) {
+      await prefs.remove(_profilePhotoUrlKey);
+    } else {
+      await prefs.setString(_profilePhotoUrlKey, value);
+    }
+  }
+
+  static Future<String> getProfilePhotoUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_profilePhotoUrlKey)?.trim() ?? '';
+  }
+
   static Future<Map<String, dynamic>> getDoctorStamp() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -476,6 +492,7 @@ class DoctorSession {
     await prefs.remove(_slmcRegNoKey);
     await prefs.remove(_affiliationKey);
     await prefs.remove(_signaturePathKey);
+    await prefs.remove(_profilePhotoUrlKey);
   }
 
   static Future<Map<String, dynamic>?> getLastDoctorForBiometric() async {

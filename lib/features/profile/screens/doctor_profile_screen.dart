@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../auth/data/doctor_session.dart';
 import '../data/doctor_profile_api_service.dart';
 
 class DoctorProfileScreen extends StatefulWidget {
@@ -29,6 +30,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   Future<void> _load() async {
     try {
       final profile = await _api.getProfile();
+      await DoctorSession.saveProfilePhotoUrl(
+        profile['profilePhotoUrl']?.toString() ?? '',
+      );
       if (mounted) setState(() => _profile = profile);
     } catch (error) {
       if (mounted) _message('Unable to load profile: $error');

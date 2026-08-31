@@ -23,7 +23,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 38,
+      version: 39,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -242,6 +242,7 @@ is_favorite INTEGER DEFAULT 0,
 ''');
     await _createIndexes(db);
     await _createDuplicateProtectionIndexes(db);
+    await _createPatientRequestIdentityIndex(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -765,6 +766,26 @@ is_favorite INTEGER DEFAULT 0,
 
     if (oldVersion < 38) {
       await _removeLegacyDoctorPasswordColumn(db);
+    }
+
+    if (oldVersion < 39) {
+      // Preserve every existing patient. If an older build reused a request
+      // identity, clear only the duplicate identity before adding the unique
+      // index; no patient row is deleted.
+      await db.execute('''
+        UPDATE patients
+        SET client_request_id = NULL
+        WHERE client_request_id IS NOT NULL
+          AND trim(client_request_id) <> ''
+          AND id NOT IN (
+            SELECT MIN(id)
+            FROM patients
+            WHERE client_request_id IS NOT NULL
+              AND trim(client_request_id) <> ''
+            GROUP BY doctor_id, client_request_id
+          )
+      ''');
+      await _createPatientRequestIdentityIndex(db);
     }
   }
 
@@ -2017,6 +2038,14 @@ is_favorite INTEGER DEFAULT 0,
     );
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_prescription_items_medicine ON prescription_items(medicine_id)',
+    );
+  }
+
+  Future<void> _createPatientRequestIdentityIndex(Database db) async {
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_patients_doctor_client_request '
+      'ON patients(doctor_id, client_request_id) '
+      "WHERE client_request_id IS NOT NULL AND trim(client_request_id) <> ''",
     );
   }
 

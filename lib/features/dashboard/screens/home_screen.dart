@@ -34,6 +34,7 @@ import '../../lab/screens/laboratory_list_screen.dart';
 import '../../lab/screens/patient_lab_reports_screen.dart';
 import '../../lab/data/lab_report_api_service.dart';
 import '../../profile/screens/doctor_profile_screen.dart';
+import '../../profile/data/doctor_profile_api_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -63,6 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _connectionOnline = false;
 
   String _doctorName = 'Doctor';
+  String _profilePhotoUrl = '';
 
   Timer? _licenseTimer;
   StreamSubscription<Map<String, dynamic>>? _queueEventSubscription;
@@ -94,6 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
 
     _loadDoctorName();
+    _loadProfilePhoto();
     _checkInternet();
     _refreshAll();
     _queueEventSubscription = QueueRealtimeService.instance.events.listen((_) {
@@ -138,6 +141,24 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _doctorName = name?.isNotEmpty == true ? name! : 'Doctor';
     });
+  }
+
+  Future<void> _loadProfilePhoto() async {
+    final cachedUrl = await DoctorSession.getProfilePhotoUrl();
+    if (mounted && cachedUrl != _profilePhotoUrl) {
+      setState(() => _profilePhotoUrl = cachedUrl);
+    }
+
+    try {
+      final profile = await DoctorProfileApiService().getProfile();
+      final currentUrl = profile['profilePhotoUrl']?.toString().trim() ?? '';
+      await DoctorSession.saveProfilePhotoUrl(currentUrl);
+      if (mounted && currentUrl != _profilePhotoUrl) {
+        setState(() => _profilePhotoUrl = currentUrl);
+      }
+    } catch (_) {
+      // Keep the cached avatar while offline or in local hotspot mode.
+    }
   }
 
   String _getGreeting() {
@@ -471,7 +492,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (screen != null) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => screen!));
+      final navigation = Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => screen!),
+      );
+      if (title == 'Doctor Profile') {
+        navigation.then((_) {
+          if (mounted) unawaited(_loadProfilePhoto());
+        });
+      }
     }
   }
 
@@ -786,11 +815,24 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
-                      child: const Icon(
-                        Icons.local_hospital_rounded,
-                        color: _primaryGreen,
-                        size: 31,
-                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: _profilePhotoUrl.isEmpty
+                          ? const Icon(
+                              Icons.local_hospital_rounded,
+                              color: _primaryGreen,
+                              size: 31,
+                            )
+                          : Image.network(
+                              _profilePhotoUrl,
+                              fit: BoxFit.cover,
+                              width: 56,
+                              height: 56,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.local_hospital_rounded,
+                                color: _primaryGreen,
+                                size: 31,
+                              ),
+                            ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
