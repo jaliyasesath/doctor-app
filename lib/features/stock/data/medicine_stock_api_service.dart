@@ -109,6 +109,11 @@ class MedicineStockApiService {
   Future<Map<String, dynamic>> allMovements() =>
       _allPages((page) => movements(page: page));
 
+  Future<Map<String, dynamic>> allPendingPrescriptions({
+    String search = '',
+  }) =>
+      _allPages((page) => pendingPrescriptions(search: search, page: page));
+
   Future<Map<String, dynamic>> _allPages(
     Future<Map<String, dynamic>> Function(int page) loader,
   ) async {

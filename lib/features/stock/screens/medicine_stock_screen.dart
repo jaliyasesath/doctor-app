@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/widgets/app_error_ui.dart';
+import '../../auth/data/doctor_session.dart';
 import '../../notifications/services/local_notification_service.dart';
 import '../../sync/services/auto_sync_service.dart';
 import '../data/medicine_stock_api_service.dart';
@@ -50,6 +51,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
   bool _batchesLoaded = false;
   bool _movementsLoaded = false;
   bool _mutationInProgress = false;
+  bool _canManageStock = false;
   int _lowStockThreshold = 10;
   int _expiringWithinDays = 90;
   bool _showingOfflineCache = false;
@@ -61,7 +63,14 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
     _tabs.addListener(_onTabChanged);
+    _loadRole();
     _load();
+  }
+
+  Future<void> _loadRole() async {
+    final role = await DoctorSession.getRole();
+    if (!mounted) return;
+    setState(() => _canManageStock = role.toLowerCase() == 'doctor');
   }
 
   @override
@@ -313,7 +322,11 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
       if (_tabs.index == 2) await _loadMovements(reset: true);
     } catch (error) {
       if (!mounted) return;
-      AppErrorUi.show(context, error, onRetry: _load);
+      AppErrorUi.show(
+        context,
+        error,
+        onRetry: () => _run(operation),
+      );
     } finally {
       if (mounted) setState(() => _mutationInProgress = false);
     }
@@ -323,7 +336,18 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
       '$prefix-${DateTime.now().microsecondsSinceEpoch}';
 
   Future<void> _receive() async {
-    if (_summary.isEmpty) {
+    List<Map<String, dynamic>> medicines;
+    try {
+      medicines = _rows(await _api.allSummary(
+        lowStockThreshold: _lowStockThreshold,
+        expiringWithinDays: _expiringWithinDays,
+      ));
+    } catch (error) {
+      if (mounted) AppErrorUi.show(context, error, onRetry: _receive);
+      return;
+    }
+    if (!mounted) return;
+    if (medicines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -333,7 +357,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
       );
       return;
     }
-    var medicine = _summary.first;
+    var medicine = medicines.first;
     final batch = TextEditingController();
     final quantity = TextEditingController();
     final cost = TextEditingController(text: '0');
@@ -353,7 +377,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                   initialValue: medicine,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Medicine'),
-                  items: _summary
+                  items: medicines
                       .map(
                         (item) => DropdownMenuItem(
                           value: item,
@@ -441,6 +465,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
       }
       return;
     }
+    final requestKey = _key('receive');
     await _run(() async {
       await _api.receive({
         'medicineId': _id(medicine['id']),
@@ -450,7 +475,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
         'costPrice': num.tryParse(cost.text) ?? 0,
         'sellingPrice': num.tryParse(selling.text) ?? 0,
         'notes': notes.text.trim(),
-        'idempotencyKey': _key('receive'),
+        'idempotencyKey': requestKey,
       });
     });
   }
@@ -515,13 +540,14 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
       }
       return;
     }
+    final requestKey = _key('adjust');
     await _run(() async {
       await _api.adjust({
         'stockBatchId': _id(item['id']),
         'direction': direction,
         'quantity': qty,
         'reason': reason.text.trim(),
-        'idempotencyKey': _key('adjust'),
+        'idempotencyKey': requestKey,
       });
     });
   }
@@ -535,7 +561,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     final selectedQuantities = <int, num>{};
     List<Map<String, dynamic>> prescriptions = [];
     try {
-      prescriptions = _rows(await _api.pendingPrescriptions());
+      prescriptions = _rows(await _api.allPendingPrescriptions());
     } catch (error) {
       if (mounted) AppErrorUi.show(context, error, onRetry: _dispense);
       return;
@@ -624,7 +650,8 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: selectedQuantities.isEmpty
+              onPressed: selectedQuantities.isEmpty ||
+                      _number(prescription?['unmatchedItemCount']) > 0
                   ? null
                   : () => Navigator.pop(dialogContext, true),
               child: const Text('Dispense All Stock Items'),
@@ -636,6 +663,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     if (ok != true) return;
     final rxId = _id(prescription?['id']);
     if (rxId <= 0 || selectedQuantities.isEmpty) return;
+    final requestKey = _key('dispense');
     await _run(() async {
       final response = await _api.dispense({
         'prescriptionId': rxId,
@@ -645,7 +673,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                   'quantity': entry.value,
                 })
             .toList(),
-        'idempotencyKey': _key('dispense'),
+        'idempotencyKey': requestKey,
       });
       if (!mounted) return;
       final transactionId =
@@ -656,8 +684,10 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     });
   }
 
-  Future<void> _reverse() async {
-    final transactionId = TextEditingController();
+  Future<void> _reverse({int? initialTransactionId}) async {
+    final transactionId = TextEditingController(
+      text: initialTransactionId?.toString() ?? '',
+    );
     final reason = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
@@ -693,11 +723,12 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     if (ok != true) return;
     final id = int.tryParse(transactionId.text);
     if (id == null || id <= 0 || reason.text.trim().isEmpty) return;
+    final requestKey = _key('reverse');
     await _run(() async {
       await _api.reverseDispense({
         'dispenseTransactionId': id,
         'reason': reason.text.trim(),
-        'idempotencyKey': _key('reverse'),
+        'idempotencyKey': requestKey,
       });
     });
   }
@@ -1019,7 +1050,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                 side: const BorderSide(color: Color(0xFFD1E7DF)),
               ),
               child: ListTile(
-                onTap: () => _adjust(item),
+                onTap: _canManageStock ? () => _adjust(item) : null,
                 leading: const CircleAvatar(
                   backgroundColor: Color(0xFFE6F5F1),
                   child: Icon(Icons.inventory_2, color: _green),
@@ -1037,8 +1068,13 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                     Text('${_number(item['availableQuantity'])}',
                         style: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.w800)),
-                    const Text('Tap to adjust',
-                        style: TextStyle(fontSize: 10, color: Colors.black54)),
+                    Text(
+                      _canManageStock ? 'Tap to adjust' : 'View only',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.black54,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1075,6 +1111,11 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
             final item = _movements[index];
             final quantity = _number(item['quantityChange']);
             final positive = quantity >= 0;
+            final canReverse = _canManageStock &&
+                _text(item['movementType']).toUpperCase() == 'DISPENSE' &&
+                _text(item['referenceType']).toUpperCase() ==
+                    'DISPENSE_TRANSACTION' &&
+                _id(item['referenceId']) > 0;
             return Card(
               elevation: 0,
               margin: const EdgeInsets.only(bottom: 10),
@@ -1084,6 +1125,11 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                 side: const BorderSide(color: Color(0xFFD1E7DF)),
               ),
               child: ListTile(
+                onTap: canReverse
+                    ? () => _reverse(
+                          initialTransactionId: _id(item['referenceId']),
+                        )
+                    : null,
                 leading: CircleAvatar(
                   backgroundColor:
                       (positive ? _green : Colors.red).withValues(alpha: .12),
@@ -1096,9 +1142,10 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                     style: const TextStyle(fontWeight: FontWeight.w700)),
                 subtitle: Text(
                   '${_text(item['movementType'])} • ${_text(item['notes'])}\n'
-                  '${_text(item['createdAt']).replaceFirst('T', ' ')}',
+                  '${_text(item['createdAt']).replaceFirst('T', ' ')}'
+                  '${canReverse ? '\nTransaction #${_id(item['referenceId'])} • Tap to reverse' : ''}',
                 ),
-                isThreeLine: true,
+                isThreeLine: canReverse,
                 trailing: Text(
                   '${positive ? '+' : ''}$quantity',
                   style: TextStyle(
@@ -1176,15 +1223,16 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                 if (value == 'dispense') _dispense();
                 if (value == 'reverse') _reverse();
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(
+              itemBuilder: (_) => [
+                const PopupMenuItem(
                   value: 'dispense',
                   child: Text('Dispense prescription'),
                 ),
-                PopupMenuItem(
-                  value: 'reverse',
-                  child: Text('Reverse dispense'),
-                ),
+                if (_canManageStock)
+                  const PopupMenuItem(
+                    value: 'reverse',
+                    child: Text('Reverse dispense'),
+                  ),
               ],
             ),
           ],
@@ -1204,22 +1252,26 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
             ],
           ),
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          onPressed: _mutationInProgress ? null : _receive,
-          backgroundColor: _green,
-          foregroundColor: Colors.white,
-          icon: _mutationInProgress
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                )
-              : const Icon(Icons.add_box_outlined),
-          label: Text(_mutationInProgress ? 'Updating...' : 'Receive Stock'),
-        ),
+        floatingActionButton: _canManageStock
+            ? FloatingActionButton.extended(
+                onPressed: _mutationInProgress ? null : _receive,
+                backgroundColor: _green,
+                foregroundColor: Colors.white,
+                icon: _mutationInProgress
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.add_box_outlined),
+                label: Text(
+                  _mutationInProgress ? 'Updating...' : 'Receive Stock',
+                ),
+              )
+            : null,
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
