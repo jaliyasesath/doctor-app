@@ -31,6 +31,25 @@ void main() {
       );
     });
 
+    test('rejects non-finite stock values', () {
+      expect(
+        StockValidation.receive(
+          batchNumber: 'B-001',
+          quantity: double.nan,
+          costPrice: 10,
+          sellingPrice: 12,
+        ),
+        isNotNull,
+      );
+      expect(
+        StockValidation.adjustment(
+          quantity: double.infinity,
+          reason: 'Correction',
+        ),
+        isNotNull,
+      );
+    });
+
     test('rejects empty adjustment reason', () {
       expect(
         StockValidation.adjustment(quantity: 1, reason: ' '),

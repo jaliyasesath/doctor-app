@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/widgets/app_error_ui.dart';
 import '../../notifications/services/local_notification_service.dart';
+import '../../sync/services/auto_sync_service.dart';
 import '../data/medicine_stock_api_service.dart';
 import '../domain/stock_validation.dart';
 
@@ -95,18 +96,38 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
       final prefs = await SharedPreferences.getInstance();
       _lowStockThreshold = prefs.getInt('stock_low_threshold') ?? 10;
       _expiringWithinDays = prefs.getInt('stock_expiry_days') ?? 90;
-      final results = await Future.wait([
-        _api.summary(
-          search: _search.text.trim(),
-          page: 1,
-          pageSize: _pageSize,
-          lowStockThreshold: _lowStockThreshold,
-          expiringWithinDays: _expiringWithinDays,
-        ),
-        _api.valuation(),
-      ]);
+      // Medicines are created offline-first. Complete any pending medicine
+      // upload before requesting the server-owned stock catalogue, otherwise a
+      // newly added medicine can be visible locally but absent from Receive Stock.
+      await AutoSyncService.syncPendingChanges();
+
+      final summaryResponse = await _api.summary(
+        search: _search.text.trim(),
+        page: 1,
+        pageSize: _pageSize,
+        lowStockThreshold: _lowStockThreshold,
+        expiringWithinDays: _expiringWithinDays,
+      );
+
+      // Valuation is supplementary. Its failure must not hide a valid medicine
+      // catalogue or block stock receiving.
+      Map<String, dynamic> valuation = {};
+      try {
+        valuation = await _api.valuation();
+      } catch (_) {
+        final cached = prefs.getString('stock_valuation_cache');
+        if (cached != null) {
+          try {
+            final decoded = jsonDecode(cached);
+            if (decoded is Map) {
+              valuation = Map<String, dynamic>.from(decoded);
+            }
+          } catch (_) {
+            valuation = {};
+          }
+        }
+      }
       if (!mounted) return;
-      final summaryResponse = Map<String, dynamic>.from(results[0]);
       setState(() {
         _summary = _rows(summaryResponse);
         _summaryPage = 1;
@@ -116,7 +137,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
         _expiryAlertCount = _id(summaryResponse['expiryAlertCount']);
         _totalAvailableQuantity =
             _number(summaryResponse['totalAvailableQuantity']);
-        _valuation = Map<String, dynamic>.from(results[1]);
+        _valuation = valuation;
         _showingOfflineCache = false;
       });
       await prefs.setString('stock_summary_cache', jsonEncode(_summary));
@@ -304,7 +325,11 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
   Future<void> _receive() async {
     if (_summary.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No medicines are available.')),
+        const SnackBar(
+          content: Text(
+            'No cloud-synced medicines are available. Sync the medicine and try again.',
+          ),
+        ),
       );
       return;
     }

@@ -13,6 +13,7 @@ class AutoSyncService {
 
   static bool _syncing = false;
   static bool _syncRequestedWhileRunning = false;
+  static Completer<void>? _activeSync;
 
   static void start() {
     final existingSubscription = _subscription;
@@ -50,6 +51,7 @@ class AutoSyncService {
   static Future<void> syncPendingChanges() async {
     if (_syncing) {
       _syncRequestedWhileRunning = true;
+      await _activeSync?.future;
       return;
     }
 
@@ -57,6 +59,8 @@ class AutoSyncService {
     if (!hasPending) return;
 
     _syncing = true;
+    final completion = Completer<void>();
+    _activeSync = completion;
 
     try {
       do {
@@ -88,6 +92,8 @@ class AutoSyncService {
       );
     } finally {
       _syncing = false;
+      if (!completion.isCompleted) completion.complete();
+      if (identical(_activeSync, completion)) _activeSync = null;
     }
   }
 
@@ -97,5 +103,8 @@ class AutoSyncService {
     _subscription = null;
     _syncing = false;
     _syncRequestedWhileRunning = false;
+    final completion = _activeSync;
+    if (completion != null && !completion.isCompleted) completion.complete();
+    _activeSync = null;
   }
 }

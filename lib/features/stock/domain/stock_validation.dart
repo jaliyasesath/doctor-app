@@ -10,8 +10,12 @@ class StockValidation {
     DateTime? now,
   }) {
     if (batchNumber.trim().isEmpty) return 'Batch number is required.';
+    if (!quantity.isFinite) return 'Quantity must be a valid number.';
     if (quantity <= 0) return 'Quantity must be greater than zero.';
-    if (costPrice < 0 || sellingPrice < 0) {
+    if (!costPrice.isFinite ||
+        !sellingPrice.isFinite ||
+        costPrice < 0 ||
+        sellingPrice < 0) {
       return 'Prices cannot be negative.';
     }
     if (expiryDate != null) {
@@ -27,6 +31,7 @@ class StockValidation {
     required num quantity,
     required String reason,
   }) {
+    if (!quantity.isFinite) return 'Quantity must be a valid number.';
     if (quantity <= 0) return 'Quantity must be greater than zero.';
     if (reason.trim().isEmpty) return 'Adjustment reason is required.';
     return null;
