@@ -322,7 +322,13 @@ class SyncService {
 
     final prefs = await SharedPreferences.getInstance();
     final syncKey = 'last_medicines_sync_at_$doctorId';
-    final lastSyncAt = _withSyncOverlap(prefs.getString(syncKey));
+    const medicinePriceSchemaVersion = 1;
+    final priceSchemaKey = 'medicine_price_schema_version_$doctorId';
+    final requiresDefaultPriceRefresh =
+        prefs.getInt(priceSchemaKey) != medicinePriceSchemaVersion;
+    final lastSyncAt = requiresDefaultPriceRefresh
+        ? null
+        : _withSyncOverlap(prefs.getString(syncKey));
     final syncStartedAt = DateTime.now().toUtc().toIso8601String();
 
     try {
@@ -401,6 +407,10 @@ class SyncService {
       await prefs.setString(
         syncKey,
         syncStartedAt,
+      );
+      await prefs.setInt(
+        priceSchemaKey,
+        medicinePriceSchemaVersion,
       );
     } catch (e) {
       // Keep old timestamp so the next auto-sync retries all failed changes.

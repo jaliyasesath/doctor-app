@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/widgets/app_error_ui.dart';
 import '../data/lab_api_service.dart';
 
 class CreateLabOrderScreen extends StatefulWidget {
@@ -24,7 +25,7 @@ class _CreateLabOrderScreenState extends State<CreateLabOrderScreen> {
   List<Map<String, dynamic>> _labs = [];
   final Set<String> _selected = {};
   int? _labId;
-  bool _fasting = false, _consent = false, _saving = false;
+  bool _fasting = false, _consent = false, _saving = false, _loadingLabs = true;
   late final String _createRequestKey =
       'lab-${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}';
   String _priority = 'Routine';
@@ -34,7 +35,21 @@ class _CreateLabOrderScreenState extends State<CreateLabOrderScreen> {
   void initState() { super.initState(); _loadLabs(); }
   @override
   void dispose() { _clinical.dispose(); _instructions.dispose(); _custom.dispose(); super.dispose(); }
-  Future<void> _loadLabs() async { try { final labs = await _api.getLabs(); if (mounted) setState(() { _labs = labs.where((x) => x['isActive'] != false).toList(); if (_labs.isNotEmpty) _labId = _labs.first['id'] as int; }); } catch (_) {} }
+  Future<void> _loadLabs() async {
+    if (mounted) setState(() => _loadingLabs = true);
+    try {
+      final labs = await _api.getLabs();
+      if (!mounted) return;
+      setState(() {
+        _labs = labs.where((x) => x['isActive'] != false).toList();
+        _labId = _labs.isEmpty ? null : _labs.first['id'] as int;
+      });
+    } catch (error) {
+      if (mounted) AppErrorUi.show(context, error, onRetry: _loadLabs);
+    } finally {
+      if (mounted) setState(() => _loadingLabs = false);
+    }
+  }
   void _message(String value) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
 
   Future<void> _submit() async {
@@ -68,7 +83,9 @@ class _CreateLabOrderScreenState extends State<CreateLabOrderScreen> {
         if (notify) await _openWhatsApp(orderNo);
       }
       if (mounted) Navigator.pop(context, true);
-    } catch (e) { if (mounted) _message('Lab request failed: $e'); }
+    } catch (error) {
+      if (mounted) AppErrorUi.show(context, error, onRetry: _submit);
+    }
     finally { if (mounted) setState(() => _saving = false); }
   }
 
@@ -85,9 +102,24 @@ class _CreateLabOrderScreenState extends State<CreateLabOrderScreen> {
   Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: const Text('Lab Investigations')),
     body: ListView(padding: const EdgeInsets.all(16), children: [
       Card(child: ListTile(leading: const Icon(Icons.person), title: Text(widget.patientName), subtitle: const Text('Patient'))),
+      if (_loadingLabs) const LinearProgressIndicator(),
+      if (!_loadingLabs && _labs.isEmpty)
+        Card(
+          color: const Color(0xFFFFF7E6),
+          child: ListTile(
+            leading: const Icon(Icons.info_outline, color: Colors.orange),
+            title: const Text('No active laboratory is available'),
+            subtitle: const Text('Add or activate a laboratory, then retry.'),
+            trailing: IconButton(
+              tooltip: 'Retry',
+              onPressed: _loadLabs,
+              icon: const Icon(Icons.refresh),
+            ),
+          ),
+        ),
       DropdownButtonFormField<int>(value: _labId, decoration: const InputDecoration(labelText: 'Laboratory', border: OutlineInputBorder()),
         items: _labs.map((x) => DropdownMenuItem(value: x['id'] as int, child: Text('${x['name']} ${x['branchName'] ?? ''}'))).toList(),
-        onChanged: (v) => setState(() => _labId = v)), const SizedBox(height: 16),
+        onChanged: _loadingLabs || _labs.isEmpty ? null : (v) => setState(() => _labId = v)), const SizedBox(height: 16),
       const Text('Investigations', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 8),
       Wrap(spacing: 8, children: tests.map((test) => FilterChip(label: Text(test), selected: _selected.contains(test),
         onSelected: (v) => setState(() => v ? _selected.add(test) : _selected.remove(test)))).toList()),

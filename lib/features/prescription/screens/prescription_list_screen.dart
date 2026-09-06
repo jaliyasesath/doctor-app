@@ -15,8 +15,10 @@ import '../data/prescription_store.dart';
 import '../models/prescription_item.dart';
 import '../widgets/smart_chips_section.dart';
 import 'print_preview_screen.dart';
-import '../../notifications/services/local_notification_service.dart';
 import '../../lab/screens/create_lab_order_screen.dart';
+import '../../lab/screens/patient_lab_reports_screen.dart';
+import '../../../core/errors/app_exception.dart';
+import '../../../core/widgets/app_error_ui.dart';
 
 class PrescriptionListScreen extends StatefulWidget {
   final bool isEditMode;
@@ -68,14 +70,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
   late final TextEditingController _temperatureController;
   late final TextEditingController _spo2Controller;
 
-  late final TextEditingController _followUpNoteController;
   late final TextEditingController _consultationFeeController;
-
-  DateTime? _followUpDate;
-
-  bool _enableAppReminder = true;
-  bool _enableWhatsappReminder = false;
-  bool _enableSmsReminder = false;
 
   String _selectedGender = 'Male';
   String? _currentRxNo;
@@ -83,6 +78,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
   int? _currentPrescriptionId;
   bool _prescriptionSaved = false;
   bool _savingPrescription = false;
+  bool _openingLabModule = false;
   final ApiPatientService _patientApi = ApiPatientService();
 
   final List<String> _selectedComplaintChips = [];
@@ -144,8 +140,6 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
   @override
   void initState() {
     super.initState();
-
-    _followUpNoteController = TextEditingController();
 
     _consultationFeeController = TextEditingController(
       text: PrescriptionStore.consultationFee.toStringAsFixed(0),
@@ -322,7 +316,6 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
 
   @override
   void dispose() {
-    _followUpNoteController.dispose();
     _consultationFeeController.dispose();
     _patientNameController.dispose();
     _patientAgeController.dispose();
@@ -1379,12 +1372,6 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
             ? null
             : _spo2Controller.text.trim(),
         'server_patient_id': null,
-        'follow_up_date': _followUpDate?.toIso8601String(),
-        'follow_up_note': _followUpNoteController.text.trim().isEmpty
-            ? null
-            : _followUpNoteController.text.trim(),
-        'follow_up_status': 'pending',
-        'reminder_sent': 0,
       };
 
       int localPrescriptionId;
@@ -1422,15 +1409,6 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
         localPrescriptionId,
         itemRows,
       );
-      if (_followUpDate != null && _enableAppReminder) {
-        await LocalNotificationService.scheduleFollowUpNotification(
-          id: localPrescriptionId,
-          patientName: patientName,
-          reason: _followUpNoteController.text.trim(),
-          date: _followUpDate!,
-        );
-      }
-
       if (!mounted) return;
 
       setState(() {
@@ -1484,11 +1462,6 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
   // ignore: unused_element
   void _resetFormAfterSave() {
     setState(() {
-      _followUpNoteController.clear();
-      _followUpDate = null;
-      _enableAppReminder = true;
-      _enableWhatsappReminder = false;
-      _enableSmsReminder = false;
       PrescriptionStore.clear();
 
       _patientNameController.clear();
@@ -1523,6 +1496,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
   }
 
   Future<void> _openLabInvestigations() async {
+    if (_openingLabModule) return;
     final localPatientId = _currentPatientId ?? widget.existingPatientId;
     final localPrescriptionId = _currentPrescriptionId ?? widget.editingPrescriptionId;
     if (localPatientId == null || localPrescriptionId == null || !_prescriptionSaved) {
@@ -1532,14 +1506,28 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       return;
     }
 
+    setState(() => _openingLabModule = true);
     try {
-      if (await NetworkService.isOnline()) await SyncService().syncAll();
+      if (!await NetworkService.isOnline()) {
+        throw const AppException(
+          message: 'Lab request requires cloud connectivity',
+          userMessage: 'Connect to the internet to create a lab request.',
+          code: 'LAB_REQUEST_OFFLINE',
+          kind: AppErrorKind.network,
+        );
+      }
+      await SyncService().syncAll();
       final patient = await DatabaseHelper.instance.getPatientById(localPatientId);
       final prescription = await DatabaseHelper.instance.getPrescriptionByLocalId(localPrescriptionId);
       final serverPatientId = int.tryParse(patient?['server_id']?.toString() ?? '');
       final serverPrescriptionId = int.tryParse(prescription?['server_id']?.toString() ?? '');
       if (serverPatientId == null || serverPrescriptionId == null) {
-        throw Exception('Prescription is waiting for cloud sync');
+        throw const AppException(
+          message: 'Prescription has no cloud identifier after sync',
+          userMessage: 'Prescription is waiting for cloud sync. Please retry.',
+          code: 'LAB_REQUEST_SYNC_PENDING',
+          kind: AppErrorKind.network,
+        );
       }
       if (!mounted) return;
       await Navigator.push(context, MaterialPageRoute(builder: (_) => CreateLabOrderScreen(
@@ -1548,7 +1536,73 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
         patientName: _patientNameController.text.trim(),
       )));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lab request unavailable: $e')));
+      if (mounted) {
+        AppErrorUi.show(
+          context,
+          e,
+          onRetry: _openLabInvestigations,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _openingLabModule = false);
+    }
+  }
+
+  Future<void> _openPatientLabReports() async {
+    if (_openingLabModule) return;
+    final localPatientId = _currentPatientId ?? widget.existingPatientId;
+    if (localPatientId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Save the patient before viewing lab reports'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _openingLabModule = true);
+    try {
+      if (!await NetworkService.isOnline()) {
+        throw const AppException(
+          message: 'Lab reports require cloud connectivity',
+          userMessage: 'Connect to the internet to view lab reports.',
+          code: 'LAB_REPORTS_OFFLINE',
+          kind: AppErrorKind.network,
+        );
+      }
+      await SyncService().syncAll();
+      final patient =
+          await DatabaseHelper.instance.getPatientById(localPatientId);
+      final serverPatientId =
+          int.tryParse(patient?['server_id']?.toString() ?? '');
+      if (serverPatientId == null) {
+        throw const AppException(
+          message: 'Patient has no cloud identifier after sync',
+          userMessage: 'Patient is waiting for cloud sync. Please retry.',
+          code: 'LAB_REPORTS_SYNC_PENDING',
+          kind: AppErrorKind.network,
+        );
+      }
+      if (!mounted) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PatientLabReportsScreen(
+            serverPatientId: serverPatientId,
+            patientName: _patientNameController.text.trim(),
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        AppErrorUi.show(
+          context,
+          e,
+          onRetry: _openPatientLabReports,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _openingLabModule = false);
     }
   }
 
@@ -2524,110 +2578,151 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
     );
   }
 
-  Widget _buildFollowUpSection() {
+  Widget _buildClinicalAssessmentSection() {
+    final hasAssessment = _complaintController.text.trim().isNotEmpty ||
+        _diagnosisController.text.trim().isNotEmpty ||
+        _visitNotesController.text.trim().isNotEmpty;
+
     return ExpansionTile(
-      initiallyExpanded: false,
+      key: const PageStorageKey<String>('clinical-assessment-accordion'),
+      initiallyExpanded: hasAssessment,
+      maintainState: true,
       tilePadding: EdgeInsets.zero,
       title: const Row(
         children: [
-          Icon(
-            Icons.notifications_active,
-            color: Colors.orange,
-          ),
+          Icon(Icons.medical_services_outlined, color: Color(0xFF0F766E)),
           SizedBox(width: 8),
           Text(
-            'Follow-Up Reminder',
+            'Clinical Assessment',
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
         ],
       ),
       subtitle: Text(
-        _followUpDate == null
-            ? 'Tap to add follow-up reminder'
-            : 'Follow-up: ${_followUpDate!.toString().substring(0, 10)}',
+        hasAssessment
+            ? 'Assessment details added'
+            : 'Complaints, diagnosis and visit notes',
       ),
       children: [
         const SizedBox(height: 12),
-        InkWell(
-          onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: DateTime.now().add(
-                const Duration(days: 7),
-              ),
-              firstDate: DateTime.now(),
-              lastDate: DateTime(2100),
-            );
-
-            if (picked == null) return;
-
-            setState(() {
-              _followUpDate = picked;
-            });
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 14,
-            ),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.black12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.calendar_month),
-                const SizedBox(width: 10),
-                Text(
-                  _followUpDate == null
-                      ? 'Select Follow-Up Date'
-                      : _followUpDate!.toString().substring(0, 10),
-                ),
-              ],
-            ),
-          ),
+        _buildSmartClinicalField(
+          title: 'Complaint',
+          hintText: 'Type or select complaints',
+          controller: _complaintController,
+          searchController: _complaintSearchController,
+          options: _complaintOptions,
+          selectedChips: _selectedComplaintChips,
+          onChipSelected: _selectComplaintChip,
+          icon: Icons.sick_outlined,
+        ),
+        const SizedBox(height: 12),
+        _buildSmartClinicalField(
+          title: 'Diagnosis',
+          hintText: 'Type or select diagnoses',
+          controller: _diagnosisController,
+          searchController: _diagnosisSearchController,
+          options: _diagnosisOptions,
+          selectedChips: _selectedDiagnosisChips,
+          onChipSelected: _selectDiagnosisChip,
+          icon: Icons.medical_information_outlined,
         ),
         const SizedBox(height: 12),
         TextField(
-          controller: _followUpNoteController,
-          decoration: InputDecoration(
-            labelText: 'Follow-Up Reason',
-            hintText: 'BP Review / Diabetes Review',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+          controller: _visitNotesController,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            labelText: 'Visit Notes (optional)',
+            hintText: 'Add clinical observations or advice',
+            prefixIcon: Icon(Icons.notes_outlined),
           ),
+          onChanged: (_) {
+            _savePatientDetailsToStore();
+            setState(() {});
+          },
         ),
+      ],
+    );
+  }
+
+  Widget _buildLabReportsSection() {
+    final canCreateRequest = _prescriptionSaved &&
+        (_currentPatientId ?? widget.existingPatientId) != null &&
+        (_currentPrescriptionId ?? widget.editingPrescriptionId) != null;
+    final canViewReports =
+        (_currentPatientId ?? widget.existingPatientId) != null;
+
+    return ExpansionTile(
+      key: const PageStorageKey<String>('lab-reports-accordion'),
+      initiallyExpanded: false,
+      maintainState: true,
+      tilePadding: EdgeInsets.zero,
+      title: const Row(
+        children: [
+          Icon(Icons.science_outlined, color: Color(0xFF2563EB)),
+          SizedBox(width: 8),
+          Text(
+            'Lab Reports',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+      subtitle: Text(
+        canCreateRequest
+            ? 'Create a lab request or view patient reports'
+            : 'Save and sync the prescription to create a lab request',
+      ),
+      children: [
         const SizedBox(height: 12),
-        CheckboxListTile(
-          value: _enableAppReminder,
-          onChanged: (v) {
-            setState(() {
-              _enableAppReminder = v ?? false;
-            });
-          },
-          title: const Text('App Notification'),
-          contentPadding: EdgeInsets.zero,
-        ),
-        CheckboxListTile(
-          value: _enableWhatsappReminder,
-          onChanged: (v) {
-            setState(() {
-              _enableWhatsappReminder = v ?? false;
-            });
-          },
-          title: const Text('WhatsApp Reminder'),
-          contentPadding: EdgeInsets.zero,
-        ),
-        CheckboxListTile(
-          value: _enableSmsReminder,
-          onChanged: (v) {
-            setState(() {
-              _enableSmsReminder = v ?? false;
-            });
-          },
-          title: const Text('SMS Reminder (Future)'),
-          contentPadding: EdgeInsets.zero,
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFD),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFDDE5F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Laboratory actions',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 5),
+              Text(
+                canCreateRequest
+                    ? 'The request will be linked to this patient and prescription.'
+                    : 'Complete Save Prescription while online before sending a new request.',
+                style: const TextStyle(color: Color(0xFF5F6B7A)),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  FilledButton.icon(
+                    onPressed: _openingLabModule || !canCreateRequest
+                        ? null
+                        : _openLabInvestigations,
+                    icon: _openingLabModule
+                        ? const SizedBox.square(
+                            dimension: 17,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add_circle_outline),
+                    label: const Text('Create Lab Request'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: _openingLabModule || !canViewReports
+                        ? null
+                        : _openPatientLabReports,
+                    icon: const Icon(Icons.folder_open_outlined),
+                    label: const Text('View Reports'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -3189,11 +3284,6 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.science_outlined),
-              tooltip: 'Lab investigations',
-              onPressed: _openLabInvestigations,
-            ),
-            IconButton(
               icon: const Icon(Icons.folder_copy_outlined),
               tooltip: 'Templates',
               onPressed: _openTemplateScreen,
@@ -3249,52 +3339,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                     const SizedBox(height: 14),
                     _premiumCard(child: _buildSmartMedicalAssist()),
                     const SizedBox(height: 14),
-                    _premiumCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _sectionHeading(
-                            icon: Icons.medical_services_outlined,
-                            title: 'Clinical Assessment',
-                            subtitle: 'Complaints, diagnosis and visit notes',
-                            color: const Color(0xFF0F766E),
-                          ),
-                          const SizedBox(height: 15),
-                          _buildSmartClinicalField(
-                            title: 'Complaint',
-                            hintText: 'Type or select complaints',
-                            controller: _complaintController,
-                            searchController: _complaintSearchController,
-                            options: _complaintOptions,
-                            selectedChips: _selectedComplaintChips,
-                            onChipSelected: _selectComplaintChip,
-                            icon: Icons.sick_outlined,
-                          ),
-                          const SizedBox(height: 12),
-                          _buildSmartClinicalField(
-                            title: 'Diagnosis',
-                            hintText: 'Type or select diagnoses',
-                            controller: _diagnosisController,
-                            searchController: _diagnosisSearchController,
-                            options: _diagnosisOptions,
-                            selectedChips: _selectedDiagnosisChips,
-                            onChipSelected: _selectDiagnosisChip,
-                            icon: Icons.medical_information_outlined,
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _visitNotesController,
-                            maxLines: 3,
-                            decoration: const InputDecoration(
-                              labelText: 'Visit Notes (optional)',
-                              hintText: 'Add clinical observations or advice',
-                              prefixIcon: Icon(Icons.notes_outlined),
-                            ),
-                            onChanged: (_) => _savePatientDetailsToStore(),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _premiumCard(child: _buildClinicalAssessmentSection()),
                     const SizedBox(height: 14),
                     _premiumCard(
                       child: Column(
@@ -3376,7 +3421,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                     const SizedBox(height: 14),
                     _premiumCard(child: _buildVisitDetailsSection()),
                     const SizedBox(height: 14),
-                    _premiumCard(child: _buildFollowUpSection()),
+                    _premiumCard(child: _buildLabReportsSection()),
                     const SizedBox(height: 14),
                     _premiumCard(child: _buildBillingSection()),
                     if (_favoriteTemplates.isNotEmpty) ...[

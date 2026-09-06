@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 
+import '../../../core/widgets/app_error_ui.dart';
 import '../data/lab_report_api_service.dart';
 
 class PatientLabReportsScreen extends StatefulWidget {
@@ -62,7 +63,7 @@ class _PatientLabReportsScreenState extends State<PatientLabReportsScreen> {
         });
       }
     } catch (error) {
-      if (mounted) _message('Unable to load lab reports: $error');
+      if (mounted) AppErrorUi.show(context, error, onRetry: _load);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -85,7 +86,7 @@ class _PatientLabReportsScreenState extends State<PatientLabReportsScreen> {
         _hasMore = reports.length == _pageSize;
       });
     } catch (error) {
-      if (mounted) _message('Unable to load more lab reports: $error');
+      if (mounted) AppErrorUi.show(context, error, onRetry: _loadMore);
     } finally {
       if (mounted) setState(() => _loadingMore = false);
     }
@@ -99,7 +100,7 @@ class _PatientLabReportsScreenState extends State<PatientLabReportsScreen> {
       final path = await _api.downloadReport(report);
       await OpenFilex.open(path);
     } catch (error) {
-      if (mounted) _message('Unable to open report: $error');
+      if (mounted) AppErrorUi.show(context, error, onRetry: () => _open(report));
     } finally {
       if (mounted) setState(() => _openingId = null);
     }
@@ -119,7 +120,13 @@ class _PatientLabReportsScreenState extends State<PatientLabReportsScreen> {
       await _load();
       if (mounted) _message(status == 'Reviewed' ? 'Report marked reviewed' : 'Report rejected for correction');
     } catch (error) {
-      if (mounted) _message('Unable to update report: $error');
+      if (mounted) {
+        AppErrorUi.show(
+          context,
+          error,
+          onRetry: () => _review(report, status),
+        );
+      }
     }
   }
 
