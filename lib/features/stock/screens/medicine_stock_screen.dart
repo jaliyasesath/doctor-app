@@ -293,6 +293,11 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
   int _id(dynamic value) => _number(value).toInt();
   String _text(dynamic value) => value?.toString() ?? '';
 
+  String _defaultPriceText(dynamic value) {
+    if (value == null) return '0';
+    return _number(value).toStringAsFixed(2);
+  }
+
   Future<void> _run(Future<void> Function() operation) async {
     if (_mutationInProgress) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -360,8 +365,12 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     var medicine = medicines.first;
     final batch = TextEditingController();
     final quantity = TextEditingController();
-    final cost = TextEditingController(text: '0');
-    final selling = TextEditingController(text: '0');
+    final cost = TextEditingController(
+      text: _defaultPriceText(medicine['defaultCostPrice']),
+    );
+    final selling = TextEditingController(
+      text: _defaultPriceText(medicine['defaultSellingPrice']),
+    );
     final notes = TextEditingController();
     DateTime? expiry;
     final result = await showDialog<bool>(
@@ -385,7 +394,16 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                         ),
                       )
                       .toList(),
-                  onChanged: (value) => medicine = value ?? medicine,
+                  onChanged: (value) {
+                    if (value == null) return;
+                    medicine = value;
+                    cost.text = _defaultPriceText(
+                      medicine['defaultCostPrice'],
+                    );
+                    selling.text = _defaultPriceText(
+                      medicine['defaultSellingPrice'],
+                    );
+                  },
                 ),
                 TextField(
                   controller: batch,
