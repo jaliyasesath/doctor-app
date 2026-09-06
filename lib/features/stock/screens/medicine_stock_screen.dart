@@ -1230,11 +1230,12 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
             ),
           ),
           actions: [
-            IconButton(
-              onPressed: _configureAlerts,
-              tooltip: 'Stock alert settings',
-              icon: const Icon(Icons.tune),
-            ),
+            if (_canManageStock)
+              IconButton(
+                onPressed: _configureAlerts,
+                tooltip: 'Stock alert settings',
+                icon: const Icon(Icons.tune),
+              ),
             PopupMenuButton<String>(
               enabled: !_mutationInProgress,
               onSelected: (value) {

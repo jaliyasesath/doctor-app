@@ -45,6 +45,7 @@ class SyncResult {
 
 class SyncService {
   static bool _syncInProgress = false;
+  static Future<SyncResult>? _medicineRefreshInProgress;
 
   final ApiInstructionService _instructionApi = ApiInstructionService();
   final ApiMedicineService _medicineApi = ApiMedicineService();
@@ -98,6 +99,39 @@ class SyncService {
     } finally {
       _syncInProgress = false;
     }
+  }
+
+  Future<SyncResult> refreshMedicineCatalogue() {
+    final current = _medicineRefreshInProgress;
+    if (current != null) return current;
+
+    final refresh = _performMedicineCatalogueRefresh();
+    _medicineRefreshInProgress = refresh;
+    return refresh.whenComplete(() {
+      if (identical(_medicineRefreshInProgress, refresh)) {
+        _medicineRefreshInProgress = null;
+      }
+    });
+  }
+
+  Future<SyncResult> _performMedicineCatalogueRefresh() async {
+    final result = SyncResult();
+
+    if (!await NetworkService.isOnline()) {
+      result.lastError = 'No internet';
+      return result;
+    }
+
+    final doctorId = await DoctorSession.getActiveDoctorIdForData();
+    final token = await TokenStorage.getToken();
+    if (doctorId == null || token == null || token.isEmpty) {
+      result.lastError = 'Online session not found. Please login again.';
+      return result;
+    }
+
+    await syncMedicines(result);
+    await pullMedicines(result);
+    return result;
   }
 
   Future<SyncResult> _performSync() async {
@@ -322,7 +356,9 @@ class SyncService {
 
     final prefs = await SharedPreferences.getInstance();
     final syncKey = 'last_medicines_sync_at_$doctorId';
-    const medicinePriceSchemaVersion = 1;
+    // Version 2 forces one full catalogue pull for devices that previously
+    // cached zero prices before global default-price fallback was available.
+    const medicinePriceSchemaVersion = 2;
     final priceSchemaKey = 'medicine_price_schema_version_$doctorId';
     final requiresDefaultPriceRefresh =
         prefs.getInt(priceSchemaKey) != medicinePriceSchemaVersion;

@@ -609,9 +609,10 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
   Future<void> _openMedicinePicker() async {
     _savePatientDetailsToStore();
 
-    if (masterMedicines.isEmpty) {
-      await _loadMasterMedicines();
+    if (await NetworkService.isOnline()) {
+      await SyncService().refreshMedicineCatalogue();
     }
+    await _loadMasterMedicines();
 
     if (!mounted) return;
 
@@ -1196,6 +1197,28 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       return;
     }
 
+    final sellingPrice = double.tryParse(
+          selected!['selling_price']?.toString() ?? '0',
+        ) ??
+        0;
+    if (!prescriptionOnly && sellingPrice <= 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Selling price is unavailable. Sync medicines or update the medicine price before billing.',
+            ),
+          ),
+        );
+      }
+      searchController.dispose();
+      dosageController.dispose();
+      durationController.dispose();
+      instructionsController.dispose();
+      quantityController.dispose();
+      return;
+    }
+
     setState(() {
       selectedMedicine = selected;
 
@@ -1213,12 +1236,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
           ),
           instructions: instructionsController.text.trim(),
           prescriptionOnly: prescriptionOnly,
-          unitPrice: prescriptionOnly
-              ? 0
-              : double.tryParse(
-                    selected!['selling_price']?.toString() ?? '0',
-                  ) ??
-                  0,
+          unitPrice: prescriptionOnly ? 0 : sellingPrice,
           quantity: prescriptionOnly
               ? 0
               : double.tryParse(
@@ -1227,10 +1245,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                   1,
           lineTotal: prescriptionOnly
               ? 0
-              : (double.tryParse(
-                        selected!['selling_price']?.toString() ?? '0',
-                      ) ??
-                      0) *
+              : sellingPrice *
                   (double.tryParse(
                         quantityController.text.trim(),
                       ) ??

@@ -550,7 +550,7 @@ class _MedicineScreenState extends State<MedicineScreen> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${medicines.length} medicines  â€¢  $favorites favourites',
+                  '${medicines.length == 1 ? '1 medicine' : '${medicines.length} medicines'} • ${favorites == 1 ? '1 favourite' : '$favorites favourites'}',
                   style: const TextStyle(
                     color: Color(0xFFD7F5EA),
                     fontSize: 12.5,

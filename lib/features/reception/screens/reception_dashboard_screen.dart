@@ -10,6 +10,7 @@ import '../../patient/screens/add_patient_screen.dart' as patient_screen;
 import '../../prescription/screens/prescription_history_screen.dart';
 import '../../queue/services/queue_realtime_service.dart';
 import '../../queue/services/queue_sync_service.dart';
+import '../../stock/screens/medicine_stock_screen.dart';
 import 'reception_bills_screen.dart';
 import 'reception_patient_search_screen.dart';
 import 'reception_queue_screen.dart';
@@ -161,6 +162,12 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
               title: 'Medicines',
               subtitle: 'View medicines and update doctor prices',
               onTap: () => _open(const MedicineScreen()),
+            ),
+            _menuCard(
+              icon: Icons.inventory_2_outlined,
+              title: 'Medicine Stock',
+              subtitle: 'View stock and dispense saved prescriptions',
+              onTap: () => _open(const MedicineStockScreen()),
             ),
             _menuCard(
               icon: Icons.search,
