@@ -251,7 +251,10 @@ class SyncService {
     }
   }
 
-  Future<void> pullPrescriptions(SyncResult result) async {
+  Future<void> pullPrescriptions(
+    SyncResult result, {
+    bool fullRefresh = false,
+  }) async {
     final doctorId = await DoctorSession.getActiveDoctorIdForData();
 
     if (doctorId == null) {
@@ -262,7 +265,9 @@ class SyncService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final syncKey = 'last_prescriptions_sync_at_$doctorId';
-      final lastSyncAt = _withSyncOverlap(prefs.getString(syncKey));
+      final lastSyncAt = fullRefresh
+          ? null
+          : _withSyncOverlap(prefs.getString(syncKey));
 
       int page = 1;
       const pageSize = 500;
@@ -627,19 +632,17 @@ class SyncService {
 
         final localItems = await _db.getPrescriptionItems(localRxId);
         final items = localItems.isNotEmpty
-            ? localItems
-                .map((item) => {
-                      'medicineId': item['medicine_id'],
-                      'medicineName': item['medicine_name']?.toString() ?? '',
-                      'dosage': item['dosage']?.toString() ?? '',
-                      'frequency': item['frequency']?.toString() ?? '',
-                      'duration': item['duration']?.toString() ?? '',
-                      'instructions': item['instructions']?.toString() ?? '',
-                      'quantity': _asDouble(item['quantity']),
-                      'prescriptionOnly':
-                          (item['prescription_only'] as num?)?.toInt() == 1,
-                    })
-                .toList()
+            ? localItems.map((item) => {
+                  'medicineId': item['medicine_id'],
+                  'medicineName': item['medicine_name']?.toString() ?? '',
+                  'dosage': item['dosage']?.toString() ?? '',
+                  'frequency': item['frequency']?.toString() ?? '',
+                  'duration': item['duration']?.toString() ?? '',
+                  'instructions': item['instructions']?.toString() ?? '',
+                  'quantity': _asDouble(item['quantity']),
+                  'prescriptionOnly':
+                      (item['prescription_only'] as num?)?.toInt() == 1,
+                }).toList()
             : _parseItemsText(rx['items_text']?.toString() ?? '');
 
         final apiResult = await _prescriptionApi.upsertPrescription(

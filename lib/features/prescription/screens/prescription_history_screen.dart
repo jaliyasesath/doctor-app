@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
@@ -7,6 +8,8 @@ import '../models/prescription_item.dart';
 import 'print_preview_screen.dart';
 import '../../reception/screens/reception_prescription_edit_screen.dart';
 import '../../sync/services/auto_sync_service.dart';
+import '../../sync/services/network_service.dart';
+import '../../sync/services/sync_service.dart';
 
 class PrescriptionHistoryScreen extends StatefulWidget {
   final bool receptionMode;
@@ -28,6 +31,7 @@ class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
   bool _isLoadingMore = false;
   bool _hasMore = true;
   bool _refreshInProgress = false;
+  bool _serverRefreshInProgress = false;
 
   int? _doctorId;
 
@@ -61,7 +65,7 @@ class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
   }
 
   Future<void> _initAndLoad() async {
-    final doctorId = await DoctorSession.getDoctorId();
+    final doctorId = await DoctorSession.getActiveDoctorIdForData();
 
     if (!mounted) return;
 
@@ -76,8 +80,14 @@ class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
 
     _doctorId = doctorId;
 
-    await DatabaseHelper.instance.assignOldLocalDataToDoctor(doctorId);
+    if (!widget.receptionMode) {
+      await DatabaseHelper.instance.assignOldLocalDataToDoctor(doctorId);
+    }
     await _loadPrescriptions(showLoader: true);
+
+    if (widget.receptionMode) {
+      unawaited(_refreshReceptionHistoryFromServer());
+    }
   }
 
   Future<void> _loadPrescriptions({bool showLoader = false}) async {
@@ -91,13 +101,11 @@ class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
     }
 
     try {
-      final data = widget.receptionMode
-          ? await DatabaseHelper.instance.getPrescriptions()
-          : await DatabaseHelper.instance.getPrescriptionsByDoctorPaged(
-              _doctorId!,
-              limit: _limit,
-              offset: 0,
-            );
+      final data = await DatabaseHelper.instance.getPrescriptionsByDoctorPaged(
+        _doctorId!,
+        limit: _limit,
+        offset: 0,
+      );
 
       if (!mounted) return;
 
@@ -383,7 +391,56 @@ class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
   }
 
   Future<void> _refresh() async {
+    if (widget.receptionMode) {
+      await _refreshReceptionHistoryFromServer(showError: true);
+      return;
+    }
+
     await _loadPrescriptions();
+  }
+
+  Future<void> _refreshReceptionHistoryFromServer({
+    bool showError = false,
+  }) async {
+    if (_serverRefreshInProgress) return;
+    _serverRefreshInProgress = true;
+
+    try {
+      if (!await NetworkService.isOnline()) {
+        if (showError && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Offline. Showing saved prescription history.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      final result = SyncResult();
+      final prefs = await SharedPreferences.getInstance();
+      final backfillKey =
+          'reception_prescription_history_backfill_v1_${_doctorId!}';
+      final needsFullBackfill = !(prefs.getBool(backfillKey) ?? false);
+
+      await SyncService().pullPrescriptions(
+        result,
+        fullRefresh: needsFullBackfill,
+      );
+
+      if (result.lastError.isEmpty && needsFullBackfill) {
+        await prefs.setBool(backfillKey, true);
+      }
+      await _loadPrescriptions();
+
+      if (showError && result.lastError.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.lastError)),
+        );
+      }
+    } finally {
+      _serverRefreshInProgress = false;
+    }
   }
 
   @override

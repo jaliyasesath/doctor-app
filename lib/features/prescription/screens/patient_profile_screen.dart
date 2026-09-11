@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
@@ -31,7 +34,13 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   bool _hasMore = false;
   int? _doctorId;
   int _totalVisits = 0;
+  int _filteredVisits = 0;
   int _offset = 0;
+  final TextEditingController _visitSearchController = TextEditingController();
+  Timer? _searchDebounce;
+  DateTimeRange? _visitDateRange;
+  bool _oldestFirst = false;
+  int _loadGeneration = 0;
   static const int _limit = 30;
   final ScrollController _scrollController = ScrollController();
 
@@ -45,6 +54,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _visitSearchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -80,6 +91,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
 
   Future<void> _loadProfile() async {
     if (_doctorId == null) return;
+    final generation = ++_loadGeneration;
 
     setState(() => _isLoading = true);
 
@@ -103,20 +115,39 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         return;
       }
 
-      final prescriptions =
-          await DatabaseHelper.instance.getPrescriptionsByPatientAndDoctorPaged(
+      final prescriptions = await DatabaseHelper.instance
+          .getFilteredPrescriptionsByPatientAndDoctorPaged(
         widget.patientId,
         _doctorId!,
+        query: _visitSearchController.text,
+        dateFrom: _dateKey(_visitDateRange?.start),
+        dateTo: _dateKey(_visitDateRange?.end),
+        oldestFirst: _oldestFirst,
         limit: _limit,
         offset: 0,
       );
       final totalVisits = await DatabaseHelper.instance
           .countPrescriptionsByPatientAndDoctor(widget.patientId, _doctorId!);
+      final filteredVisits = await DatabaseHelper.instance
+          .countFilteredPrescriptionsByPatientAndDoctor(
+        widget.patientId,
+        _doctorId!,
+        query: _visitSearchController.text,
+        dateFrom: _dateKey(_visitDateRange?.start),
+        dateTo: _dateKey(_visitDateRange?.end),
+      );
+      final latest = await DatabaseHelper.instance
+          .getFilteredPrescriptionsByPatientAndDoctorPaged(
+        widget.patientId,
+        _doctorId!,
+        limit: 1,
+        offset: 0,
+      );
       Map<String, dynamic>? lastPrescription;
       List<Map<String, dynamic>> lastMedicines = [];
 
-      if (prescriptions.isNotEmpty) {
-        lastPrescription = prescriptions.first;
+      if (latest.isNotEmpty) {
+        lastPrescription = latest.first;
 
         final lastId = lastPrescription['id'] as int;
 
@@ -124,14 +155,15 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             await DatabaseHelper.instance.getLastPrescriptionMedicines(lastId);
       }
 
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
 
       setState(() {
         _patient = patient;
         _prescriptions = prescriptions;
         _totalVisits = totalVisits;
+        _filteredVisits = filteredVisits;
         _offset = prescriptions.length;
-        _hasMore = prescriptions.length < totalVisits;
+        _hasMore = prescriptions.length < filteredVisits;
         _lastPrescription = lastPrescription;
         _lastMedicines = lastMedicines;
         _isLoading = false;
@@ -151,10 +183,14 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     if (_doctorId == null || !_hasMore || _isLoadingMore) return;
     setState(() => _isLoadingMore = true);
     try {
-      final data =
-          await DatabaseHelper.instance.getPrescriptionsByPatientAndDoctorPaged(
+      final data = await DatabaseHelper.instance
+          .getFilteredPrescriptionsByPatientAndDoctorPaged(
         widget.patientId,
         _doctorId!,
+        query: _visitSearchController.text,
+        dateFrom: _dateKey(_visitDateRange?.start),
+        dateTo: _dateKey(_visitDateRange?.end),
+        oldestFirst: _oldestFirst,
         limit: _limit,
         offset: _offset,
       );
@@ -162,7 +198,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
       setState(() {
         _prescriptions.addAll(data);
         _offset += data.length;
-        _hasMore = _offset < _totalVisits;
+        _hasMore = _offset < _filteredVisits;
       });
     } catch (e) {
       if (mounted) {
@@ -223,6 +259,46 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
 
   String _getImportantAlerts() {
     return (_patient?['important_alerts'] ?? '').toString();
+  }
+
+  String? _dateKey(DateTime? value) =>
+      value == null ? null : DateFormat('yyyy-MM-dd').format(value);
+
+  String _friendlyDate(dynamic value) {
+    final raw = value?.toString().trim() ?? '';
+    if (raw.isEmpty) return '-';
+    final parsed = DateTime.tryParse(raw);
+    return parsed == null ? raw : DateFormat('dd MMM yyyy').format(parsed);
+  }
+
+  void _onVisitSearchChanged(String _) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => unawaited(_loadProfile()),
+    );
+  }
+
+  Future<void> _pickVisitDateRange() async {
+    final now = DateTime.now();
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(now.year + 1),
+      initialDateRange: _visitDateRange,
+    );
+    if (range == null || !mounted) return;
+    setState(() => _visitDateRange = range);
+    await _loadProfile();
+  }
+
+  void _clearVisitFilters() {
+    _visitSearchController.clear();
+    setState(() {
+      _visitDateRange = null;
+      _oldestFirst = false;
+    });
+    unawaited(_loadProfile());
   }
 
   List<PrescriptionItem> _parseItemsText(String itemsText) {
@@ -450,7 +526,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         (_lastPrescription!['bp'] ?? _lastPrescription!['blood_pressure'] ?? '')
             .toString();
 
-    final date = (_lastPrescription!['prescription_date'] ?? '').toString();
+    final date = _friendlyDate(_lastPrescription!['prescription_date']);
 
     final medicineNames = _lastMedicines
         .map(
@@ -544,11 +620,14 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   Widget _buildPrescriptionCard(Map<String, dynamic> item) {
     final id = item['id'] as int;
     final rxNo = (item['prescription_no'] ?? '').toString();
-    final date = (item['prescription_date'] ?? '').toString();
+    final date = _friendlyDate(item['prescription_date']);
     final diagnosis = (item['diagnosis'] ?? '').toString();
     final complaint = (item['complaint'] ?? '').toString();
     final notes = (item['visit_notes'] ?? '').toString();
     final syncStatus = (item['sync_status'] ?? '').toString();
+    final followUpDate = _friendlyDate(item['follow_up_date']);
+    final followUpNote = (item['follow_up_note'] ?? '').toString();
+    final followUpStatus = (item['follow_up_status'] ?? '').toString();
 
     final bp = (item['bp'] ?? item['blood_pressure'] ?? '').toString();
     final weight = (item['weight'] ?? '').toString();
@@ -561,6 +640,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         pulse.isNotEmpty ||
         temperature.isNotEmpty ||
         spo2.isNotEmpty;
+    final medicines = _parseItemsText((item['items_text'] ?? '').toString());
 
     return Card(
       elevation: 0,
@@ -590,7 +670,7 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          date.isEmpty ? 'Date: -' : 'Date: $date',
+          'Date: $date${diagnosis.isEmpty ? '' : '  •  $diagnosis'}',
         ),
         children: [
           Align(
@@ -598,9 +678,14 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (complaint.isNotEmpty) Text('Complaint: $complaint'),
-                if (diagnosis.isNotEmpty) Text('Diagnosis: $diagnosis'),
-                if (notes.isNotEmpty) Text('Visit Notes: $notes'),
+                _detailSection('Clinical Assessment', [
+                  if (complaint.isNotEmpty) _detailRow('Complaint', complaint),
+                  if (diagnosis.isNotEmpty) _detailRow('Diagnosis', diagnosis),
+                  if (notes.isNotEmpty) _detailRow('Visit Notes', notes),
+                  if (complaint.isEmpty && diagnosis.isEmpty && notes.isEmpty)
+                    const Text('No clinical notes recorded.',
+                        style: TextStyle(color: Color(0xFF64748B))),
+                ]),
                 if (hasVitals) ...[
                   const SizedBox(height: 10),
                   const Text(
@@ -621,6 +706,53 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                       _vitalChip('SpO2', spo2),
                     ],
                   ),
+                ],
+                if (medicines.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _detailSection(
+                    'Medicines (${medicines.length})',
+                    medicines.asMap().entries.map((entry) {
+                      final medicine = entry.value;
+                      final directions = [
+                        medicine.dosage,
+                        medicine.frequency,
+                        medicine.duration
+                      ].where((x) => x.trim().isNotEmpty).join(' • ');
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12)),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${entry.key + 1}. ${medicine.medicineName}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w800)),
+                              if (directions.isNotEmpty)
+                                Text(directions,
+                                    style: const TextStyle(
+                                        color: Color(0xFF475569))),
+                              if (medicine.instructions.trim().isNotEmpty)
+                                Text('Instructions: ${medicine.instructions}',
+                                    style: const TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontSize: 12)),
+                            ]),
+                      );
+                    }).toList(),
+                  ),
+                ],
+                if (followUpDate != '-' || followUpNote.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _detailSection('Follow-up', [
+                    if (followUpDate != '-') _detailRow('Date', followUpDate),
+                    if (followUpNote.isNotEmpty)
+                      _detailRow('Note', followUpNote),
+                    if (followUpStatus.isNotEmpty)
+                      _detailRow('Status', followUpStatus),
+                  ]),
                 ],
                 if (syncStatus.isNotEmpty) ...[
                   const SizedBox(height: 8),
@@ -665,6 +797,99 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     );
   }
 
+  Widget _detailSection(String title, List<Widget> children) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+          const SizedBox(height: 8),
+          ...children,
+        ]),
+      );
+
+  Widget _detailRow(String label, String value) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: RichText(
+            text: TextSpan(
+                style: const TextStyle(color: Color(0xFF334155), height: 1.4),
+                children: [
+              TextSpan(
+                  text: '$label: ',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              TextSpan(text: value),
+            ])),
+      );
+
+  Widget _buildVisitFilters() {
+    final dateLabel = _visitDateRange == null
+        ? 'Date range'
+        : '${_friendlyDate(_visitDateRange!.start)} – ${_friendlyDate(_visitDateRange!.end)}';
+    final active = _visitSearchController.text.trim().isNotEmpty ||
+        _visitDateRange != null ||
+        _oldestFirst;
+    return Column(children: [
+      TextField(
+        controller: _visitSearchController,
+        onChanged: _onVisitSearchChanged,
+        decoration: InputDecoration(
+          hintText: 'Search Rx, diagnosis, complaint or medicine',
+          prefixIcon: const Icon(Icons.search_rounded),
+          suffixIcon: _visitSearchController.text.isEmpty
+              ? null
+              : IconButton(
+                  onPressed: () {
+                    _visitSearchController.clear();
+                    unawaited(_loadProfile());
+                  },
+                  icon: const Icon(Icons.close_rounded)),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+        ),
+      ),
+      const SizedBox(height: 9),
+      Row(children: [
+        Expanded(
+            child: OutlinedButton.icon(
+                onPressed: _pickVisitDateRange,
+                icon: const Icon(Icons.date_range_outlined),
+                label: Text(dateLabel, overflow: TextOverflow.ellipsis))),
+        const SizedBox(width: 8),
+        PopupMenuButton<bool>(
+          initialValue: _oldestFirst,
+          onSelected: (value) {
+            setState(() => _oldestFirst = value);
+            unawaited(_loadProfile());
+          },
+          itemBuilder: (_) => const [
+            PopupMenuItem(value: false, child: Text('Newest first')),
+            PopupMenuItem(value: true, child: Text('Oldest first'))
+          ],
+          child: const Padding(
+              padding: EdgeInsets.all(10), child: Icon(Icons.sort_rounded)),
+        ),
+        if (active)
+          IconButton(
+              tooltip: 'Clear filters',
+              onPressed: _clearVisitFilters,
+              icon: const Icon(Icons.filter_alt_off_outlined)),
+      ]),
+      Align(
+          alignment: Alignment.centerLeft,
+          child: Text('$_filteredVisits of $_totalVisits visit(s)',
+              style: const TextStyle(
+                  color: Color(0xFF64748B), fontWeight: FontWeight.w600))),
+    ]);
+  }
+
   Future<void> _refresh() async {
     await _loadProfile();
   }
@@ -706,6 +931,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
+                  _buildVisitFilters(),
+                  const SizedBox(height: 12),
                   if (_prescriptions.isEmpty)
                     Container(
                       padding: const EdgeInsets.all(30),

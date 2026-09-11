@@ -17,9 +17,6 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
   final _ageController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
-  final _allergiesController = TextEditingController();
-  final _chronicController = TextEditingController();
-  final _alertsController = TextEditingController();
 
   final ApiPatientService _api = ApiPatientService();
 
@@ -36,9 +33,6 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
     _ageController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
-    _allergiesController.dispose();
-    _chronicController.dispose();
-    _alertsController.dispose();
     super.dispose();
   }
 
@@ -63,9 +57,9 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
         phone: _phoneController.text.trim(),
         address: _addressController.text.trim(),
         notes: '',
-        allergies: _allergiesController.text.trim(),
-        chronicDiseases: _chronicController.text.trim(),
-        importantAlerts: _alertsController.text.trim(),
+        allergies: '',
+        chronicDiseases: '',
+        importantAlerts: '',
         idempotencyKey: _requestKey,
       );
 
@@ -102,10 +96,6 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
       _ageController.clear();
       _phoneController.clear();
       _addressController.clear();
-
-      _allergiesController.clear();
-      _chronicController.clear();
-      _alertsController.clear();
 
       setState(() => _gender = 'Male');
       _requestKey = _newRequestKey();
@@ -229,27 +219,6 @@ class _AddPatientScreenState extends State<AddPatientScreen> {
                       controller: _addressController,
                       label: 'Address',
                       icon: Icons.location_on_outlined,
-                      requiredField: false,
-                      maxLines: 2,
-                    ),
-                    _field(
-                      controller: _allergiesController,
-                      label: 'Allergies',
-                      icon: Icons.warning_amber_rounded,
-                      requiredField: false,
-                    ),
-                    const SizedBox(height: 14),
-                    _field(
-                      controller: _chronicController,
-                      label: 'Chronic Diseases',
-                      icon: Icons.monitor_heart_outlined,
-                      requiredField: false,
-                    ),
-                    const SizedBox(height: 14),
-                    _field(
-                      controller: _alertsController,
-                      label: 'Important Alerts',
-                      icon: Icons.notification_important_outlined,
                       requiredField: false,
                       maxLines: 2,
                     ),

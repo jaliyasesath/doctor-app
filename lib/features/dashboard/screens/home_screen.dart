@@ -43,7 +43,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const Color _primaryGreen = Color(0xFF0F766E);
   static const Color _deepGreen = Color(0xFF064E3B);
   static const Color _freshGreen = Color(0xFF22A06B);
@@ -68,6 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Timer? _licenseTimer;
   StreamSubscription<Map<String, dynamic>>? _queueEventSubscription;
+  bool _queueSummaryLoading = false;
 
   Map<String, dynamic> _queueSummary = {
     'waiting': 0,
@@ -94,6 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     _loadDoctorName();
     _loadProfilePhoto();
@@ -113,6 +115,16 @@ class _HomeScreenState extends State<HomeScreen> {
         _checkLicenseOnDashboard();
       },
     );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+
+    // Recover updates that may have occurred while the app was backgrounded.
+    unawaited(QueueRealtimeService.instance.connect());
+    unawaited(QueueSyncService.instance.syncChanges());
+    unawaited(_loadQueueSummary());
   }
 
   Future<void> _refreshAll() async {
@@ -626,6 +638,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadQueueSummary() async {
+    if (_queueSummaryLoading) return;
+    _queueSummaryLoading = true;
     try {
       final summary = await ApiPatientService().getQueueSummary();
 
@@ -636,6 +650,8 @@ class _HomeScreenState extends State<HomeScreen> {
       });
     } catch (e) {
       debugPrint('Queue summary load failed: $e');
+    } finally {
+      _queueSummaryLoading = false;
     }
   }
 
@@ -1796,6 +1812,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     unawaited(_queueEventSubscription?.cancel());
     _licenseTimer?.cancel();
     super.dispose();

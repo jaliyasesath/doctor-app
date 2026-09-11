@@ -75,6 +75,9 @@ class QueueRealtimeService {
       });
       connection.onreconnected(({connectionId}) {
         _started = true;
+        unawaited(_syncThenEmit(const {
+          'action': 'reconnected',
+        }));
       });
 
       _connection = connection;

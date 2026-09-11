@@ -2100,6 +2100,184 @@ is_favorite INTEGER DEFAULT 0,
     );
   }
 
+  Future<List<Map<String, dynamic>>> searchPatientHistoryByDoctorPaged(
+    int doctorId, {
+    String query = '',
+    String gender = 'All',
+    bool alertsOnly = false,
+    String visitFilter = 'all',
+    String sort = 'recent',
+    int limit = 30,
+    int offset = 0,
+  }) async {
+    final db = await database;
+    final where = <String>['p.doctor_id = ?', 'p.is_deleted = 0'];
+    final args = <Object?>[doctorId];
+    final text = query.trim();
+    if (text.isNotEmpty) {
+      final pattern = '%$text%';
+      where.add('(p.patient_name LIKE ? OR p.phone_number LIKE ? OR '
+          'p.address LIKE ? OR '
+          'CAST(COALESCE(p.server_id, p.id) AS TEXT) LIKE ?)');
+      args.addAll([pattern, pattern, pattern, pattern]);
+    }
+    if (gender != 'All') {
+      where.add('LOWER(p.patient_gender) = LOWER(?)');
+      args.add(gender);
+    }
+    if (alertsOnly) {
+      where.add("(TRIM(COALESCE(p.allergies, '')) <> '' OR "
+          "TRIM(COALESCE(p.chronic_diseases, '')) <> '' OR "
+          "TRIM(COALESCE(p.important_alerts, '')) <> '')");
+    }
+    final visitExists = 'SELECT 1 FROM prescriptions v WHERE '
+        'v.patient_id = p.id AND v.doctor_id = p.doctor_id '
+        'AND v.is_deleted = 0';
+    if (visitFilter == 'withVisits') {
+      where.add('EXISTS ($visitExists)');
+    } else if (visitFilter == 'withoutVisits') {
+      where.add('NOT EXISTS ($visitExists)');
+    }
+    final orderBy = switch (sort) {
+      'name' => 'LOWER(p.patient_name) ASC, p.id DESC',
+      'mostVisits' => 'visit_count DESC, last_visit_date DESC, p.id DESC',
+      _ => 'COALESCE(last_visit_date, p.created_at) DESC, p.id DESC',
+    };
+    return db.rawQuery('''
+      SELECT p.*, COUNT(rx.id) AS visit_count,
+             MAX(rx.prescription_date) AS last_visit_date
+      FROM patients p
+      LEFT JOIN prescriptions rx ON rx.patient_id = p.id
+        AND rx.doctor_id = p.doctor_id AND rx.is_deleted = 0
+      WHERE ${where.join(' AND ')}
+      GROUP BY p.id
+      ORDER BY $orderBy
+      LIMIT ? OFFSET ?
+    ''', [...args, limit, offset]);
+  }
+
+  Future<int> countPatientHistoryByDoctor(
+    int doctorId, {
+    String query = '',
+    String gender = 'All',
+    bool alertsOnly = false,
+    String visitFilter = 'all',
+  }) async {
+    final db = await database;
+    final where = <String>['p.doctor_id = ?', 'p.is_deleted = 0'];
+    final args = <Object?>[doctorId];
+    final text = query.trim();
+    if (text.isNotEmpty) {
+      final pattern = '%$text%';
+      where.add('(p.patient_name LIKE ? OR p.phone_number LIKE ? OR '
+          'p.address LIKE ? OR '
+          'CAST(COALESCE(p.server_id, p.id) AS TEXT) LIKE ?)');
+      args.addAll([pattern, pattern, pattern, pattern]);
+    }
+    if (gender != 'All') {
+      where.add('LOWER(p.patient_gender) = LOWER(?)');
+      args.add(gender);
+    }
+    if (alertsOnly) {
+      where.add("(TRIM(COALESCE(p.allergies, '')) <> '' OR "
+          "TRIM(COALESCE(p.chronic_diseases, '')) <> '' OR "
+          "TRIM(COALESCE(p.important_alerts, '')) <> '')");
+    }
+    final visitExists = 'SELECT 1 FROM prescriptions v WHERE '
+        'v.patient_id = p.id AND v.doctor_id = p.doctor_id '
+        'AND v.is_deleted = 0';
+    if (visitFilter == 'withVisits') {
+      where.add('EXISTS ($visitExists)');
+    } else if (visitFilter == 'withoutVisits') {
+      where.add('NOT EXISTS ($visitExists)');
+    }
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) FROM patients p WHERE ${where.join(' AND ')}',
+      args,
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<List<Map<String, dynamic>>>
+      getFilteredPrescriptionsByPatientAndDoctorPaged(
+    int patientId,
+    int doctorId, {
+    String query = '',
+    String? dateFrom,
+    String? dateTo,
+    bool oldestFirst = false,
+    int limit = 30,
+    int offset = 0,
+  }) async {
+    final db = await database;
+    final where = <String>[
+      'patient_id = ?',
+      'doctor_id = ?',
+      'is_deleted = 0',
+    ];
+    final args = <Object?>[patientId, doctorId];
+    final text = query.trim();
+    if (text.isNotEmpty) {
+      final pattern = '%$text%';
+      where.add('(prescription_no LIKE ? OR complaint LIKE ? OR '
+          'diagnosis LIKE ? OR visit_notes LIKE ? OR items_text LIKE ?)');
+      args.addAll([pattern, pattern, pattern, pattern, pattern]);
+    }
+    if (dateFrom != null && dateFrom.isNotEmpty) {
+      where.add('date(prescription_date) >= date(?)');
+      args.add(dateFrom);
+    }
+    if (dateTo != null && dateTo.isNotEmpty) {
+      where.add('date(prescription_date) <= date(?)');
+      args.add(dateTo);
+    }
+    return db.query(
+      'prescriptions',
+      where: where.join(' AND '),
+      whereArgs: args,
+      orderBy: 'prescription_date ${oldestFirst ? 'ASC' : 'DESC'}, '
+          'id ${oldestFirst ? 'ASC' : 'DESC'}',
+      limit: limit,
+      offset: offset,
+    );
+  }
+
+  Future<int> countFilteredPrescriptionsByPatientAndDoctor(
+    int patientId,
+    int doctorId, {
+    String query = '',
+    String? dateFrom,
+    String? dateTo,
+  }) async {
+    final db = await database;
+    final where = <String>[
+      'patient_id = ?',
+      'doctor_id = ?',
+      'is_deleted = 0',
+    ];
+    final args = <Object?>[patientId, doctorId];
+    final text = query.trim();
+    if (text.isNotEmpty) {
+      final pattern = '%$text%';
+      where.add('(prescription_no LIKE ? OR complaint LIKE ? OR '
+          'diagnosis LIKE ? OR visit_notes LIKE ? OR items_text LIKE ?)');
+      args.addAll([pattern, pattern, pattern, pattern, pattern]);
+    }
+    if (dateFrom != null && dateFrom.isNotEmpty) {
+      where.add('date(prescription_date) >= date(?)');
+      args.add(dateFrom);
+    }
+    if (dateTo != null && dateTo.isNotEmpty) {
+      where.add('date(prescription_date) <= date(?)');
+      args.add(dateTo);
+    }
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) FROM prescriptions WHERE ${where.join(' AND ')}',
+      args,
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
   Future<List<Map<String, dynamic>>> getPrescriptionsByDoctorPaged(
     int doctorId, {
     int limit = 30,

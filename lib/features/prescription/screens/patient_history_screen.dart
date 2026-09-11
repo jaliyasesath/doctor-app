@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
@@ -19,11 +20,17 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
   bool _isLoading = false;
   bool _isLoadingMore = false;
   bool _hasMore = false;
+  int _total = 0;
   int? _doctorId;
+  String _genderFilter = 'All';
+  String _visitFilter = 'all';
+  String _sort = 'recent';
+  bool _alertsOnly = false;
   Timer? _searchDebounce;
   final ScrollController _scrollController = ScrollController();
   static const int _limit = 30;
   int _offset = 0;
+  int _searchGeneration = 0;
 
   @override
   void initState() {
@@ -63,9 +70,11 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
 
     _doctorId = doctorId;
     await DatabaseHelper.instance.assignOldLocalDataToDoctor(doctorId);
+    await _search();
   }
 
   Future<void> _search() async {
+    final generation = ++_searchGeneration;
     final query = _searchController.text.trim();
 
     if (_doctorId == null) {
@@ -73,31 +82,35 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
       if (_doctorId == null) return;
     }
 
-    if (query.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _results = [];
-          _offset = 0;
-          _hasMore = false;
-        });
-      }
-      return;
-    }
-
     setState(() => _isLoading = true);
 
     try {
-      final data = await DatabaseHelper.instance.searchPatientsByDoctorPaged(
+      final data =
+          await DatabaseHelper.instance.searchPatientHistoryByDoctorPaged(
         _doctorId!,
-        query,
+        query: query,
+        gender: _genderFilter,
+        alertsOnly: _alertsOnly,
+        visitFilter: _visitFilter,
+        sort: _sort,
         limit: _limit,
         offset: 0,
       );
-      if (!mounted || query != _searchController.text.trim()) return;
+      final total = await DatabaseHelper.instance.countPatientHistoryByDoctor(
+        _doctorId!,
+        query: query,
+        gender: _genderFilter,
+        alertsOnly: _alertsOnly,
+        visitFilter: _visitFilter,
+      );
+      if (!mounted ||
+          generation != _searchGeneration ||
+          query != _searchController.text.trim()) return;
       setState(() {
         _results = data;
+        _total = total;
         _offset = data.length;
-        _hasMore = data.length == _limit;
+        _hasMore = data.length < total;
         _isLoading = false;
       });
     } catch (e) {
@@ -110,23 +123,31 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
   }
 
   Future<void> _loadMore() async {
+    final generation = _searchGeneration;
     final query = _searchController.text.trim();
-    if (_doctorId == null || query.isEmpty || !_hasMore || _isLoadingMore) {
+    if (_doctorId == null || !_hasMore || _isLoadingMore) {
       return;
     }
     setState(() => _isLoadingMore = true);
     try {
-      final data = await DatabaseHelper.instance.searchPatientsByDoctorPaged(
+      final data =
+          await DatabaseHelper.instance.searchPatientHistoryByDoctorPaged(
         _doctorId!,
-        query,
+        query: query,
+        gender: _genderFilter,
+        alertsOnly: _alertsOnly,
+        visitFilter: _visitFilter,
+        sort: _sort,
         limit: _limit,
         offset: _offset,
       );
-      if (!mounted || query != _searchController.text.trim()) return;
+      if (!mounted ||
+          generation != _searchGeneration ||
+          query != _searchController.text.trim()) return;
       setState(() {
         _results.addAll(data);
         _offset += data.length;
-        _hasMore = data.length == _limit;
+        _hasMore = _offset < _total;
       });
     } catch (e) {
       if (mounted) {
@@ -165,6 +186,120 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
   String _phone(Map<String, dynamic> p) =>
       _value(p, ['phone_number', 'phoneNumber']);
 
+  String _friendlyDate(dynamic value) {
+    final raw = value?.toString().trim() ?? '';
+    if (raw.isEmpty) return 'No visits yet';
+    final parsed = DateTime.tryParse(raw);
+    return parsed == null ? raw : DateFormat('dd MMM yyyy').format(parsed);
+  }
+
+  bool get _hasActiveFilters =>
+      _genderFilter != 'All' ||
+      _visitFilter != 'all' ||
+      _alertsOnly ||
+      _sort != 'recent';
+
+  void _resetFilters() {
+    setState(() {
+      _genderFilter = 'All';
+      _visitFilter = 'all';
+      _alertsOnly = false;
+      _sort = 'recent';
+    });
+    unawaited(_search());
+  }
+
+  Future<void> _showFilters() async {
+    var gender = _genderFilter;
+    var visitFilter = _visitFilter;
+    var sort = _sort;
+    var alertsOnly = _alertsOnly;
+    final applied = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Filter Patient History',
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 18),
+                  const Text('Gender',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  Wrap(
+                      spacing: 8,
+                      children: ['All', 'Male', 'Female', 'Other']
+                          .map((x) => ChoiceChip(
+                              label: Text(x),
+                              selected: gender == x,
+                              onSelected: (_) =>
+                                  setSheetState(() => gender = x)))
+                          .toList()),
+                  const SizedBox(height: 14),
+                  const Text('Visit history',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  DropdownButtonFormField<String>(
+                      value: visitFilter,
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'all', child: Text('All patients')),
+                        DropdownMenuItem(
+                            value: 'withVisits',
+                            child: Text('With previous visits')),
+                        DropdownMenuItem(
+                            value: 'withoutVisits',
+                            child: Text('No previous visits')),
+                      ],
+                      onChanged: (v) =>
+                          setSheetState(() => visitFilter = v ?? 'all')),
+                  SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Medical alerts only'),
+                      subtitle: const Text(
+                          'Allergies, chronic diseases or important alerts'),
+                      value: alertsOnly,
+                      onChanged: (v) => setSheetState(() => alertsOnly = v)),
+                  const Text('Sort by',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  DropdownButtonFormField<String>(
+                      value: sort,
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'recent',
+                            child: Text('Most recently visited')),
+                        DropdownMenuItem(
+                            value: 'name', child: Text('Patient name A–Z')),
+                        DropdownMenuItem(
+                            value: 'mostVisits', child: Text('Most visits')),
+                      ],
+                      onChanged: (v) =>
+                          setSheetState(() => sort = v ?? 'recent')),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Apply Filters'))),
+                ]),
+          ),
+        ),
+      ),
+    );
+    if (applied != true || !mounted) return;
+    setState(() {
+      _genderFilter = gender;
+      _visitFilter = visitFilter;
+      _sort = sort;
+      _alertsOnly = alertsOnly;
+    });
+    await _search();
+  }
+
   void _openPatientProfile(Map<String, dynamic> patient) {
     Navigator.push(
       context,
@@ -180,6 +315,11 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
     final gender = _gender(patient);
     final phone = _phone(patient);
     final allergies = _value(patient, ['allergies']);
+    final chronic = _value(patient, ['chronic_diseases']);
+    final importantAlert = _value(patient, ['important_alerts']);
+    final visits = int.tryParse('${patient['visit_count'] ?? 0}') ?? 0;
+    final lastVisit = _friendlyDate(patient['last_visit_date']);
+    final patientId = patient['server_id'] ?? patient['id'];
     final initial = name.isEmpty ? 'P' : name[0].toUpperCase();
 
     return Container(
@@ -258,6 +398,15 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
                         ],
                       ),
                     ],
+                    const SizedBox(height: 7),
+                    Wrap(spacing: 7, runSpacing: 5, children: [
+                      _smallBadge('ID $patientId', const Color(0xFFEFF6FF),
+                          const Color(0xFF1D4ED8)),
+                      _smallBadge('$visits visit${visits == 1 ? '' : 's'}',
+                          const Color(0xFFE6FFFB), const Color(0xFF0F766E)),
+                      _smallBadge(lastVisit, const Color(0xFFF8FAFC),
+                          const Color(0xFF475569)),
+                    ]),
                     if (allergies.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Container(
@@ -281,6 +430,16 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
                         ),
                       ),
                     ],
+                    if (allergies.isEmpty && chronic.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _smallBadge('Chronic: $chronic', const Color(0xFFFFF7ED),
+                          const Color(0xFFC2410C)),
+                    ],
+                    if (importantAlert.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      _smallBadge('Alert: $importantAlert',
+                          const Color(0xFFFFF1F2), const Color(0xFFBE123C)),
+                    ],
                   ],
                 ),
               ),
@@ -295,6 +454,18 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
       ),
     );
   }
+
+  Widget _smallBadge(String text, Color background, Color foreground) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+            color: background, borderRadius: BorderRadius.circular(20)),
+        child: Text(text,
+            style: TextStyle(
+                color: foreground,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700)),
+      );
 
   Widget _emptyState() {
     final hasQuery = _searchController.text.trim().isNotEmpty;
@@ -317,7 +488,9 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
         ),
         const SizedBox(height: 18),
         Text(
-          hasQuery ? 'No patients found' : 'Search patient history',
+          hasQuery || _hasActiveFilters
+              ? 'No patients found'
+              : 'No patient records',
           textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 19,
@@ -327,9 +500,9 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
         ),
         const SizedBox(height: 7),
         Text(
-          hasQuery
-              ? 'Try a different name or phone number.'
-              : 'Enter a patient name or phone number to view previous visits.',
+          hasQuery || _hasActiveFilters
+              ? 'Try changing the search text or filters.'
+              : 'Registered patients will appear here.',
           textAlign: TextAlign.center,
           style: const TextStyle(color: Color(0xFF64748B), height: 1.5),
         ),
@@ -385,7 +558,7 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
                 ),
                 const SizedBox(height: 5),
                 const Text(
-                  'Search by patient name or phone number',
+                  'Search by name, phone, address or patient ID',
                   style: TextStyle(color: Color(0xFFCCFBF1)),
                 ),
                 const SizedBox(height: 14),
@@ -395,7 +568,7 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
                   onSubmitted: (_) => _search(),
                   onChanged: _onSearchChanged,
                   decoration: InputDecoration(
-                    hintText: 'Name or phone number...',
+                    hintText: 'Name, phone, address or ID...',
                     prefixIcon: const Icon(Icons.search_rounded),
                     suffixIcon: _searchController.text.isEmpty
                         ? null
@@ -403,10 +576,9 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
                             onPressed: () {
                               _searchController.clear();
                               setState(() {
-                                _results = [];
                                 _offset = 0;
-                                _hasMore = false;
                               });
+                              unawaited(_search());
                             },
                             icon: const Icon(Icons.close_rounded),
                           ),
@@ -422,13 +594,30 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
             ),
           ),
           Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(children: [
+              OutlinedButton.icon(
+                onPressed: _showFilters,
+                icon: Icon(_hasActiveFilters
+                    ? Icons.filter_alt
+                    : Icons.filter_alt_outlined),
+                label: Text(_hasActiveFilters ? 'Filters on' : 'Filters'),
+              ),
+              if (_hasActiveFilters) ...[
+                const SizedBox(width: 8),
+                TextButton(
+                    onPressed: _resetFilters, child: const Text('Clear')),
+              ],
+            ]),
+          ),
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
             child: Row(
               children: [
                 Text(
                   _results.isEmpty
                       ? 'Patient directory'
-                      : '${_results.length} patient${_results.length == 1 ? '' : 's'} found',
+                      : '$_total patient${_total == 1 ? '' : 's'} found',
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF475569),
