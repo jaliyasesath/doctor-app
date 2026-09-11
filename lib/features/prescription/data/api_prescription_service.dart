@@ -19,18 +19,21 @@ class ApiPrescriptionService {
     int? expectedVersion,
     String? idempotencyKey,
   }) async {
-    final response = await _api.post('/Prescriptions/upsert', {
-      'id': serverId,
-      'patientId': serverPatientId,
-      'prescriptionNo': prescriptionNo,
-      'prescriptionDate': prescriptionDate,
-      'complaint': complaint,
-      'diagnosis': diagnosis,
-      'visitNotes': visitNotes,
-      'qrValue': qrValue,
-      'items': items,
-      'expectedVersion': expectedVersion,
-    }, idempotencyKey: idempotencyKey);
+    final response = await _api.post(
+        '/Prescriptions/upsert',
+        {
+          'id': serverId,
+          'patientId': serverPatientId,
+          'prescriptionNo': prescriptionNo,
+          'prescriptionDate': prescriptionDate,
+          'complaint': complaint,
+          'diagnosis': diagnosis,
+          'visitNotes': visitNotes,
+          'qrValue': qrValue,
+          'items': items,
+          'expectedVersion': expectedVersion,
+        },
+        idempotencyKey: idempotencyKey);
 
     return Map<String, dynamic>.from(response);
   }

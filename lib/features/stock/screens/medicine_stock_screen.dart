@@ -12,7 +12,14 @@ import '../data/medicine_stock_api_service.dart';
 import '../domain/stock_validation.dart';
 
 class MedicineStockScreen extends StatefulWidget {
-  const MedicineStockScreen({super.key});
+  final int? initialPrescriptionId;
+  final bool openDispenseOnStart;
+
+  const MedicineStockScreen({
+    super.key,
+    this.initialPrescriptionId,
+    this.openDispenseOnStart = false,
+  });
 
   @override
   State<MedicineStockScreen> createState() => _MedicineStockScreenState();
@@ -57,6 +64,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
   bool _showingOfflineCache = false;
   bool _loading = true;
   Object? _error;
+  bool _initialDispenseOpened = false;
 
   @override
   void initState() {
@@ -65,6 +73,13 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     _tabs.addListener(_onTabChanged);
     _loadRole();
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.openDispenseOnStart || _initialDispenseOpened) {
+        return;
+      }
+      _initialDispenseOpened = true;
+      _dispense(initialPrescriptionId: widget.initialPrescriptionId);
+    });
   }
 
   Future<void> _loadRole() async {
@@ -159,13 +174,18 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
       if (!mounted) return;
       final prefs = await SharedPreferences.getInstance();
       try {
-        final summary = jsonDecode(prefs.getString('stock_summary_cache') ?? '[]');
-        final batches = jsonDecode(prefs.getString('stock_batches_cache') ?? '[]');
-        final movements = jsonDecode(prefs.getString('stock_movements_cache') ?? '[]');
-        final valuation = jsonDecode(prefs.getString('stock_valuation_cache') ?? '{}');
+        final summary =
+            jsonDecode(prefs.getString('stock_summary_cache') ?? '[]');
+        final batches =
+            jsonDecode(prefs.getString('stock_batches_cache') ?? '[]');
+        final movements =
+            jsonDecode(prefs.getString('stock_movements_cache') ?? '[]');
+        final valuation =
+            jsonDecode(prefs.getString('stock_valuation_cache') ?? '{}');
         if (summary is List && summary.isNotEmpty) {
           setState(() {
-            _summary = summary.map((e) => Map<String, dynamic>.from(e)).toList();
+            _summary =
+                summary.map((e) => Map<String, dynamic>.from(e)).toList();
             _batches = (batches as List)
                 .map((e) => Map<String, dynamic>.from(e))
                 .toList();
@@ -570,7 +590,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     });
   }
 
-  Future<void> _dispense() async {
+  Future<void> _dispense({int? initialPrescriptionId}) async {
     if (_showingOfflineCache) {
       await _run(() async {});
       return;
@@ -581,19 +601,49 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     try {
       prescriptions = _rows(await _api.allPendingPrescriptions());
     } catch (error) {
-      if (mounted) AppErrorUi.show(context, error, onRetry: _dispense);
+      if (mounted) {
+        AppErrorUi.show(
+          context,
+          error,
+          onRetry: () => _dispense(
+            initialPrescriptionId: initialPrescriptionId,
+          ),
+        );
+      }
       return;
     }
     if (!mounted) return;
     if (prescriptions.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No prescriptions are waiting to be dispensed.')),
+          const SnackBar(
+              content: Text('No prescriptions are waiting to be dispensed.')),
         );
       }
       return;
     }
-    prescription = prescriptions.first;
+    if (initialPrescriptionId != null) {
+      for (final item in prescriptions) {
+        if (_id(item['id']) == initialPrescriptionId) {
+          prescription = item;
+          break;
+        }
+      }
+      if (prescription == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'This prescription is no longer waiting to be dispensed.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
+    } else {
+      prescription = prescriptions.first;
+    }
     void loadItems(Map<String, dynamic> value) {
       selectedQuantities.clear();
       final items = value['items'];
@@ -606,6 +656,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
         }
       }
     }
+
     loadItems(prescription);
     final ok = await showDialog<bool>(
       context: context,
@@ -621,14 +672,17 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                   DropdownButtonFormField<Map<String, dynamic>>(
                     initialValue: prescription,
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Prescription'),
-                    items: prescriptions.map((item) => DropdownMenuItem(
-                      value: item,
-                      child: Text(
-                        '${_text(item['prescriptionNo'])} — ${_text(item['patientName'])}',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    )).toList(),
+                    decoration:
+                        const InputDecoration(labelText: 'Prescription'),
+                    items: prescriptions
+                        .map((item) => DropdownMenuItem(
+                              value: item,
+                              child: Text(
+                                '${_text(item['prescriptionNo'])} — ${_text(item['patientName'])}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ))
+                        .toList(),
                     onChanged: (value) {
                       if (value == null) return;
                       setDialogState(() {
@@ -770,7 +824,8 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
             TextField(
               controller: days,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Expiry warning days'),
+              decoration:
+                  const InputDecoration(labelText: 'Expiry warning days'),
             ),
           ],
         ),
@@ -789,8 +844,11 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     if (ok != true) return;
     final lowValue = int.tryParse(low.text);
     final daysValue = int.tryParse(days.text);
-    if (lowValue == null || lowValue < 0 ||
-        daysValue == null || daysValue < 1 || daysValue > 3650) {
+    if (lowValue == null ||
+        lowValue < 0 ||
+        daysValue == null ||
+        daysValue < 1 ||
+        daysValue > 3650) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Enter valid alert settings.')),
@@ -905,131 +963,131 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
       child: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (_showingOfflineCache) ...[
-            MaterialBanner(
-              content: const Text(
-                'Offline cached stock is shown. Stock changes are disabled.',
+          padding: const EdgeInsets.all(16),
+          children: [
+            if (_showingOfflineCache) ...[
+              MaterialBanner(
+                content: const Text(
+                  'Offline cached stock is shown. Stock changes are disabled.',
+                ),
+                actions: [
+                  TextButton(onPressed: _load, child: const Text('RETRY')),
+                ],
               ),
-              actions: [
-                TextButton(onPressed: _load, child: const Text('RETRY')),
-              ],
+              const SizedBox(height: 10),
+            ],
+            _stockHero(low, expiry),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _search,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => _load(),
+              decoration: InputDecoration(
+                hintText: 'Search medicine stock',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: IconButton(
+                  onPressed: _load,
+                  icon: const Icon(Icons.arrow_forward),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+            const SizedBox(height: 14),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final width = (constraints.maxWidth - 20) / 3;
+                return Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    SizedBox(
+                      width: width < 104 ? constraints.maxWidth : width,
+                      child: _metric('Medicines', '$_summaryTotal',
+                          Icons.medication, _green),
+                    ),
+                    SizedBox(
+                      width: width < 104 ? constraints.maxWidth : width,
+                      child: _metric('Low stock', '$low', Icons.warning_amber,
+                          Colors.orange),
+                    ),
+                    SizedBox(
+                      width: width < 104 ? constraints.maxWidth : width,
+                      child: _metric('Expiry alerts', '$expiry',
+                          Icons.event_busy, Colors.red),
+                    ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 10),
-          ],
-          _stockHero(low, expiry),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _search,
-            textInputAction: TextInputAction.search,
-            onSubmitted: (_) => _load(),
-            decoration: InputDecoration(
-              hintText: 'Search medicine stock',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: IconButton(
-                onPressed: _load,
-                icon: const Icon(Icons.arrow_forward),
-              ),
-              filled: true,
-              fillColor: Colors.white,
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-          ),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final width = (constraints.maxWidth - 20) / 3;
-              return Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  SizedBox(
-                    width: width < 104 ? constraints.maxWidth : width,
-                    child: _metric('Medicines', '$_summaryTotal',
-                        Icons.medication, _green),
-                  ),
-                  SizedBox(
-                    width: width < 104 ? constraints.maxWidth : width,
-                    child: _metric('Low stock', '$low', Icons.warning_amber,
-                        Colors.orange),
-                  ),
-                  SizedBox(
-                    width: width < 104 ? constraints.maxWidth : width,
-                    child: _metric('Expiry alerts', '$expiry', Icons.event_busy,
-                        Colors.red),
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 10),
-          Card(
-            elevation: 0,
-            child: ListTile(
-              leading: const Icon(Icons.account_balance_wallet_outlined,
-                  color: _green),
-              title: const Text('Stock valuation'),
-              subtitle: Text(
-                'Cost: ${_number(_valuation['costValue']).toStringAsFixed(2)}  •  '
-                'Retail: ${_number(_valuation['retailValue']).toStringAsFixed(2)}',
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          ..._summary.map((item) {
-            final lowStock = item['isLowStock'] == true;
-            final expired = item['isExpired'] == true;
-            final expiring = item['isExpiringSoon'] == true;
-            final warning = expired
-                ? 'Expired'
-                : expiring
-                    ? 'Expiring soon'
-                    : lowStock
-                        ? 'Low stock'
-                        : 'In stock';
-            final warningColor = expired
-                ? Colors.red
-                : (expiring || lowStock ? Colors.orange : _green);
-            return Card(
+            Card(
               elevation: 0,
-              margin: const EdgeInsets.only(bottom: 10),
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-                side: BorderSide(
-                  color: warningColor.withValues(alpha: .20),
+              child: ListTile(
+                leading: const Icon(Icons.account_balance_wallet_outlined,
+                    color: _green),
+                title: const Text('Stock valuation'),
+                subtitle: Text(
+                  'Cost: ${_number(_valuation['costValue']).toStringAsFixed(2)}  •  '
+                  'Retail: ${_number(_valuation['retailValue']).toStringAsFixed(2)}',
                 ),
               ),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: warningColor.withValues(alpha: .12),
-                  child: Icon(Icons.medication_liquid, color: warningColor),
-                ),
-                title: Text(_text(item['medicineName']),
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text(
-                  '$warning • ${_number(item['activeBatchCount'])} active batches',
-                ),
-                trailing: Text(
-                  '${_number(item['availableQuantity'])}',
-                  style: TextStyle(
-                    color: warningColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
+            ),
+            const SizedBox(height: 14),
+            ..._summary.map((item) {
+              final lowStock = item['isLowStock'] == true;
+              final expired = item['isExpired'] == true;
+              final expiring = item['isExpiringSoon'] == true;
+              final warning = expired
+                  ? 'Expired'
+                  : expiring
+                      ? 'Expiring soon'
+                      : lowStock
+                          ? 'Low stock'
+                          : 'In stock';
+              final warningColor = expired
+                  ? Colors.red
+                  : (expiring || lowStock ? Colors.orange : _green);
+              return Card(
+                elevation: 0,
+                margin: const EdgeInsets.only(bottom: 10),
+                color: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  side: BorderSide(
+                    color: warningColor.withValues(alpha: .20),
                   ),
                 ),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: warningColor.withValues(alpha: .12),
+                    child: Icon(Icons.medication_liquid, color: warningColor),
+                  ),
+                  title: Text(_text(item['medicineName']),
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text(
+                    '$warning • ${_number(item['activeBatchCount'])} active batches',
+                  ),
+                  trailing: Text(
+                    '${_number(item['availableQuantity'])}',
+                    style: TextStyle(
+                      color: warningColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              );
+            }),
+            if (_loadingMoreSummary)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
               ),
-            );
-          }),
-          if (_loadingMoreSummary)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -1040,65 +1098,66 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
           return false;
         },
         child: RefreshIndicator(
-        onRefresh: () => _loadBatches(reset: true),
-        child: !_batchesLoaded && _loadingMoreBatches
-            ? ListView(
-                children: const [
-                  SizedBox(height: 220),
-                  Center(child: CircularProgressIndicator()),
-                ],
-              )
-            : ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: _batches.length + (_loadingMoreBatches ? 1 : 0),
-          itemBuilder: (_, index) {
-            if (index == _batches.length) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            final item = _batches[index];
-            return Card(
-              elevation: 0,
-              margin: const EdgeInsets.only(bottom: 10),
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-                side: const BorderSide(color: Color(0xFFD1E7DF)),
-              ),
-              child: ListTile(
-                onTap: _canManageStock ? () => _adjust(item) : null,
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFE6F5F1),
-                  child: Icon(Icons.inventory_2, color: _green),
-                ),
-                title: Text(_text(item['medicineName']),
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text(
-                  'Batch ${_text(item['batchNumber'])}\n'
-                  'Expiry: ${_text(item['expiryDate']).split('T').first}',
-                ),
-                isThreeLine: true,
-                trailing: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('${_number(item['availableQuantity'])}',
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w800)),
-                    Text(
-                      _canManageStock ? 'Tap to adjust' : 'View only',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: Colors.black54,
-                      ),
-                    ),
+          onRefresh: () => _loadBatches(reset: true),
+          child: !_batchesLoaded && _loadingMoreBatches
+              ? ListView(
+                  children: const [
+                    SizedBox(height: 220),
+                    Center(child: CircularProgressIndicator()),
                   ],
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _batches.length + (_loadingMoreBatches ? 1 : 0),
+                  itemBuilder: (_, index) {
+                    if (index == _batches.length) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    final item = _batches[index];
+                    return Card(
+                      elevation: 0,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        side: const BorderSide(color: Color(0xFFD1E7DF)),
+                      ),
+                      child: ListTile(
+                        onTap: _canManageStock ? () => _adjust(item) : null,
+                        leading: const CircleAvatar(
+                          backgroundColor: Color(0xFFE6F5F1),
+                          child: Icon(Icons.inventory_2, color: _green),
+                        ),
+                        title: Text(_text(item['medicineName']),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: Text(
+                          'Batch ${_text(item['batchNumber'])}\n'
+                          'Expiry: ${_text(item['expiryDate']).split('T').first}',
+                        ),
+                        isThreeLine: true,
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('${_number(item['availableQuantity'])}',
+                                style: const TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.w800)),
+                            Text(
+                              _canManageStock ? 'Tap to adjust' : 'View only',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              ),
-            );
-          },
-        ),
         ),
       );
 
@@ -1108,73 +1167,77 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
           return false;
         },
         child: RefreshIndicator(
-        onRefresh: () => _loadMovements(reset: true),
-        child: !_movementsLoaded && _loadingMoreMovements
-            ? ListView(
-                children: const [
-                  SizedBox(height: 220),
-                  Center(child: CircularProgressIndicator()),
-                ],
-              )
-            : ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: _movements.length + (_loadingMoreMovements ? 1 : 0),
-          itemBuilder: (_, index) {
-            if (index == _movements.length) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              );
-            }
-            final item = _movements[index];
-            final quantity = _number(item['quantityChange']);
-            final positive = quantity >= 0;
-            final canReverse = _canManageStock &&
-                _text(item['movementType']).toUpperCase() == 'DISPENSE' &&
-                _text(item['referenceType']).toUpperCase() ==
-                    'DISPENSE_TRANSACTION' &&
-                _id(item['referenceId']) > 0;
-            return Card(
-              elevation: 0,
-              margin: const EdgeInsets.only(bottom: 10),
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-                side: const BorderSide(color: Color(0xFFD1E7DF)),
-              ),
-              child: ListTile(
-                onTap: canReverse
-                    ? () => _reverse(
-                          initialTransactionId: _id(item['referenceId']),
-                        )
-                    : null,
-                leading: CircleAvatar(
-                  backgroundColor:
-                      (positive ? _green : Colors.red).withValues(alpha: .12),
-                  child: Icon(
-                    positive ? Icons.add : Icons.remove,
-                    color: positive ? _green : Colors.red,
-                  ),
+          onRefresh: () => _loadMovements(reset: true),
+          child: !_movementsLoaded && _loadingMoreMovements
+              ? ListView(
+                  children: const [
+                    SizedBox(height: 220),
+                    Center(child: CircularProgressIndicator()),
+                  ],
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount:
+                      _movements.length + (_loadingMoreMovements ? 1 : 0),
+                  itemBuilder: (_, index) {
+                    if (index == _movements.length) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    final item = _movements[index];
+                    final quantity = _number(item['quantityChange']);
+                    final positive = quantity >= 0;
+                    final canReverse = _canManageStock &&
+                        _text(item['movementType']).toUpperCase() ==
+                            'DISPENSE' &&
+                        _text(item['referenceType']).toUpperCase() ==
+                            'DISPENSE_TRANSACTION' &&
+                        _id(item['referenceId']) > 0;
+                    return Card(
+                      elevation: 0,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                        side: const BorderSide(color: Color(0xFFD1E7DF)),
+                      ),
+                      child: ListTile(
+                        onTap: canReverse
+                            ? () => _reverse(
+                                  initialTransactionId:
+                                      _id(item['referenceId']),
+                                )
+                            : null,
+                        leading: CircleAvatar(
+                          backgroundColor: (positive ? _green : Colors.red)
+                              .withValues(alpha: .12),
+                          child: Icon(
+                            positive ? Icons.add : Icons.remove,
+                            color: positive ? _green : Colors.red,
+                          ),
+                        ),
+                        title: Text(_text(item['medicineName']),
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w700)),
+                        subtitle: Text(
+                          '${_text(item['movementType'])} • ${_text(item['notes'])}\n'
+                          '${_text(item['createdAt']).replaceFirst('T', ' ')}'
+                          '${canReverse ? '\nTransaction #${_id(item['referenceId'])} • Tap to reverse' : ''}',
+                        ),
+                        isThreeLine: canReverse,
+                        trailing: Text(
+                          '${positive ? '+' : ''}$quantity',
+                          style: TextStyle(
+                            color: positive ? _green : Colors.red,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                title: Text(_text(item['medicineName']),
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text(
-                  '${_text(item['movementType'])} • ${_text(item['notes'])}\n'
-                  '${_text(item['createdAt']).replaceFirst('T', ' ')}'
-                  '${canReverse ? '\nTransaction #${_id(item['referenceId'])} • Tap to reverse' : ''}',
-                ),
-                isThreeLine: canReverse,
-                trailing: Text(
-                  '${positive ? '+' : ''}$quantity',
-                  style: TextStyle(
-                    color: positive ? _green : Colors.red,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
         ),
       );
 

@@ -208,8 +208,7 @@ class LocalClinicServer {
       }, statusCode: 400);
     }
 
-    final suppliedRequestId =
-        request.headers['idempotency-key']?.trim() ?? '';
+    final suppliedRequestId = request.headers['idempotency-key']?.trim() ?? '';
     final bodyRequestId = data['clientRequestId']?.toString().trim() ?? '';
     final requestId = suppliedRequestId.isNotEmpty
         ? suppliedRequestId
@@ -242,8 +241,7 @@ class LocalClinicServer {
         ''',
         [doctorId, _today],
       );
-      final nextQueueNo =
-          ((result.first['max_no'] as num?)?.toInt() ?? 0) + 1;
+      final nextQueueNo = ((result.first['max_no'] as num?)?.toInt() ?? 0) + 1;
       final now = DateTime.now().toIso8601String();
 
       final localId = await txn.insert('patients', {
@@ -273,7 +271,8 @@ class LocalClinicServer {
         where: 'id = ?',
         whereArgs: [localId],
         limit: 1,
-      )).first;
+      ))
+          .first;
     });
 
     unawaited(AutoSyncService.syncPendingChanges());

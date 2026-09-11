@@ -108,9 +108,12 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
         maxWidth: 1200,
         maxHeight: 1200,
       );
-      if (picked != null && mounted) setState(() => _medicalCenterLogo = File(picked.path));
+      if (picked != null && mounted)
+        setState(() => _medicalCenterLogo = File(picked.path));
     } catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Logo could not be selected: $error')));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Logo could not be selected: $error')));
     }
   }
 
@@ -480,22 +483,31 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
         border: Border.all(color: const Color(0xFF99F6E4)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Medical Centre Logo (Optional)', style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text('Medical Centre Logo (Optional)',
+            style: TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 6),
-        const Text('Reused on prescriptions, PDFs and laboratory emails.', style: TextStyle(fontSize: 12, color: Colors.black54)),
+        const Text('Reused on prescriptions, PDFs and laboratory emails.',
+            style: TextStyle(fontSize: 12, color: Colors.black54)),
         if (_medicalCenterLogo != null) ...[
           const SizedBox(height: 12),
-          Center(child: Image.file(_medicalCenterLogo!, height: 100, fit: BoxFit.contain)),
+          Center(
+              child: Image.file(_medicalCenterLogo!,
+                  height: 100, fit: BoxFit.contain)),
         ],
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: OutlinedButton.icon(
+          Expanded(
+              child: OutlinedButton.icon(
             onPressed: _pickMedicalCenterLogo,
             icon: const Icon(Icons.add_photo_alternate_outlined),
-            label: Text(_medicalCenterLogo == null ? 'Choose logo' : 'Change logo'),
+            label: Text(
+                _medicalCenterLogo == null ? 'Choose logo' : 'Change logo'),
           )),
           if (_medicalCenterLogo != null)
-            IconButton(onPressed: () => setState(() => _medicalCenterLogo = null), icon: const Icon(Icons.delete_outline), color: Colors.red),
+            IconButton(
+                onPressed: () => setState(() => _medicalCenterLogo = null),
+                icon: const Icon(Icons.delete_outline),
+                color: Colors.red),
         ]),
       ]),
     );

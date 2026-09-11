@@ -1513,10 +1513,15 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
   Future<void> _openLabInvestigations() async {
     if (_openingLabModule) return;
     final localPatientId = _currentPatientId ?? widget.existingPatientId;
-    final localPrescriptionId = _currentPrescriptionId ?? widget.editingPrescriptionId;
-    if (localPatientId == null || localPrescriptionId == null || !_prescriptionSaved) {
+    final localPrescriptionId =
+        _currentPrescriptionId ?? widget.editingPrescriptionId;
+    if (localPatientId == null ||
+        localPrescriptionId == null ||
+        !_prescriptionSaved) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Save and sync the prescription before adding lab investigations')),
+        const SnackBar(
+            content: Text(
+                'Save and sync the prescription before adding lab investigations')),
       );
       return;
     }
@@ -1532,10 +1537,14 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
         );
       }
       await SyncService().syncAll();
-      final patient = await DatabaseHelper.instance.getPatientById(localPatientId);
-      final prescription = await DatabaseHelper.instance.getPrescriptionByLocalId(localPrescriptionId);
-      final serverPatientId = int.tryParse(patient?['server_id']?.toString() ?? '');
-      final serverPrescriptionId = int.tryParse(prescription?['server_id']?.toString() ?? '');
+      final patient =
+          await DatabaseHelper.instance.getPatientById(localPatientId);
+      final prescription = await DatabaseHelper.instance
+          .getPrescriptionByLocalId(localPrescriptionId);
+      final serverPatientId =
+          int.tryParse(patient?['server_id']?.toString() ?? '');
+      final serverPrescriptionId =
+          int.tryParse(prescription?['server_id']?.toString() ?? '');
       if (serverPatientId == null || serverPrescriptionId == null) {
         throw const AppException(
           message: 'Prescription has no cloud identifier after sync',
@@ -1545,11 +1554,14 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
         );
       }
       if (!mounted) return;
-      await Navigator.push(context, MaterialPageRoute(builder: (_) => CreateLabOrderScreen(
-        patientId: serverPatientId,
-        prescriptionId: serverPrescriptionId,
-        patientName: _patientNameController.text.trim(),
-      )));
+      await Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => CreateLabOrderScreen(
+                    patientId: serverPatientId,
+                    prescriptionId: serverPrescriptionId,
+                    patientName: _patientNameController.text.trim(),
+                  )));
     } catch (e) {
       if (mounted) {
         AppErrorUi.show(
@@ -1683,9 +1695,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       await TemplateService.saveTemplate(template);
     } catch (error) {
       if (!mounted) return;
-      final message = error
-          .toString()
-          .replaceFirst('Bad state: ', '');
+      final message = error.toString().replaceFirst('Bad state: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
@@ -3455,7 +3465,8 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                         ),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: const Color(0xFF0F766E).withValues(alpha: 0.18),
+                          color:
+                              const Color(0xFF0F766E).withValues(alpha: 0.18),
                         ),
                       ),
                       child: Column(
@@ -3539,8 +3550,8 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
                             _savingPrescription
                                 ? 'Saving...'
                                 : _isEditMode
-                                ? 'Update Prescription'
-                                : 'Save Prescription',
+                                    ? 'Update Prescription'
+                                    : 'Save Prescription',
                           ),
                           style: FilledButton.styleFrom(
                             minimumSize: const Size.fromHeight(54),

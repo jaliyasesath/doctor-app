@@ -87,8 +87,7 @@ class MedicineStockApiService {
     );
   }
 
-  Future<Map<String, dynamic>> valuation() async =>
-      Map<String, dynamic>.from(
+  Future<Map<String, dynamic>> valuation() async => Map<String, dynamic>.from(
         await _client.get('/medicine-stock/valuation') as Map,
       );
 
@@ -96,12 +95,13 @@ class MedicineStockApiService {
     String search = '',
     int lowStockThreshold = 10,
     int expiringWithinDays = 90,
-  }) => _allPages((page) => summary(
-        search: search,
-        page: page,
-        lowStockThreshold: lowStockThreshold,
-        expiringWithinDays: expiringWithinDays,
-      ));
+  }) =>
+      _allPages((page) => summary(
+            search: search,
+            page: page,
+            lowStockThreshold: lowStockThreshold,
+            expiringWithinDays: expiringWithinDays,
+          ));
 
   Future<Map<String, dynamic>> allBatches() =>
       _allPages((page) => batches(page: page));

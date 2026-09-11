@@ -21,23 +21,26 @@ class ApiBillService {
     int? expectedVersion,
     String? idempotencyKey,
   }) async {
-    final response = await _api.post('/Bills/upsert', {
-      'id': serverId,
-      'patientId': serverPatientId,
-      'prescriptionId': serverPrescriptionId,
-      'prescriptionNo': prescriptionNo,
-      'consultationFee': consultationFee,
-      'medicineCharges': medicineCharges,
-      'otherCharges': otherCharges,
-      'discountAmount': discountAmount,
-      'totalAmount': totalAmount,
-      'paidAmount': paidAmount,
-      'balanceAmount': balanceAmount,
-      'paymentMethod': paymentMethod,
-      'paymentStatus': paymentStatus,
-      'notes': notes,
-      'expectedVersion': expectedVersion,
-    }, idempotencyKey: idempotencyKey);
+    final response = await _api.post(
+        '/Bills/upsert',
+        {
+          'id': serverId,
+          'patientId': serverPatientId,
+          'prescriptionId': serverPrescriptionId,
+          'prescriptionNo': prescriptionNo,
+          'consultationFee': consultationFee,
+          'medicineCharges': medicineCharges,
+          'otherCharges': otherCharges,
+          'discountAmount': discountAmount,
+          'totalAmount': totalAmount,
+          'paidAmount': paidAmount,
+          'balanceAmount': balanceAmount,
+          'paymentMethod': paymentMethod,
+          'paymentStatus': paymentStatus,
+          'notes': notes,
+          'expectedVersion': expectedVersion,
+        },
+        idempotencyKey: idempotencyKey);
 
     return Map<String, dynamic>.from(response);
   }

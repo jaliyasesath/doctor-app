@@ -103,8 +103,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
         return;
       }
 
-      final prescriptions = await DatabaseHelper.instance
-          .getPrescriptionsByPatientAndDoctorPaged(
+      final prescriptions =
+          await DatabaseHelper.instance.getPrescriptionsByPatientAndDoctorPaged(
         widget.patientId,
         _doctorId!,
         limit: _limit,
@@ -151,8 +151,8 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     if (_doctorId == null || !_hasMore || _isLoadingMore) return;
     setState(() => _isLoadingMore = true);
     try {
-      final data = await DatabaseHelper.instance
-          .getPrescriptionsByPatientAndDoctorPaged(
+      final data =
+          await DatabaseHelper.instance.getPrescriptionsByPatientAndDoctorPaged(
         widget.patientId,
         _doctorId!,
         limit: _limit,
@@ -514,16 +514,29 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
   }
 
   Widget _buildLabReportsCard() {
-    final serverId = int.tryParse((_patient?['server_id'] ?? _patient?['serverId'] ?? '').toString());
+    final serverId = int.tryParse(
+        (_patient?['server_id'] ?? _patient?['serverId'] ?? '').toString());
     return Card(
       elevation: 0,
       child: ListTile(
-        leading: const CircleAvatar(backgroundColor: Color(0xFFE6FFFB), child: Icon(Icons.science_outlined, color: Color(0xFF0F766E))),
-        title: const Text('Laboratory Reports', style: TextStyle(fontWeight: FontWeight.w800)),
-        subtitle: Text(serverId == null ? 'Sync this patient to view cloud lab reports' : 'View uploaded reports and mark them reviewed'),
+        leading: const CircleAvatar(
+            backgroundColor: Color(0xFFE6FFFB),
+            child: Icon(Icons.science_outlined, color: Color(0xFF0F766E))),
+        title: const Text('Laboratory Reports',
+            style: TextStyle(fontWeight: FontWeight.w800)),
+        subtitle: Text(serverId == null
+            ? 'Sync this patient to view cloud lab reports'
+            : 'View uploaded reports and mark them reviewed'),
         trailing: const Icon(Icons.chevron_right),
         enabled: serverId != null,
-        onTap: serverId == null ? null : () => Navigator.push(context, MaterialPageRoute(builder: (_) => PatientLabReportsScreen(serverPatientId: serverId, patientName: _getPatientName()))),
+        onTap: serverId == null
+            ? null
+            : () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => PatientLabReportsScreen(
+                        serverPatientId: serverId,
+                        patientName: _getPatientName()))),
       ),
     );
   }

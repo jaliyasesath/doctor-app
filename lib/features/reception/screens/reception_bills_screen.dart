@@ -68,8 +68,7 @@ class _ReceptionBillsScreenState extends State<ReceptionBillsScreen> {
             final patientId =
                 bill['patient_id']?.toString().toLowerCase() ?? '';
 
-            final amount =
-                bill['total_amount']?.toString().toLowerCase() ?? '';
+            final amount = bill['total_amount']?.toString().toLowerCase() ?? '';
 
             return rx.contains(currentSearch) ||
                 patientId.contains(currentSearch) ||

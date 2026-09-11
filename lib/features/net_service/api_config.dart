@@ -18,12 +18,10 @@ class ApiConfig {
   );
 
   // Local computer API
-  static const String localWifiBaseUrl =
-      'http://192.168.8.91:5219/api';
+  static const String localWifiBaseUrl = 'http://192.168.8.91:5219/api';
 
   // Doctor phone hotspot API
-  static const String hotspotBaseUrl =
-      'http://192.168.43.1:8080/api';
+  static const String hotspotBaseUrl = 'http://192.168.43.1:8080/api';
 
   static String customHotspotBaseUrl = hotspotBaseUrl;
   static String hotspotPairingToken = '';

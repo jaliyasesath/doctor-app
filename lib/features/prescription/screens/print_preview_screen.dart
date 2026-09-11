@@ -99,7 +99,8 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
     Map<String, dynamic>? cloudProfile;
     try {
       cloudProfile = await DoctorProfileApiService().getProfile();
-      medicalCenterLogoUrl = cloudProfile['medicalCenterLogoUrl']?.toString() ?? '';
+      medicalCenterLogoUrl =
+          cloudProfile['medicalCenterLogoUrl']?.toString() ?? '';
       signatureImageUrl = cloudProfile['signatureImageUrl']?.toString() ?? '';
       _logoBytes = await _downloadBrandImage(medicalCenterLogoUrl);
       _signatureBytes = await _downloadBrandImage(signatureImageUrl);
@@ -128,8 +129,10 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
 
   Future<Uint8List?> _downloadBrandImage(String url) async {
     if (url.isEmpty) return null;
-    final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 8));
-    if (response.statusCode == 200 && response.bodyBytes.length <= 2 * 1024 * 1024) return response.bodyBytes;
+    final response =
+        await http.get(Uri.parse(url)).timeout(const Duration(seconds: 8));
+    if (response.statusCode == 200 &&
+        response.bodyBytes.length <= 2 * 1024 * 1024) return response.bodyBytes;
     return null;
   }
 
@@ -686,7 +689,13 @@ GET WELL SOON
                       child: Column(
                         children: [
                           if (medicalCenterLogoUrl.isNotEmpty)
-                            Padding(padding: const EdgeInsets.only(bottom: 8), child: Image.network(medicalCenterLogoUrl, height: 66, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox.shrink())),
+                            Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Image.network(medicalCenterLogoUrl,
+                                    height: 66,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) =>
+                                        const SizedBox.shrink())),
                           Text(
                             medicalCenterName,
                             style: const TextStyle(

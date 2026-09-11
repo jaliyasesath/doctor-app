@@ -44,9 +44,14 @@ class _ReceptionHotspotConnectScreenState
       pairingToken = '';
       expiresAt = null;
     }
-    if (scannedUrl.isEmpty || pairingToken.length < 32 ||
-        expiresAt == null || !expiresAt.isAfter(DateTime.now().toUtc())) {
-      setState(() { _scanned = false; _message = 'Invalid or old pairing QR'; });
+    if (scannedUrl.isEmpty ||
+        pairingToken.length < 32 ||
+        expiresAt == null ||
+        !expiresAt.isAfter(DateTime.now().toUtc())) {
+      setState(() {
+        _scanned = false;
+        _message = 'Invalid or old pairing QR';
+      });
       return;
     }
 
@@ -101,11 +106,9 @@ class _ReceptionHotspotConnectScreenState
     try {
       final root = url.replaceAll('/api', '');
 
-      final response = await http
-          .get(Uri.parse('$root/api/Health'), headers: {
-            'X-Clinic-Pairing-Token': pairingToken,
-          })
-          .timeout(const Duration(seconds: 2));
+      final response = await http.get(Uri.parse('$root/api/Health'), headers: {
+        'X-Clinic-Pairing-Token': pairingToken,
+      }).timeout(const Duration(seconds: 2));
 
       return response.statusCode == 200;
     } catch (_) {

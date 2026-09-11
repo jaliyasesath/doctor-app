@@ -87,7 +87,8 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
       'cover' => 'coverPhotoUrl',
       'logo' => 'medicalCenterLogoUrl',
       _ => 'signatureImageUrl',
-    }).isNotEmpty;
+    })
+        .isNotEmpty;
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -170,7 +171,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
       appBar: AppBar(
         title: const Text('Profile'),
         actions: [
-          IconButton(onPressed: _edit, tooltip: 'Edit profile', icon: const Icon(Icons.edit_outlined)),
+          IconButton(
+              onPressed: _edit,
+              tooltip: 'Edit profile',
+              icon: const Icon(Icons.edit_outlined)),
         ],
       ),
       body: RefreshIndicator(
@@ -183,18 +187,22 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                 child: Container(
                   height: 190,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [_teal, Color(0xFF164E63)]),
+                    gradient: const LinearGradient(
+                        colors: [_teal, Color(0xFF164E63)]),
                     image: cover.isEmpty
                         ? null
-                        : DecorationImage(image: NetworkImage(cover), fit: BoxFit.cover),
+                        : DecorationImage(
+                            image: NetworkImage(cover), fit: BoxFit.cover),
                   ),
                   child: _uploadingKind == 'cover'
-                      ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                      ? const Center(
+                          child: CircularProgressIndicator(color: Colors.white))
                       : const Align(
                           alignment: Alignment.topRight,
                           child: Padding(
                             padding: EdgeInsets.all(14),
-                            child: CircleAvatar(child: Icon(Icons.camera_alt_outlined)),
+                            child: CircleAvatar(
+                                child: Icon(Icons.camera_alt_outlined)),
                           ),
                         ),
                 ),
@@ -206,11 +214,13 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                   onTap: () => _mediaMenu('profile'),
                   child: Container(
                     padding: const EdgeInsets.all(5),
-                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                    decoration: const BoxDecoration(
+                        color: Colors.white, shape: BoxShape.circle),
                     child: CircleAvatar(
                       radius: 55,
                       backgroundColor: const Color(0xFFE2E8F0),
-                      backgroundImage: photo.isEmpty ? null : NetworkImage(photo),
+                      backgroundImage:
+                          photo.isEmpty ? null : NetworkImage(photo),
                       child: _uploadingKind == 'profile'
                           ? const CircularProgressIndicator()
                           : photo.isEmpty
@@ -223,26 +233,41 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             ]),
             Padding(
               padding: const EdgeInsets.fromLTRB(22, 72, 22, 8),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(children: [
-                  Expanded(
-                    child: Text(_v('doctorName'),
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
-                  ),
-                  if (_v('verificationStatus').toLowerCase().contains('verified'))
-                    const Icon(Icons.verified, color: Color(0xFF2563EB)),
-                ]),
-                const SizedBox(height: 4),
-                Text([_v('qualifications'), _v('specialization')].where((x) => x.isNotEmpty).join(' · ')),
-                const SizedBox(height: 5),
-                Text('SLMC ${_v('slmcRegNo')} · ${_v('city')}', style: const TextStyle(color: Colors.black54)),
-                const SizedBox(height: 18),
-                Row(children: [
-                  Expanded(child: LinearProgressIndicator(value: completeness / 100, minHeight: 8, borderRadius: BorderRadius.circular(8))),
-                  const SizedBox(width: 12),
-                  Text('$completeness% complete', style: const TextStyle(fontWeight: FontWeight.w700)),
-                ]),
-              ]),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Expanded(
+                        child: Text(_v('doctorName'),
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(fontWeight: FontWeight.w800)),
+                      ),
+                      if (_v('verificationStatus')
+                          .toLowerCase()
+                          .contains('verified'))
+                        const Icon(Icons.verified, color: Color(0xFF2563EB)),
+                    ]),
+                    const SizedBox(height: 4),
+                    Text([_v('qualifications'), _v('specialization')]
+                        .where((x) => x.isNotEmpty)
+                        .join(' · ')),
+                    const SizedBox(height: 5),
+                    Text('SLMC ${_v('slmcRegNo')} · ${_v('city')}',
+                        style: const TextStyle(color: Colors.black54)),
+                    const SizedBox(height: 18),
+                    Row(children: [
+                      Expanded(
+                          child: LinearProgressIndicator(
+                              value: completeness / 100,
+                              minHeight: 8,
+                              borderRadius: BorderRadius.circular(8))),
+                      const SizedBox(width: 12),
+                      Text('$completeness% complete',
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                    ]),
+                  ]),
             ),
             _section('About', _v('professionalBio'), Icons.person_outline),
             _detailsCard(),
@@ -259,11 +284,18 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
         child: Padding(
           padding: const EdgeInsets.all(18),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const _CardTitle(icon: Icons.workspace_premium_outlined, title: 'Professional details'),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const _CardTitle(
+                icon: Icons.workspace_premium_outlined,
+                title: 'Professional details'),
             _row('Profession', _v('profession')),
             _row('Qualifications', _v('qualifications')),
-            _row('Experience', _v('yearsOfExperience').isEmpty ? '' : '${_v('yearsOfExperience')} years'),
+            _row(
+                'Experience',
+                _v('yearsOfExperience').isEmpty
+                    ? ''
+                    : '${_v('yearsOfExperience')} years'),
             _row('Affiliation', _v('affiliation')),
             _row('Languages', _v('languages')),
             _row('Special interests', _v('specialInterests')),
@@ -275,35 +307,58 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
         child: Padding(
           padding: const EdgeInsets.all(18),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const _CardTitle(icon: Icons.local_hospital_outlined, title: 'Medical centre'),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const _CardTitle(
+                icon: Icons.local_hospital_outlined, title: 'Medical centre'),
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               GestureDetector(
                 onTap: () => _mediaMenu('logo'),
                 child: Container(
                   width: 76,
                   height: 76,
-                  decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)),
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12)),
                   child: _uploadingKind == 'logo'
-                      ? const Padding(padding: EdgeInsets.all(22), child: CircularProgressIndicator())
+                      ? const Padding(
+                          padding: EdgeInsets.all(22),
+                          child: CircularProgressIndicator())
                       : logo.isEmpty
-                          ? const Icon(Icons.add_photo_alternate_outlined, color: _teal)
-                          : ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.network(logo, fit: BoxFit.contain)),
+                          ? const Icon(Icons.add_photo_alternate_outlined,
+                              color: _teal)
+                          : ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(logo, fit: BoxFit.contain)),
                 ),
               ),
               const SizedBox(width: 14),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(_v('medicalCenterName').isEmpty ? 'Medical centre not added' : _v('medicalCenterName'),
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-                const SizedBox(height: 6),
-                Text(_v('clinicAddress')),
-                Text(_v('clinicHours'), style: const TextStyle(color: Colors.black54)),
-              ])),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(
+                        _v('medicalCenterName').isEmpty
+                            ? 'Medical centre not added'
+                            : _v('medicalCenterName'),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800, fontSize: 17)),
+                    const SizedBox(height: 6),
+                    Text(_v('clinicAddress')),
+                    Text(_v('clinicHours'),
+                        style: const TextStyle(color: Colors.black54)),
+                  ])),
             ]),
             const SizedBox(height: 12),
             Wrap(spacing: 8, children: [
-              OutlinedButton.icon(onPressed: _openMap, icon: const Icon(Icons.map_outlined), label: const Text('Open map')),
-              OutlinedButton.icon(onPressed: () => _mediaMenu('logo'), icon: const Icon(Icons.image_outlined), label: Text(logo.isEmpty ? 'Add logo' : 'Change logo')),
+              OutlinedButton.icon(
+                  onPressed: _openMap,
+                  icon: const Icon(Icons.map_outlined),
+                  label: const Text('Open map')),
+              OutlinedButton.icon(
+                  onPressed: () => _mediaMenu('logo'),
+                  icon: const Icon(Icons.image_outlined),
+                  label: Text(logo.isEmpty ? 'Add logo' : 'Change logo')),
             ]),
           ]),
         ),
@@ -316,13 +371,17 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const _CardTitle(icon: Icons.branding_watermark_outlined, title: 'Documents & branding'),
-          const Text('These assets are reused on prescriptions, PDFs and laboratory emails.'),
+          const _CardTitle(
+              icon: Icons.branding_watermark_outlined,
+              title: 'Documents & branding'),
+          const Text(
+              'These assets are reused on prescriptions, PDFs and laboratory emails.'),
           const SizedBox(height: 14),
           Row(children: [
             Expanded(child: _assetTile('Centre logo', logo, 'logo')),
             const SizedBox(width: 10),
-            Expanded(child: _assetTile('Doctor signature', signature, 'signature')),
+            Expanded(
+                child: _assetTile('Doctor signature', signature, 'signature')),
           ]),
         ]),
       ),
@@ -335,9 +394,15 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
         child: Container(
           height: 120,
           padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(border: Border.all(color: const Color(0xFFE2E8F0)), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+              borderRadius: BorderRadius.circular(12)),
           child: Column(children: [
-            Expanded(child: url.isEmpty ? const Icon(Icons.add_photo_alternate_outlined, size: 38, color: _teal) : Image.network(url, fit: BoxFit.contain)),
+            Expanded(
+                child: url.isEmpty
+                    ? const Icon(Icons.add_photo_alternate_outlined,
+                        size: 38, color: _teal)
+                    : Image.network(url, fit: BoxFit.contain)),
             Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
           ]),
         ),
@@ -347,9 +412,11 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
         child: Padding(
           padding: const EdgeInsets.all(18),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             _CardTitle(icon: icon, title: title),
-            Text(value.isEmpty ? 'Not added yet' : value, style: const TextStyle(height: 1.5)),
+            Text(value.isEmpty ? 'Not added yet' : value,
+                style: const TextStyle(height: 1.5)),
           ]),
         ),
       );
@@ -357,8 +424,13 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
   Widget _row(String label, String value) => Padding(
         padding: const EdgeInsets.only(top: 11),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SizedBox(width: 115, child: Text(label, style: const TextStyle(color: Colors.black54))),
-          Expanded(child: Text(value.isEmpty ? 'Not added' : value, style: const TextStyle(fontWeight: FontWeight.w600))),
+          SizedBox(
+              width: 115,
+              child:
+                  Text(label, style: const TextStyle(color: Colors.black54))),
+          Expanded(
+              child: Text(value.isEmpty ? 'Not added' : value,
+                  style: const TextStyle(fontWeight: FontWeight.w600))),
         ]),
       );
 }
@@ -370,7 +442,12 @@ class _CardTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
-        child: Row(children: [Icon(icon, color: const Color(0xFF0F766E)), const SizedBox(width: 9), Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17))]),
+        child: Row(children: [
+          Icon(icon, color: const Color(0xFF0F766E)),
+          const SizedBox(width: 9),
+          Text(title,
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17))
+        ]),
       );
 }
 
@@ -379,7 +456,8 @@ class _DoctorProfileEditScreen extends StatefulWidget {
   final DoctorProfileApiService api;
   const _DoctorProfileEditScreen({required this.initial, required this.api});
   @override
-  State<_DoctorProfileEditScreen> createState() => _DoctorProfileEditScreenState();
+  State<_DoctorProfileEditScreen> createState() =>
+      _DoctorProfileEditScreenState();
 }
 
 class _DoctorProfileEditScreenState extends State<_DoctorProfileEditScreen> {
@@ -390,31 +468,56 @@ class _DoctorProfileEditScreenState extends State<_DoctorProfileEditScreen> {
   bool _saving = false;
 
   static const _fields = [
-    'doctorName', 'contactNumber', 'specialization', 'medicalCenterName', 'clinicAddress', 'city',
-    'qualifications', 'profession', 'affiliation', 'professionalBio', 'languages', 'specialInterests',
-    'clinicHours', 'websiteUrl', 'yearsOfExperience'
+    'doctorName',
+    'contactNumber',
+    'specialization',
+    'medicalCenterName',
+    'clinicAddress',
+    'city',
+    'qualifications',
+    'profession',
+    'affiliation',
+    'professionalBio',
+    'languages',
+    'specialInterests',
+    'clinicHours',
+    'websiteUrl',
+    'yearsOfExperience'
   ];
 
   @override
   void initState() {
     super.initState();
-    _c = {for (final key in _fields) key: TextEditingController(text: widget.initial[key]?.toString() ?? '')};
-    _latitude = double.tryParse(widget.initial['medicalCenterLatitude']?.toString() ?? '');
-    _longitude = double.tryParse(widget.initial['medicalCenterLongitude']?.toString() ?? '');
+    _c = {
+      for (final key in _fields)
+        key: TextEditingController(text: widget.initial[key]?.toString() ?? '')
+    };
+    _latitude = double.tryParse(
+        widget.initial['medicalCenterLatitude']?.toString() ?? '');
+    _longitude = double.tryParse(
+        widget.initial['medicalCenterLongitude']?.toString() ?? '');
   }
 
   @override
   void dispose() {
-    for (final controller in _c.values) { controller.dispose(); }
+    for (final controller in _c.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
   Future<void> _locate() async {
     var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) permission = await Geolocator.requestPermission();
-    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
+    if (permission == LocationPermission.denied)
+      permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) return;
     final position = await Geolocator.getCurrentPosition();
-    if (mounted) setState(() { _latitude = position.latitude; _longitude = position.longitude; });
+    if (mounted)
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+      });
   }
 
   Future<void> _save() async {
@@ -422,11 +525,15 @@ class _DoctorProfileEditScreenState extends State<_DoctorProfileEditScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      final payload = <String, dynamic>{for (final entry in _c.entries) entry.key: entry.value.text.trim()};
-      payload['yearsOfExperience'] = int.tryParse(_c['yearsOfExperience']!.text.trim());
+      final payload = <String, dynamic>{
+        for (final entry in _c.entries) entry.key: entry.value.text.trim()
+      };
+      payload['yearsOfExperience'] =
+          int.tryParse(_c['yearsOfExperience']!.text.trim());
       payload['profilePhotoUrl'] = widget.initial['profilePhotoUrl'] ?? '';
       payload['coverPhotoUrl'] = widget.initial['coverPhotoUrl'] ?? '';
-      payload['medicalCenterLogoUrl'] = widget.initial['medicalCenterLogoUrl'] ?? '';
+      payload['medicalCenterLogoUrl'] =
+          widget.initial['medicalCenterLogoUrl'] ?? '';
       payload['signatureImageUrl'] = widget.initial['signatureImageUrl'] ?? '';
       payload['medicalCenterLatitude'] = _latitude;
       payload['medicalCenterLongitude'] = _longitude;
@@ -434,7 +541,9 @@ class _DoctorProfileEditScreenState extends State<_DoctorProfileEditScreen> {
       await widget.api.updateProfile(payload);
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Update failed: $error')));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Update failed: $error')));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -442,59 +551,103 @@ class _DoctorProfileEditScreenState extends State<_DoctorProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Edit Profile'), actions: [TextButton(onPressed: _saving ? null : _save, child: const Text('SAVE'))]),
+        appBar: AppBar(title: const Text('Edit Profile'), actions: [
+          TextButton(
+              onPressed: _saving ? null : _save, child: const Text('SAVE'))
+        ]),
         body: Form(
           key: _formKey,
           child: ListView(padding: const EdgeInsets.all(16), children: [
             _heading('Professional identity'),
             _field('doctorName', 'Doctor name', required: true),
-            _field('contactNumber', 'Contact number', keyboard: TextInputType.phone),
+            _field('contactNumber', 'Contact number',
+                keyboard: TextInputType.phone),
             _field('qualifications', 'Qualifications'),
             _field('profession', 'Profession'),
             _field('specialization', 'Specialization'),
-            _field('yearsOfExperience', 'Years of experience', keyboard: TextInputType.number),
+            _field('yearsOfExperience', 'Years of experience',
+                keyboard: TextInputType.number),
             _field('affiliation', 'Professional affiliation'),
             _field('professionalBio', 'Professional bio', lines: 4),
             _field('languages', 'Languages'),
             _field('specialInterests', 'Special interests', lines: 2),
-            const ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.lock_outline), title: Text('SLMC number and verified email are protected'), subtitle: Text('Use the verified identity change process to update these fields.')),
+            const ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.lock_outline),
+                title: Text('SLMC number and verified email are protected'),
+                subtitle: Text(
+                    'Use the verified identity change process to update these fields.')),
             _heading('Medical centre'),
             _field('medicalCenterName', 'Medical centre name'),
             _field('clinicAddress', 'Clinic address', lines: 2),
             _field('city', 'City'),
             _field('clinicHours', 'Clinic hours', lines: 2),
             _field('websiteUrl', 'Website', keyboard: TextInputType.url),
-            OutlinedButton.icon(onPressed: _locate, icon: const Icon(Icons.my_location), label: const Text('Use current GPS location')),
+            OutlinedButton.icon(
+                onPressed: _locate,
+                icon: const Icon(Icons.my_location),
+                label: const Text('Use current GPS location')),
             if (_latitude != null && _longitude != null)
-              Padding(padding: const EdgeInsets.symmetric(vertical: 10), child: Text('GPS: ${_latitude!.toStringAsFixed(6)}, ${_longitude!.toStringAsFixed(6)}')),
+              Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text(
+                      'GPS: ${_latitude!.toStringAsFixed(6)}, ${_longitude!.toStringAsFixed(6)}')),
             const SizedBox(height: 20),
-            FilledButton.icon(onPressed: _saving ? null : _save, icon: _saving ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save_outlined), label: Text(_saving ? 'Saving...' : 'Save profile')),
+            FilledButton.icon(
+                onPressed: _saving ? null : _save,
+                icon: _saving
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.save_outlined),
+                label: Text(_saving ? 'Saving...' : 'Save profile')),
             const SizedBox(height: 30),
           ]),
         ),
       );
 
-  Widget _heading(String value) => Padding(padding: const EdgeInsets.only(top: 14, bottom: 12), child: Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF0F766E))));
-  Widget _field(String key, String label, {int lines = 1, bool required = false, TextInputType? keyboard}) => Padding(
+  Widget _heading(String value) => Padding(
+      padding: const EdgeInsets.only(top: 14, bottom: 12),
+      child: Text(value,
+          style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F766E))));
+  Widget _field(String key, String label,
+          {int lines = 1, bool required = false, TextInputType? keyboard}) =>
+      Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: TextFormField(
-          controller: _c[key], maxLines: lines, keyboardType: keyboard,
+          controller: _c[key],
+          maxLines: lines,
+          keyboardType: keyboard,
           validator: (value) => _validateField(key, label, value, required),
-          decoration: InputDecoration(labelText: label, border: const OutlineInputBorder()),
+          decoration: InputDecoration(
+              labelText: label, border: const OutlineInputBorder()),
         ),
       );
 
-  String? _validateField(String key, String label, String? value, bool required) {
+  String? _validateField(
+      String key, String label, String? value, bool required) {
     final text = value?.trim() ?? '';
     if (required && text.isEmpty) return '$label is required';
     if (text.isEmpty) return null;
 
     final limits = <String, int>{
-      'doctorName': 200, 'contactNumber': 30, 'specialization': 200,
-      'medicalCenterName': 200, 'clinicAddress': 500, 'city': 100,
-      'qualifications': 500, 'profession': 200, 'affiliation': 500,
-      'professionalBio': 2000, 'languages': 500,
-      'specialInterests': 1000, 'clinicHours': 500, 'websiteUrl': 500,
+      'doctorName': 200,
+      'contactNumber': 30,
+      'specialization': 200,
+      'medicalCenterName': 200,
+      'clinicAddress': 500,
+      'city': 100,
+      'qualifications': 500,
+      'profession': 200,
+      'affiliation': 500,
+      'professionalBio': 2000,
+      'languages': 500,
+      'specialInterests': 1000,
+      'clinicHours': 500,
+      'websiteUrl': 500,
     };
     final limit = limits[key];
     if (limit != null && text.length > limit) {

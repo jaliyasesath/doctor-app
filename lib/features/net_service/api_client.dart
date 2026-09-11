@@ -82,17 +82,19 @@ class ApiClient {
   }) {
     final mutationKey = 'POST|$path|${jsonEncode(body)}';
     final requestKey = idempotencyKey ?? _newIdempotencyKey();
-    return _singleFlightMutation(mutationKey, () => _send(
-      method: 'POST',
-      path: path,
-      auth: auth,
-      idempotencyKey: requestKey,
-      request: (url, headers) => http.post(
-        url,
-        headers: headers,
-        body: jsonEncode(body),
-      ),
-    ));
+    return _singleFlightMutation(
+        mutationKey,
+        () => _send(
+              method: 'POST',
+              path: path,
+              auth: auth,
+              idempotencyKey: requestKey,
+              request: (url, headers) => http.post(
+                url,
+                headers: headers,
+                body: jsonEncode(body),
+              ),
+            ));
   }
 
   Future<dynamic> put(
@@ -101,25 +103,29 @@ class ApiClient {
     bool auth = true,
   }) {
     final mutationKey = 'PUT|$path|${jsonEncode(body)}';
-    return _singleFlightMutation(mutationKey, () => _send(
-      method: 'PUT',
-      path: path,
-      auth: auth,
-      request: (url, headers) => http.put(
-        url,
-        headers: headers,
-        body: jsonEncode(body),
-      ),
-    ));
+    return _singleFlightMutation(
+        mutationKey,
+        () => _send(
+              method: 'PUT',
+              path: path,
+              auth: auth,
+              request: (url, headers) => http.put(
+                url,
+                headers: headers,
+                body: jsonEncode(body),
+              ),
+            ));
   }
 
   Future<dynamic> delete(String path, {bool auth = true}) {
-    return _singleFlightMutation('DELETE|$path', () => _send(
-      method: 'DELETE',
-      path: path,
-      auth: auth,
-      request: (url, headers) => http.delete(url, headers: headers),
-    ));
+    return _singleFlightMutation(
+        'DELETE|$path',
+        () => _send(
+              method: 'DELETE',
+              path: path,
+              auth: auth,
+              request: (url, headers) => http.delete(url, headers: headers),
+            ));
   }
 
   Future<dynamic> _singleFlightMutation(
@@ -190,8 +196,8 @@ class ApiClient {
       if (idempotencyKey != null) {
         initialHeaders['Idempotency-Key'] = idempotencyKey;
       }
-      var response = await request(url, initialHeaders)
-          .timeout(_requestTimeout);
+      var response =
+          await request(url, initialHeaders).timeout(_requestTimeout);
 
       if (auth && response.statusCode == 401) {
         final refreshed = await _refreshAccessToken();
@@ -200,8 +206,7 @@ class ApiClient {
           if (idempotencyKey != null) {
             retryHeaders['Idempotency-Key'] = idempotencyKey;
           }
-          response = await request(url, retryHeaders)
-              .timeout(_requestTimeout);
+          response = await request(url, retryHeaders).timeout(_requestTimeout);
         }
       }
 

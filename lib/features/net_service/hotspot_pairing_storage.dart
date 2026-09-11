@@ -10,12 +10,14 @@ class HotspotPairingStorage {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
 
-  static Future<void> save({required String url, required String token,
+  static Future<void> save(
+      {required String url,
+      required String token,
       required DateTime expiresAt}) async {
     await _storage.write(key: _urlKey, value: url);
     await _storage.write(key: _tokenKey, value: token);
-    await _storage.write(key: _expiryKey,
-        value: expiresAt.toUtc().toIso8601String());
+    await _storage.write(
+        key: _expiryKey, value: expiresAt.toUtc().toIso8601String());
   }
 
   static Future<bool> restore() async {
@@ -24,7 +26,9 @@ class HotspotPairingStorage {
     final expiry = DateTime.tryParse(
       await _storage.read(key: _expiryKey) ?? '',
     )?.toUtc();
-    if (url == null || token == null || expiry == null ||
+    if (url == null ||
+        token == null ||
+        expiry == null ||
         !expiry.isAfter(DateTime.now().toUtc())) {
       await clear();
       return false;

@@ -126,7 +126,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadLabReportCount() async {
     try {
       final reports = await LabReportApiService().getReports();
-      final count = reports.where((x) => x['status']?.toString() == 'Uploaded').length;
+      final count =
+          reports.where((x) => x['status']?.toString() == 'Uploaded').length;
       if (mounted) setState(() => _unreviewedLabReportCount = count);
     } catch (_) {
       // Dashboard remains usable offline; the inbox refreshes when opened.
@@ -1691,95 +1692,99 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-              const Text(
-                'More Options',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                leading: const Icon(Icons.people_alt),
-                title: const Text('Patients'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigate('Patient Master');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.person_search),
-                title: const Text('Patient History'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigate('Patient History');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.history),
-                title: const Text('Prescription History'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigate('Prescription History');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.qr_code_scanner),
-                title: const Text('QR Scan'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigate('Scan Prescription');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.science_outlined),
-                title: const Text('Laboratories'),
-                subtitle: const Text('Register and manage referral laboratories'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigate('Laboratories');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.assignment_turned_in_outlined),
-                title: const Text('Lab Reports'),
-                subtitle: Text(_unreviewedLabReportCount == 0 ? 'No reports awaiting review' : '$_unreviewedLabReportCount report(s) awaiting review'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigate('Lab Reports');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.account_circle_outlined),
-                title: const Text('My Profile'),
-                subtitle: const Text('Doctor and medical centre details'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigate('Doctor Profile');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.sync),
-                title: const Text('Sync Now'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _syncNow();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.support_agent),
-                title: const Text('Reception Accounts'),
-                subtitle: const Text('Add and manage linked reception users'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigate('Reception Accounts');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.settings_ethernet),
-                title: const Text('Connection Mode'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showConnectionModeDialog();
-                },
-              ),
+                  const Text(
+                    'More Options',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  const SizedBox(height: 12),
+                  ListTile(
+                    leading: const Icon(Icons.people_alt),
+                    title: const Text('Patients'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigate('Patient Master');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.person_search),
+                    title: const Text('Patient History'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigate('Patient History');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.history),
+                    title: const Text('Prescription History'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigate('Prescription History');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.qr_code_scanner),
+                    title: const Text('QR Scan'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigate('Scan Prescription');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.science_outlined),
+                    title: const Text('Laboratories'),
+                    subtitle:
+                        const Text('Register and manage referral laboratories'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigate('Laboratories');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.assignment_turned_in_outlined),
+                    title: const Text('Lab Reports'),
+                    subtitle: Text(_unreviewedLabReportCount == 0
+                        ? 'No reports awaiting review'
+                        : '$_unreviewedLabReportCount report(s) awaiting review'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigate('Lab Reports');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.account_circle_outlined),
+                    title: const Text('My Profile'),
+                    subtitle: const Text('Doctor and medical centre details'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigate('Doctor Profile');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.sync),
+                    title: const Text('Sync Now'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _syncNow();
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.support_agent),
+                    title: const Text('Reception Accounts'),
+                    subtitle:
+                        const Text('Add and manage linked reception users'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _navigate('Reception Accounts');
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.settings_ethernet),
+                    title: const Text('Connection Mode'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showConnectionModeDialog();
+                    },
+                  ),
                 ],
               ),
             ),

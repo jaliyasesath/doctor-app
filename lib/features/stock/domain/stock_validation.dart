@@ -21,7 +21,8 @@ class StockValidation {
     if (expiryDate != null) {
       final current = now ?? DateTime.now();
       final today = DateTime(current.year, current.month, current.day);
-      final expiry = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
+      final expiry =
+          DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
       if (expiry.isBefore(today)) return 'Expired stock cannot be received.';
     }
     return null;

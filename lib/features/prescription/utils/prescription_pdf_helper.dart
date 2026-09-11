@@ -33,7 +33,11 @@ class PrescriptionPdfHelper {
 
     pw.Widget signatureWidget() {
       if (signatureBytes != null && signatureBytes.isNotEmpty) {
-        return pw.Column(children: [pw.Center(child: pw.Image(pw.MemoryImage(signatureBytes), height: 60)), pw.SizedBox(height: 6)]);
+        return pw.Column(children: [
+          pw.Center(
+              child: pw.Image(pw.MemoryImage(signatureBytes), height: 60)),
+          pw.SizedBox(height: 6)
+        ]);
       }
       if (signaturePath.isEmpty) return pw.SizedBox();
 
@@ -61,8 +65,12 @@ class PrescriptionPdfHelper {
           pw.Center(
             child: pw.Column(
               children: [
-                if (medicalCenterLogoBytes != null && medicalCenterLogoBytes.isNotEmpty)
-                  pw.Padding(padding: const pw.EdgeInsets.only(bottom: 8), child: pw.Image(pw.MemoryImage(medicalCenterLogoBytes), height: 64, fit: pw.BoxFit.contain)),
+                if (medicalCenterLogoBytes != null &&
+                    medicalCenterLogoBytes.isNotEmpty)
+                  pw.Padding(
+                      padding: const pw.EdgeInsets.only(bottom: 8),
+                      child: pw.Image(pw.MemoryImage(medicalCenterLogoBytes),
+                          height: 64, fit: pw.BoxFit.contain)),
                 pw.Text(
                   medicalCenterName,
                   style: pw.TextStyle(

@@ -201,8 +201,8 @@ class _DoctorHotspotQrScreenState extends State<DoctorHotspotQrScreen> {
                       'version': 1,
                       'url': _serverUrl,
                       'token': LocalClinicServer.pairingToken,
-                      'expiresAt': LocalClinicServer.pairingExpiresAt
-                          ?.toIso8601String(),
+                      'expiresAt':
+                          LocalClinicServer.pairingExpiresAt?.toIso8601String(),
                     }),
                     version: QrVersions.auto,
                     size: 240,
