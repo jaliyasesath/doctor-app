@@ -12,7 +12,10 @@ void main() {
     expect(source, contains('getPrescriptionsByDoctorPaged('));
     expect(source, isNot(contains('DatabaseHelper.instance.getPrescriptions()')));
     expect(source, contains('_refreshReceptionHistoryFromServer'));
-    expect(source, contains('reception_prescription_history_backfill_v1_'));
+    expect(
+  source,
+  contains('reception_prescription_history_billing_backfill_v2_'),
+);
     expect(source, contains('fullRefresh: needsFullBackfill'));
   });
 }

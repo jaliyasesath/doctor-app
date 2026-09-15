@@ -48,6 +48,7 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
   bool _isPrinting = false;
   bool _isBillMode = false;
   bool _alreadyBilled = false;
+  Map<String, dynamic>? _savedBill;
 
   String rxNo = '';
   String qrValue = '';
@@ -163,7 +164,15 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
 
     setState(() {
       _alreadyBilled = bill != null;
+      _savedBill = bill == null ? null : Map<String, dynamic>.from(bill);
     });
+  }
+
+  double _savedBillAmount(String key, double fallback) {
+    final value = _savedBill?[key];
+    return value == null
+        ? fallback
+        : double.tryParse(value.toString()) ?? fallback;
   }
 
   // Future<void> _autoConnectPrinter() async {
@@ -371,7 +380,16 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
         slmcRegNo: slmcRegNo,
         affiliation: affiliation,
         contactNumber: contactNumber,
-        consultationFee: PrescriptionStore.consultationFee,
+        consultationFee: _savedBillAmount(
+          'consultation_fee',
+          PrescriptionStore.consultationFee,
+        ),
+        medicineChargesOverride: _savedBill == null
+            ? null
+            : _savedBillAmount('medicine_charges', 0),
+        grandTotalOverride: _savedBill == null
+            ? null
+            : _savedBillAmount('total_amount', 0),
         qrValue: qrValue,
       );
 
@@ -789,12 +807,21 @@ GET WELL SOON
                                     Text(
                                       'Qty: ${item.quantity}',
                                     ),
-                                    Text(
-                                      'Rs. ${item.lineTotal.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
+                                    if (item.lineTotal > 0)
+                                      Text(
+                                        'Rs. ${item.lineTotal.toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      )
+                                    else if (_savedBill != null)
+                                      const Text(
+                                        'Included in total',
+                                        style: TextStyle(
+                                          color: Colors.black54,
+                                          fontSize: 12,
+                                        ),
                                       ),
-                                    ),
                                   ],
                                 ),
                               ],
@@ -806,17 +833,27 @@ GET WELL SOON
                       const Divider(height: 30),
                       Builder(
                         builder: (_) {
-                          final medicineTotal = items
+                          final calculatedMedicineTotal = items
                               .where((e) => !e.prescriptionOnly)
                               .fold<double>(
                                 0,
                                 (sum, item) => sum + item.lineTotal,
                               );
 
-                          final consultationFee =
-                              PrescriptionStore.consultationFee;
+                          final medicineTotal = _savedBillAmount(
+                            'medicine_charges',
+                            calculatedMedicineTotal,
+                          );
 
-                          final grandTotal = consultationFee + medicineTotal;
+                          final consultationFee = _savedBillAmount(
+                            'consultation_fee',
+                            PrescriptionStore.consultationFee,
+                          );
+
+                          final grandTotal = _savedBillAmount(
+                            'total_amount',
+                            consultationFee + medicineTotal,
+                          );
 
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

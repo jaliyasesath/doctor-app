@@ -2883,6 +2883,7 @@ is_favorite INTEGER DEFAULT 0,
     required String prescriptionNo,
     required String prescriptionDate,
     required String itemsText,
+    List<Map<String, dynamic>> items = const [],
     String? complaint,
     String? diagnosis,
     String? visitNotes,
@@ -2947,15 +2948,86 @@ is_favorite INTEGER DEFAULT 0,
       'updated_at': updatedAt ?? DateTime.now().toIso8601String(),
     };
 
+    late final int localPrescriptionId;
     if (existing.isEmpty) {
-      await db.insert('prescriptions', data);
+      localPrescriptionId = await db.insert('prescriptions', data);
     } else {
+      localPrescriptionId = existing.first['id'] as int;
       await db.update(
         'prescriptions',
         data,
         where: 'id = ?',
-        whereArgs: [existing.first['id']],
+        whereArgs: [localPrescriptionId],
       );
+    }
+
+    if (items.isNotEmpty) {
+      final existingItems = await db.query(
+        'prescription_items',
+        where: 'prescription_id = ?',
+        whereArgs: [localPrescriptionId],
+        orderBy: 'id ASC',
+      );
+
+      await db.transaction((txn) async {
+        await txn.delete(
+          'prescription_items',
+          where: 'prescription_id = ?',
+          whereArgs: [localPrescriptionId],
+        );
+
+        for (final item in items) {
+          int? localMedicineId;
+          final serverMedicineId = (item['medicineId'] as num?)?.toInt();
+          if (serverMedicineId != null && serverMedicineId > 0) {
+            final medicine = await txn.query(
+              'medicines',
+              columns: ['id'],
+              where: 'doctor_id = ? AND server_id = ? AND is_deleted = 0',
+              whereArgs: [doctorId, serverMedicineId],
+              limit: 1,
+            );
+            if (medicine.isNotEmpty) {
+              localMedicineId = medicine.first['id'] as int;
+            }
+          }
+
+          Map<String, dynamic>? pricedLocalItem;
+          final medicineName = item['medicineName']?.toString() ?? '';
+          for (final existingItem in existingItems) {
+            if ((existingItem['medicine_name']?.toString() ?? '')
+                    .toLowerCase() ==
+                medicineName.toLowerCase()) {
+              pricedLocalItem = existingItem;
+              break;
+            }
+          }
+
+          final unitPrice =
+              (pricedLocalItem?['unit_price'] as num?)?.toDouble() ?? 0;
+          final quantity =
+              (item['quantity'] as num?)?.toDouble() ?? 1;
+          final preservedLineTotal =
+              (pricedLocalItem?['line_total'] as num?)?.toDouble();
+
+          await txn.insert('prescription_items', {
+            'prescription_id': localPrescriptionId,
+            'medicine_id': localMedicineId,
+            'medicine_name': medicineName,
+            'dosage': item['dosage']?.toString() ?? '',
+            'frequency': item['frequency']?.toString() ?? '',
+            'duration': item['duration']?.toString() ?? '',
+            'instructions': item['instructions']?.toString() ?? '',
+            'prescription_only': item['prescriptionOnly'] == true ? 1 : 0,
+            'unit_price': unitPrice,
+            'quantity': quantity,
+            'line_total': unitPrice > 0
+                ? unitPrice * quantity
+                : (preservedLineTotal ?? 0),
+            'created_at': DateTime.now().toIso8601String(),
+          });
+        }
+      });
     }
   }
 

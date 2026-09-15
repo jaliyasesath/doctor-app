@@ -232,8 +232,32 @@ class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
     }).toList();
   }
 
-  void _open(Map<String, dynamic> item) {
-    final items = _parseItemsText((item['items_text'] ?? '').toString());
+  Future<void> _open(Map<String, dynamic> item) async {
+    final prescriptionId = item['id'] as int;
+    final storedItems =
+        await DatabaseHelper.instance.getPrescriptionItems(prescriptionId);
+    final items = storedItems.isEmpty
+        ? _parseItemsText((item['items_text'] ?? '').toString())
+        : storedItems.map((storedItem) {
+            return PrescriptionItem(
+              medicineId: (storedItem['medicine_id'] as num?)?.toInt(),
+              medicineName:
+                  storedItem['medicine_name']?.toString() ?? '',
+              dosage: storedItem['dosage']?.toString() ?? '',
+              frequency: storedItem['frequency']?.toString() ?? '',
+              duration: storedItem['duration']?.toString() ?? '',
+              instructions: storedItem['instructions']?.toString() ?? '',
+              prescriptionOnly:
+                  (storedItem['prescription_only'] as num?)?.toInt() == 1,
+              unitPrice:
+                  (storedItem['unit_price'] as num?)?.toDouble() ?? 0,
+              quantity: (storedItem['quantity'] as num?)?.toDouble() ?? 1,
+              lineTotal:
+                  (storedItem['line_total'] as num?)?.toDouble() ?? 0,
+            );
+          }).toList();
+
+    if (!mounted) return;
 
     PrescriptionStore.setPatientDetails(
       name: (item['patient_name'] ?? '').toString(),
@@ -420,10 +444,15 @@ class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
       final result = SyncResult();
       final prefs = await SharedPreferences.getInstance();
       final backfillKey =
-          'reception_prescription_history_backfill_v1_${_doctorId!}';
+          'reception_prescription_history_billing_backfill_v2_${_doctorId!}';
       final needsFullBackfill = !(prefs.getBool(backfillKey) ?? false);
 
-      await SyncService().pullPrescriptions(
+      final syncService = SyncService();
+      await syncService.pullPrescriptions(
+        result,
+        fullRefresh: needsFullBackfill,
+      );
+      await syncService.pullBills(
         result,
         fullRefresh: needsFullBackfill,
       );

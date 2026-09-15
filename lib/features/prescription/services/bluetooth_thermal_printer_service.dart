@@ -117,6 +117,8 @@ class BluetoothThermalPrinterService {
     required String affiliation,
     required String contactNumber,
     required double consultationFee,
+    double? medicineChargesOverride,
+    double? grandTotalOverride,
     required String qrValue,
   }) async {
     if (!await connectSaved()) return false;
@@ -212,7 +214,9 @@ class BluetoothThermalPrinterService {
                 width: 6,
               ),
               PosColumn(
-                text: 'Rs.${item.lineTotal.toStringAsFixed(2)}',
+                text: item.lineTotal > 0
+                    ? 'Rs.${item.lineTotal.toStringAsFixed(2)}'
+                    : 'Included',
                 width: 6,
                 styles: const PosStyles(align: PosAlign.right),
               ),
@@ -220,11 +224,14 @@ class BluetoothThermalPrinterService {
           );
       }
 
-      final medicineTotal = billItems.fold<double>(
+      final calculatedMedicineTotal = billItems.fold<double>(
         0,
         (sum, item) => sum + item.lineTotal,
       );
-      final grandTotal = consultationFee + medicineTotal;
+      final medicineTotal =
+          medicineChargesOverride ?? calculatedMedicineTotal;
+      final grandTotal =
+          grandTotalOverride ?? (consultationFee + medicineTotal);
       bytes
         ..addAll(generator.hr())
         ..addAll(_moneyRow(generator, 'Channeling Fee', consultationFee))

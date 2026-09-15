@@ -320,6 +320,10 @@ class SyncService {
             prescriptionNo: (rx['prescriptionNo'] ?? '').toString(),
             prescriptionDate: (rx['prescriptionDate'] ?? '').toString(),
             itemsText: itemsText,
+            items: items
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList(),
             complaint: rx['complaint']?.toString(),
             diagnosis: rx['diagnosis']?.toString(),
             visitNotes: rx['visitNotes']?.toString(),
@@ -768,7 +772,10 @@ class SyncService {
     }
   }
 
-  Future<void> pullBills(SyncResult result) async {
+  Future<void> pullBills(
+    SyncResult result, {
+    bool fullRefresh = false,
+  }) async {
     final doctorId = await DoctorSession.getActiveDoctorIdForData();
     if (doctorId == null) {
       result.lastError = 'Doctor session not found';
@@ -777,7 +784,9 @@ class SyncService {
 
     final prefs = await SharedPreferences.getInstance();
     final syncKey = 'last_bills_sync_at_$doctorId';
-    final lastSyncAt = _withSyncOverlap(prefs.getString(syncKey));
+    final lastSyncAt = fullRefresh
+        ? null
+        : _withSyncOverlap(prefs.getString(syncKey));
     final syncStartedAt = DateTime.now().toUtc().toIso8601String();
 
     try {
