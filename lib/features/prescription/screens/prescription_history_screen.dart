@@ -184,6 +184,7 @@ class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
   Future<void> _confirmDelete(int id) async {
     final result = await showDialog<bool>(
       context: context,
+      useRootNavigator: false,
       builder: (context) {
         return AlertDialog(
           title: const Text('Delete Prescription'),

@@ -5,3 +5,6 @@
 
 -keep class com.google.gson.reflect.TypeToken { *; }
 -keep class * extends com.google.gson.reflect.TypeToken
+
+# Required by sqflite_sqlcipher in minified release builds.
+-keep class net.sqlcipher.** { *; }

@@ -408,6 +408,7 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
       } else {
         final openSettings = await showDialog<bool>(
           context: context,
+          useRootNavigator: false,
           builder: (dialogContext) => AlertDialog(
             title: const Text('Printer not connected'),
             content: const Text(

@@ -108,7 +108,8 @@ class _SmartChipsSectionState extends State<SmartChipsSection> {
 
     final value = await showDialog<String>(
       context: context,
-      builder: (_) {
+      useRootNavigator: false,
+      builder: (dialogContext) {
         return AlertDialog(
           title: Text('Add $title'),
           content: TextField(
@@ -121,12 +122,12 @@ class _SmartChipsSectionState extends State<SmartChipsSection> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(context, controller.text.trim());
+                Navigator.pop(dialogContext, controller.text.trim());
               },
               child: const Text('Add'),
             ),
@@ -176,6 +177,7 @@ class _SmartChipsSectionState extends State<SmartChipsSection> {
 
     final confirm = await showDialog<bool>(
       context: context,
+      useRootNavigator: false,
       builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Delete Chip'),

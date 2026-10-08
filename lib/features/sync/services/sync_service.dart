@@ -1,9 +1,10 @@
 import '../../../data/local/database_helper.dart';
 import '../../../core/errors/app_exception.dart';
-import '../../auth/data/api_auth_service.dart';
-import '../../auth/data/credential_storage.dart';
 import '../../auth/data/doctor_session.dart';
 import '../../net_service/token_storage.dart';
+import '../../net_service/api_client.dart';
+import '../../net_service/api_config.dart';
+import '../../net_service/auto_api_resolver.dart';
 import '../../patient/data/api_patient_service.dart';
 import '../../prescription/data/api_prescription_service.dart';
 import 'network_service.dart';
@@ -50,7 +51,6 @@ class SyncService {
   final ApiInstructionService _instructionApi = ApiInstructionService();
   final ApiMedicineService _medicineApi = ApiMedicineService();
   final DatabaseHelper _db = DatabaseHelper.instance;
-  final ApiAuthService _authApi = ApiAuthService();
   final ApiPatientService _patientApi = ApiPatientService();
   final ApiPrescriptionService _prescriptionApi = ApiPrescriptionService();
   final ApiBillService _billApi = ApiBillService();
@@ -85,7 +85,7 @@ class SyncService {
     }
   }
 
-  Future<SyncResult> syncAll() async {
+  Future<SyncResult> syncAll({bool networkConfirmed = false}) async {
     if (_syncInProgress) {
       final result = SyncResult();
       result.lastError = 'Sync already in progress';
@@ -95,7 +95,7 @@ class SyncService {
     _syncInProgress = true;
 
     try {
-      return await _performSync();
+      return await _performSync(networkConfirmed: networkConfirmed);
     } finally {
       _syncInProgress = false;
     }
@@ -123,8 +123,7 @@ class SyncService {
     }
 
     final doctorId = await DoctorSession.getActiveDoctorIdForData();
-    final token = await TokenStorage.getToken();
-    if (doctorId == null || token == null || token.isEmpty) {
+    if (doctorId == null || !(await _ensureOnlineSession())) {
       result.lastError = 'Online session not found. Please login again.';
       return result;
     }
@@ -134,13 +133,31 @@ class SyncService {
     return result;
   }
 
-  Future<SyncResult> _performSync() async {
+  Future<SyncResult> _performSync({bool networkConfirmed = false}) async {
     final result = SyncResult();
 
-    final online = await NetworkService.isOnline();
-    if (!online) {
-      result.lastError = 'No internet';
+    // Auto mode can be resolved to an empty URL when the app starts without
+    // internet. A later connectivity event must resolve the API again before
+    // any queued request is attempted. `networkConfirmed` only means that a
+    // transport is available; it does not mean that AutoApiResolver currently
+    // has a usable server URL.
+    if (ApiConfig.isAuto) {
+      await AutoApiResolver.resolve();
+    }
+
+    if (ApiConfig.baseUrl.trim().isEmpty) {
+      result.lastError = ApiConfig.isOffline
+          ? 'Offline Only mode is enabled.'
+          : 'No reachable API server was found.';
       return result;
+    }
+
+    if (!networkConfirmed) {
+      final online = await NetworkService.isOnline();
+      if (!online) {
+        result.lastError = 'No internet';
+        return result;
+      }
     }
 
     final doctor = await DoctorSession.getDoctor();
@@ -151,8 +168,7 @@ class SyncService {
 
     await syncDoctors(result);
 
-    final token = await TokenStorage.getToken();
-    if (token == null || token.isEmpty) {
+    if (!(await _ensureOnlineSession())) {
       result.lastError = 'Online session not found. Please login again.';
       return result;
     }
@@ -169,6 +185,15 @@ class SyncService {
     await pullBills(result);
 
     return result;
+  }
+
+  Future<bool> _ensureOnlineSession() async {
+    final token = await TokenStorage.getToken();
+    if (token != null && token.isNotEmpty) return true;
+
+    // Biometric/offline access intentionally does not retain the account
+    // password. Restore online access only with the device-bound refresh token.
+    return ApiClient.refreshSession();
   }
 
   Future<void> syncCustomInstructions() async {
@@ -482,49 +507,13 @@ class SyncService {
     for (final doctor in pendingDoctors) {
       final localId = doctor['id'] as int;
       final email = doctor['email']?.toString() ?? '';
-      final password = await CredentialStorage.getPassword(email) ?? '';
-
-      if (password.isEmpty) {
-        await _db.markDoctorSyncFailed(localId);
-        result.doctorFailed++;
-        result.lastError = 'Doctor sync requires the user to log in again.';
-        continue;
-      }
-
-      try {
-        // Doctor registration now requires live identity verification,
-        // including the SLMC/NIC front and back images and explicit consent.
-        // Therefore an old offline doctor record must never be registered
-        // automatically in the background. If the account already exists and
-        // is approved, login can safely reconnect the legacy local record.
-        final loginResult = await _authApi.login(
-          email: email,
-          password: password,
-        );
-
-        if (loginResult['success'] == true) {
-          final doctorData = loginResult['doctor'] as Map<String, dynamic>;
-          final serverId = doctorData['id'] ?? doctorData['serverId'] ?? 0;
-
-          await _db.markDoctorSynced(
-            localId,
-            serverId is int ? serverId : 0,
-          );
-
-          result.doctorSuccess++;
-          continue;
-        }
-
-        await _db.markDoctorSyncFailed(localId);
-        result.doctorFailed++;
-        result.lastError =
-            'Doctor registration requires online identity verification. '
-            'Open the registration screen and upload both ID images.';
-      } catch (e) {
-        await _db.markDoctorSyncFailed(localId);
-        result.doctorFailed++;
-        result.lastError = SyncErrorPolicy.message('Doctor sync', e);
-      }
+      // Never retain or replay the account password in background sync.
+      // Legacy offline-created doctor records require an explicit online
+      // sign-in, after which normal token-authenticated sync resumes.
+      await _db.markDoctorSyncFailed(localId);
+      result.doctorFailed++;
+      result.lastError =
+          'Doctor sync requires an explicit online sign-in for $email.';
     }
   }
 

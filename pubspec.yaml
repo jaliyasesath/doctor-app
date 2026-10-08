@@ -2,7 +2,7 @@ name: doctor_app
 description: Doctor Prescription & OPD Management App
 publish_to: "none"
 
-version: 1.0.0+1
+version: 1.1.1+14
 
 environment:
   sdk: ">=3.2.0 <4.0.0"
@@ -18,12 +18,20 @@ dependencies:
   signalr_netcore: ^1.4.4
 
   # DATABASE
-  sqflite: ^2.3.3
+  # SQLCipher-backed drop-in replacement for sqflite on Android/iOS/macOS.
+  # Windows uses a separate encrypted adapter in the desktop milestone.
+  sqflite_sqlcipher: ^3.4.1
+  # Windows database adapter. sqlite3 is built with SQLite3 Multiple Ciphers;
+  # the adapter selects its SQLCipher-compatible AES-256 scheme before opening.
+  # Pinned to the newest releases compatible with the current Dart 3.11 SDK.
+  sqflite_common_ffi: 2.4.0+3
+  sqlite3: 3.5.2
   path: ^1.9.0
 
   # LOCAL STORAGE
   shared_preferences: ^2.2.3
   flutter_secure_storage: ^9.2.4
+  crypto: ^3.0.6
 
   # NETWORK CHECK
   connectivity_plus: ^6.0.5
@@ -91,3 +99,11 @@ flutter:
   assets:
     - assets/images/private_practices_logo.jpeg
     - assets/images/app_icon.png
+
+# sqlite3 3.5.2 (the Dart 3.11-compatible release) provides the encrypted
+# SQLite3 Multiple Ciphers native build. The Windows adapter explicitly selects
+# its SQLCipher-compatible AES-256 scheme before applying the database key.
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc

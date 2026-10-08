@@ -551,7 +551,8 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      useRootNavigator: false,
+      builder: (dialogContext) => AlertDialog(
         title: const Text('⚠️ Allergy Warning'),
         content: Text(
           'Patient allergies: ${selectedAllergies.join(', ')}\n\n'
@@ -561,12 +562,12 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Add Anyway'),
           ),
         ],
@@ -665,6 +666,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
 
     final added = await showDialog<bool>(
       context: context,
+      useRootNavigator: false,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
@@ -1649,6 +1651,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
 
     final result = await showDialog<String>(
       context: context,
+      useRootNavigator: false,
       builder: (context) {
         return AlertDialog(
           title: const Text('Template Name'),
@@ -1810,6 +1813,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
 
     final result = await showDialog<bool>(
       context: context,
+      useRootNavigator: false,
       builder: (context) {
         return AlertDialog(
           title: Text('Edit ${item.medicineName}'),
@@ -1971,7 +1975,8 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
 
     final value = await showDialog<String>(
       context: context,
-      builder: (_) {
+      useRootNavigator: false,
+      builder: (dialogContext) {
         return AlertDialog(
           title: Text('Add $title'),
           content: TextField(
@@ -1984,13 +1989,13 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(
-                  context,
+                  dialogContext,
                   newController.text.trim(),
                 );
               },
@@ -2072,7 +2077,8 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
 
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) {
+      useRootNavigator: false,
+      builder: (dialogContext) {
         return AlertDialog(
           title: const Text('Delete Chip'),
           content: Text(
@@ -2080,14 +2086,14 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.red,
               ),
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(dialogContext, true),
               child: const Text('Delete'),
             ),
           ],
@@ -3056,6 +3062,7 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       confirmDismiss: (_) async {
         return await showDialog<bool>(
               context: context,
+              useRootNavigator: false,
               builder: (dialogContext) {
                 return AlertDialog(
                   title: const Text('Remove Medicine'),

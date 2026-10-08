@@ -113,9 +113,9 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
     await _loadPending(silent: true);
   }
 
-  Future<void> _logout() async {
+  Future<void> _lockApp() async {
     await QueueRealtimeService.instance.disconnect();
-    await ApiAuthService().logout();
+    await ApiAuthService().lockApp();
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(context, '/', (_) => false);
   }
@@ -246,7 +246,7 @@ class _ReceptionDashboardScreenState extends State<ReceptionDashboardScreen> {
               icon: const Icon(Icons.refresh_rounded, color: Colors.white)),
           IconButton(
               tooltip: 'Logout',
-              onPressed: _logout,
+              onPressed: _lockApp,
               icon: const Icon(Icons.logout_rounded, color: Colors.white)),
         ]),
         const SizedBox(height: 16),

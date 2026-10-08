@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
@@ -9,9 +10,12 @@ import '../../prescription/screens/prescription_list_screen.dart';
 import '../services/queue_local_page_service.dart';
 import '../services/queue_realtime_service.dart';
 import '../services/queue_sync_service.dart';
+import 'desktop_doctor_queue_view.dart';
 
 class DoctorQueueScreen extends StatefulWidget {
-  const DoctorQueueScreen({super.key});
+  const DoctorQueueScreen({super.key, this.embeddedDesktop = false});
+
+  final bool embeddedDesktop;
 
   @override
   State<DoctorQueueScreen> createState() => _DoctorQueueScreenState();
@@ -390,6 +394,49 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen>
         e,
         onRetry: () => _completePatient(id),
       );
+    }
+  }
+
+  Future<void> _openPatient(Map<String, dynamic> patient) async {
+    final id = patient['id'] as int;
+    final name = patient['patientName']?.toString() ?? '';
+    final age = patient['patientAge']?.toString() ?? '';
+    final gender = patient['patientGender']?.toString() ?? '';
+    final phone = patient['phoneNumber']?.toString() ?? '';
+    final status = patient['queueStatus']?.toString() ?? '';
+
+    if (status != 'Completed' && status != 'Skipped') {
+      try {
+        await _api.setServingPatient(id);
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PrescriptionListScreen(
+          patientName: name,
+          patientAge: age,
+          patientGender: gender,
+          patientPhone: phone,
+          patientAddress: patient['address']?.toString() ?? '',
+          existingPatientId: id,
+        ),
+      ),
+    );
+
+    if (mounted) await _reloadCurrentTab(silent: false);
+  }
+
+  void _changeTab(String selected) {
+    if (selected == 'completed') {
+      _loadCompleted(silent: false);
+    } else if (selected == 'skipped') {
+      _loadSkipped(silent: false);
+    } else {
+      _loadWaiting(silent: false);
     }
   }
 
@@ -867,6 +914,26 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen>
       brightness: Theme.of(context).brightness,
     );
 
+    if (Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000) {
+      return DesktopDoctorQueueView(
+        selectedTab: _selectedTab,
+        patients: _patients,
+        previousPendingPatients: _previousPendingPatients,
+        loading: _loading,
+        loadingMore: _loadingMore,
+        error: _error,
+        scrollController: _scrollController,
+        onTabChanged: _changeTab,
+        onRefresh: () => _reloadCurrentTab(silent: false),
+        onOpen: _openPatient,
+        onSkip: _skipPatient,
+        onComplete: _completePatient,
+        onMoveToToday: _movePatientToToday,
+        onBack: () => Navigator.pop(context),
+        embedded: widget.embeddedDesktop,
+      );
+    }
+
     return Theme(
       data: Theme.of(context).copyWith(
         colorScheme: greenScheme,
@@ -958,17 +1025,7 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen>
                     ),
                   ),
                 ),
-                onSelectionChanged: (value) {
-                  final selected = value.first;
-
-                  if (selected == 'completed') {
-                    _loadCompleted(silent: false);
-                  } else if (selected == 'skipped') {
-                    _loadSkipped(silent: false);
-                  } else {
-                    _loadWaiting(silent: false);
-                  }
-                },
+                onSelectionChanged: (value) => _changeTab(value.first),
               ),
             ),
             Expanded(child: _body()),

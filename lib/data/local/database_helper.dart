@@ -1,28 +1,68 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:path/path.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_sqlcipher/sqflite.dart';
 
 import '../../features/auth/data/doctor_session.dart';
+import 'database_key_service.dart';
+import 'encrypted_database_migrator.dart';
+import 'windows_encrypted_database.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
+  static Future<Database>? _databaseOpening;
 
   DatabaseHelper._init();
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDB('doctor_app.db');
-    return _database!;
+
+    // Database encryption/migration must be single-flight. Startup services,
+    // biometric login and sync may request the database together; running two
+    // plaintext-to-SQLCipher migrations against the same files can otherwise
+    // leave a recovery copy and surface DBM-01.
+    final inProgress = _databaseOpening;
+    if (inProgress != null) return inProgress;
+
+    final opening = _initDB('doctor_app.db');
+    _databaseOpening = opening;
+    try {
+      final opened = await opening;
+      _database = opened;
+      return opened;
+    } finally {
+      if (identical(_databaseOpening, opening)) {
+        _databaseOpening = null;
+      }
+    }
   }
 
   Future<Database> _initDB(String filePath) async {
+    final password = await DatabaseKeyService.instance.getOrCreateKey();
+
+    if (Platform.isWindows) {
+      return WindowsEncryptedDatabase.open(
+        fileName: filePath,
+        password: password,
+        version: 39,
+        onCreate: _createDB,
+        onUpgrade: _onUpgrade,
+      );
+    }
+
+    if (!Platform.isAndroid && !Platform.isIOS && !Platform.isMacOS) {
+      throw UnsupportedError(
+        'Encrypted local medical records are not configured for this platform.',
+      );
+    }
+
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
-
-    return openDatabase(
-      path,
+    return EncryptedDatabaseMigrator.openOrMigrate(
+      path: path,
+      password: password,
       version: 39,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
@@ -3005,8 +3045,7 @@ is_favorite INTEGER DEFAULT 0,
 
           final unitPrice =
               (pricedLocalItem?['unit_price'] as num?)?.toDouble() ?? 0;
-          final quantity =
-              (item['quantity'] as num?)?.toDouble() ?? 1;
+          final quantity = (item['quantity'] as num?)?.toDouble() ?? 1;
           final preservedLineTotal =
               (pricedLocalItem?['line_total'] as num?)?.toDouble();
 

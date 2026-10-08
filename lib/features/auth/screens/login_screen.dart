@@ -37,6 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _biometricEnabledForLastDoctor = false;
   bool _deviceSupportsBiometric = false;
   String _lastDoctorName = '';
+  String _loginStage = '';
 
   @override
   void initState() {
@@ -56,7 +57,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loadBiometricState() async {
-    final lastDoctor = await DoctorSession.getLastDoctorForBiometric();
+    Map<String, dynamic>? lastDoctor;
+    try {
+      lastDoctor = await DoctorSession.getLastDoctorForBiometric();
+    } catch (_) {
+      // The login form must remain usable even when an optional cached
+      // biometric profile cannot be read.
+      lastDoctor = null;
+    }
 
     bool supported = false;
     try {
@@ -293,6 +301,12 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loginWithBiometric() async {
+    if (_isLoading) return;
+    setState(() {
+      _isLoading = true;
+      _loginStage = 'Waiting for device authentication...';
+    });
+
     try {
       final lastDoctor = await DoctorSession.getLastDoctorForBiometric();
 
@@ -346,38 +360,39 @@ class _LoginScreenState extends State<LoginScreen> {
       final licenseOk = await _checkOfflineLicenseOnly();
       if (!licenseOk) return;
 
+      if (mounted) {
+        setState(() => _loginStage = 'Restoring secure offline session...');
+      }
+
       await DoctorSession.saveDoctorSession({
         'id': (lastDoctor['id'] is int)
             ? lastDoctor['id']
             : int.tryParse(lastDoctor['id'].toString()) ?? 0,
         'doctor_name': lastDoctor['doctor_name'] ?? '',
         'email': lastDoctor['email'] ?? '',
-        'password': lastDoctor['password'] ?? '',
+        'password': '',
         'role': lastDoctor['role'] ?? 'Doctor',
         'medical_center_name': lastDoctor['medical_center_name'] ?? '',
         'specialization': lastDoctor['specialization'] ?? '',
         'clinic_address': lastDoctor['clinic_address'] ?? '',
         'biometric_enabled': 1,
-      });
-
-      try {
-        final email = lastDoctor['email']?.toString() ?? '';
-        final password = lastDoctor['password']?.toString() ?? '';
-
-        if (email.isNotEmpty && password.isNotEmpty) {
-          await _apiAuthService.login(
-            email: email,
-            password: password,
-          );
-        }
-      } catch (_) {
-        // Ignore. Biometric login can still continue offline.
-      }
+      }).timeout(
+        const Duration(seconds: 12),
+        onTimeout: () => throw TimeoutException('offline_session'),
+      );
 
       final doctorId = await DoctorSession.getDoctorId();
 
       if (doctorId != null && doctorId > 0) {
-        await DatabaseHelper.instance.assignOldLocalDataToDoctor(doctorId);
+        if (mounted) {
+          setState(() => _loginStage = 'Securing local medical records...');
+        }
+        await DatabaseHelper.instance
+            .assignOldLocalDataToDoctor(doctorId)
+            .timeout(
+              const Duration(seconds: 45),
+              onTimeout: () => throw TimeoutException('database_migration'),
+            );
       }
 
       if (!mounted) return;
@@ -389,7 +404,8 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       final role = lastDoctor['role']?.toString() ?? 'Doctor';
-      _navigateByRole(role);
+      setState(() => _loginStage = 'Opening dashboard...');
+      await _navigateByRole(role);
     } on LocalAuthException catch (e) {
       if (!mounted) return;
 
@@ -398,14 +414,62 @@ class _LoginScreenState extends State<LoginScreen> {
         e,
         onRetry: _loginWithBiometric,
       );
+    } on TimeoutException catch (e) {
+      if (!mounted) return;
+
+      final stage = e.message == 'database_migration'
+          ? 'local database migration'
+          : 'offline session restoration';
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'Login stopped during $stage. Existing data was not deleted. '
+              'Close the app before trying again.',
+            ),
+            backgroundColor: const Color(0xFF9F2D2D),
+            duration: const Duration(seconds: 12),
+          ),
+        );
     } catch (e) {
       if (!mounted) return;
 
-      AppErrorUi.show(
-        context,
-        e,
-        onRetry: _loginWithBiometric,
-      );
+      final duringDatabaseSecurity =
+          _loginStage == 'Securing local medical records...';
+      if (duringDatabaseSecurity) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Local medical records could not be secured (DBM-01). '
+                'Existing data was not deleted. Close the app before '
+                'trying again.',
+              ),
+              backgroundColor: const Color(0xFF9F2D2D),
+              duration: const Duration(seconds: 12),
+              action: SnackBarAction(
+                label: 'RETRY',
+                textColor: Colors.white,
+                onPressed: _loginWithBiometric,
+              ),
+            ),
+          );
+      } else {
+        AppErrorUi.show(
+          context,
+          e,
+          onRetry: _loginWithBiometric,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _loginStage = '';
+        });
+      }
     }
   }
 
@@ -772,6 +836,21 @@ class _LoginScreenState extends State<LoginScreen> {
                                               ),
                                       ),
                                     ),
+                                    if (_isLoading &&
+                                        _loginStage.isNotEmpty) ...[
+                                      const SizedBox(height: 10),
+                                      Center(
+                                        child: Text(
+                                          _loginStage,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            color: Color(0xFF475569),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                     if (showBiometricButton) ...[
                                       const SizedBox(height: 14),
                                       SizedBox(

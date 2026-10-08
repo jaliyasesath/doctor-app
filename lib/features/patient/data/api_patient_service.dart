@@ -9,7 +9,7 @@ import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 import '../../net_service/api_config.dart';
 import '../../net_service/token_storage.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_sqlcipher/sqflite.dart';
 
 class QueueChangesPage {
   final List<dynamic> data;

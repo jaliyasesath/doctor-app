@@ -1,13 +1,18 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 import '../../prescription/screens/patient_profile_screen.dart';
 import '../../sync/services/auto_sync_service.dart';
+import 'add_patient_screen.dart';
+import 'desktop_patient_master_view.dart';
 import 'patient_edit_screen.dart';
 
 class PatientMasterScreen extends StatefulWidget {
-  const PatientMasterScreen({super.key});
+  const PatientMasterScreen({super.key, this.embeddedDesktop = false});
+
+  final bool embeddedDesktop;
 
   @override
   State<PatientMasterScreen> createState() => _PatientMasterScreenState();
@@ -201,6 +206,7 @@ class _PatientMasterScreenState extends State<PatientMasterScreen> {
   Future<void> _confirmDelete(int id) async {
     final result = await showDialog<bool>(
       context: context,
+      useRootNavigator: false,
       builder: (context) {
         return AlertDialog(
           title: const Text('Delete Patient'),
@@ -251,6 +257,21 @@ class _PatientMasterScreenState extends State<PatientMasterScreen> {
   Future<void> _refreshPatients() async {
     _searchController.clear();
     await _loadPatients();
+  }
+
+  void _openAddPatient() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AddPatientScreen()),
+    ).then((_) => _loadPatients());
+  }
+
+  void _handleSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _searchPatients(value),
+    );
   }
 
   String _getName(Map<String, dynamic> patient) {
@@ -390,6 +411,24 @@ class _PatientMasterScreenState extends State<PatientMasterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000) {
+      return DesktopPatientMasterView(
+        patients: _patients,
+        isLoading: _isLoading,
+        isLoadingMore: _isLoadingMore,
+        searchController: _searchController,
+        scrollController: _scrollController,
+        onSearchChanged: _handleSearchChanged,
+        onRefresh: _refreshPatients,
+        onOpen: _openProfile,
+        onEdit: _openEditScreen,
+        onDelete: _confirmDelete,
+        onAdd: _openAddPatient,
+        onBack: () => Navigator.pop(context),
+        embedded: widget.embeddedDesktop,
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F7F6),
       appBar: AppBar(
@@ -430,15 +469,7 @@ class _PatientMasterScreenState extends State<PatientMasterScreen> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              onChanged: (value) {
-                _searchDebounce?.cancel();
-                _searchDebounce = Timer(
-                  const Duration(milliseconds: 350),
-                  () {
-                    _searchPatients(value);
-                  },
-                );
-              },
+              onChanged: _handleSearchChanged,
             ),
           ),
           Expanded(

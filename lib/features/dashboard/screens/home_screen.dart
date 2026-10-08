@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../../core/widgets/app_error_ui.dart';
+import '../../../core/widgets/desktop_workspace_screen.dart';
 import '../../../data/local/database_helper.dart';
 
 import '../../auth/data/doctor_session.dart';
@@ -35,6 +37,7 @@ import '../../lab/screens/patient_lab_reports_screen.dart';
 import '../../lab/data/lab_report_api_service.dart';
 import '../../profile/screens/doctor_profile_screen.dart';
 import '../../profile/data/doctor_profile_api_service.dart';
+import 'desktop_home_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -378,9 +381,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _logout() async {
+  Future<void> _lockApp() async {
     await QueueRealtimeService.instance.disconnect();
-    await ApiAuthService().logout();
+    await ApiAuthService().lockApp();
 
     if (!mounted) return;
 
@@ -444,6 +447,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!_licenseValid) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('License expired. Dashboard locked.')),
+      );
+      return;
+    }
+
+    if (Platform.isWindows && title == 'Scan Prescription') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Camera QR scanning is available on mobile. Use prescription '
+            'search on desktop.',
+          ),
+        ),
       );
       return;
     }
@@ -747,7 +762,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   label: const Text('Check Again'),
                 ),
                 TextButton(
-                  onPressed: _logout,
+                  onPressed: _lockApp,
                   child: const Text('Logout'),
                 ),
               ],
@@ -885,7 +900,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     _headerActionButton(
                       icon: Icons.logout_rounded,
                       tooltip: 'Logout',
-                      onTap: _logout,
+                      onTap: _lockApp,
                     ),
                   ],
                 ),
@@ -1826,6 +1841,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
     }
 
+    // Keep the existing Android/iOS/tablet presentation exactly as-is.
+    // The professional desktop surface is selected only for Windows.
+    final useDesktopNavigation =
+        Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000;
+
+    if (useDesktopNavigation) {
+      return _buildDesktopScaffold();
+    }
+
     return Scaffold(
       backgroundColor: _surface,
       body: _licenseValid ? _buildDashboard() : _buildLicenseBlock(),
@@ -1859,6 +1883,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             )
           : null,
+    );
+  }
+
+  Widget _buildDesktopScaffold() {
+    if (!_licenseValid) return Scaffold(body: _buildLicenseBlock());
+
+    return DesktopWorkspaceScreen(
+      onLogout: _lockApp,
+      dashboardBuilder: (openModule) => DesktopHomeScreen(
+        embedded: true,
+        doctorName: _doctorName,
+        formattedToday: _getFormattedToday(),
+        connectionOnline: _connectionOnline,
+        planName: _planName,
+        daysRemaining: _daysRemaining,
+        pendingSyncCount: _pendingSyncCount,
+        queueSummary: _queueSummary,
+        todayIncome: _todayIncome,
+        todayFollowUpCount: _todayFollowUpCount,
+        unreviewedLabReportCount: _unreviewedLabReportCount,
+        recentPrescriptions: _recentPrescriptions,
+        profilePhotoUrl: _profilePhotoUrl,
+        isSyncing: _isSyncing,
+        onNavigate: openModule,
+        onRefresh: _refreshAll,
+        onSync: _syncNow,
+        onConnectionSettings: _showConnectionModeDialog,
+        onLogout: _lockApp,
+      ),
     );
   }
 

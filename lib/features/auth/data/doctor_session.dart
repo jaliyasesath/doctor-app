@@ -64,17 +64,6 @@ class DoctorSession {
     return '';
   }
 
-  static Future<String?> _readSecurePassword(
-    SharedPreferences prefs,
-    String email,
-  ) async {
-    // Never read or trust the old plaintext SharedPreferences values. Remove
-    // any remnants and use encrypted secure storage exclusively.
-    await prefs.remove(_passwordKey);
-    await prefs.remove(_lastPasswordKey);
-    return CredentialStorage.getPassword(email);
-  }
-
   static Future<void> saveDoctorSession(
     Map<String, dynamic> doctor,
   ) async {
@@ -117,11 +106,6 @@ class DoctorSession {
     final email = _readString(
       doctor,
       ['email'],
-    );
-
-    final password = _readString(
-      doctor,
-      ['password'],
     );
 
     final role = _readString(
@@ -199,9 +183,9 @@ class DoctorSession {
       email,
     );
 
-    if (email.isNotEmpty && password.isNotEmpty) {
-      await CredentialStorage.savePassword(email, password);
-    }
+    // Offline verifiers are refreshed only by a successful online login in
+    // ApiAuthService. Restoring an offline/biometric session must not extend
+    // the offline access expiry.
     await prefs.remove(_passwordKey);
 
     await prefs.setBool(
@@ -320,10 +304,10 @@ class DoctorSession {
 
     final id = prefs.getInt(_doctorIdKey);
     final email = prefs.getString(_emailKey);
-    final password =
-        email == null ? null : await _readSecurePassword(prefs, email);
+    await prefs.remove(_passwordKey);
+    await prefs.remove(_lastPasswordKey);
 
-    if (id == null || email == null || password == null) {
+    if (id == null || email == null) {
       return null;
     }
 
@@ -331,7 +315,6 @@ class DoctorSession {
       'id': id,
       'doctor_name': prefs.getString(_doctorNameKey) ?? '',
       'email': email,
-      'password': password,
       'role': prefs.getString(_roleKey) ?? 'Doctor',
       'parentDoctorId': prefs.getInt(_parentDoctorIdKey) ?? 0,
       'parent_doctor_id': prefs.getInt(_parentDoctorIdKey) ?? 0,
@@ -502,6 +485,9 @@ class DoctorSession {
 
     if (id == null) return null;
 
+    final email = prefs.getString(_lastEmailKey) ?? '';
+    await CredentialStorage.purgeLegacyPassword(email);
+
     return {
       'id': id,
       'parentDoctorId': prefs.getInt(_lastParentDoctorIdKey) ?? 0,
@@ -510,12 +496,7 @@ class DoctorSession {
       'medical_center_name': prefs.getString(_lastMedicalCenterKey) ?? '',
       'specialization': prefs.getString(_lastSpecializationKey) ?? '',
       'clinic_address': prefs.getString(_lastClinicAddressKey) ?? '',
-      'email': prefs.getString(_lastEmailKey) ?? '',
-      'password': await _readSecurePassword(
-            prefs,
-            prefs.getString(_lastEmailKey) ?? '',
-          ) ??
-          '',
+      'email': email,
       'role': prefs.getString(_lastRoleKey) ?? 'Doctor',
       'biometric_enabled':
           (prefs.getBool(_lastBiometricEnabledKey) ?? false) ? 1 : 0,

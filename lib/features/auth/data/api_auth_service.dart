@@ -226,7 +226,7 @@ class ApiAuthService {
         accessToken: token,
         refreshToken: refreshToken,
       );
-      await CredentialStorage.savePassword(email, password);
+      await CredentialStorage.saveVerifier(email, password);
 
       final existing = await DatabaseHelper.instance.getDoctorByEmail(email);
 
@@ -346,6 +346,14 @@ class ApiAuthService {
         'code': 'OFFLINE_LOGIN_UNAVAILABLE',
         'mode': 'offline',
       };
+    } on StateError {
+      return {
+        'success': false,
+        'message':
+            'The secure local database could not be opened. Your existing '
+                'data has not been deleted. Close the app and try again.',
+        'code': 'LOCAL_DATABASE_UNAVAILABLE',
+      };
     } catch (_) {
       return {
         'success': false,
@@ -357,6 +365,14 @@ class ApiAuthService {
 
   Future<String?> getToken() async {
     return TokenStorage.getToken();
+  }
+
+  /// Locks the local UI while preserving the device-bound online session.
+  /// The refresh token remains protected by platform secure storage so a
+  /// successful biometric unlock can resume background synchronization.
+  Future<void> lockApp() async {
+    await DoctorSession.clearSession();
+    PrescriptionStore.clear();
   }
 
   Future<void> logout() async {
@@ -377,6 +393,10 @@ class ApiAuthService {
       }
     }
 
+    // A complete sign-out must not leave a biometric shortcut capable of
+    // reopening the account. The user must authenticate with credentials
+    // again, which creates a new device-bound server session.
+    await DoctorSession.disableBiometric();
     await TokenStorage.clearToken();
     await DoctorSession.clearSession();
     PrescriptionStore.clear();

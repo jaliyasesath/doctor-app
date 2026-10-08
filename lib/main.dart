@@ -111,6 +111,7 @@ class _DoctorAppState extends State<DoctorApp> with WidgetsBindingObserver {
 
     unawaited(QueueRealtimeService.instance.connect());
     unawaited(QueueSyncService.instance.syncChanges());
+    AutoSyncService.scheduleRecovery();
   }
 
   @override
