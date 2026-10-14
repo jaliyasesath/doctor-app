@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'client/pp_client_app.dart';
@@ -16,7 +17,10 @@ void main() {
     ErrorWidget.builder = (_) => const Material(
       child: Center(child: Text('Unable to display this screen. Please reopen the app.')),
     );
-    if (appFlavor != 'client') {
+    // Android uses the client flavor. iOS uses the dedicated entry point
+    // with its identity configured by prepare_pp_client_ios.py in Codemagic.
+    final isIosBuild = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+    if (!isIosBuild && appFlavor != 'client') {
       runApp(const MaterialApp(home: Scaffold(body: Center(
         child: Text('Build PP Client with --flavor client -t lib/main_client.dart.'),
       ))));
