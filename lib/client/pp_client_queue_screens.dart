@@ -16,17 +16,45 @@ String _requestId() {
   return '${hex.substring(0,8)}-${hex.substring(8,12)}-${hex.substring(12,16)}-${hex.substring(16,20)}-${hex.substring(20)}';
 }
 Widget _photo(Map<String, dynamic> doctor) {
-  final value = doctor['profilePhotoUrl']?.toString() ?? '';
+  const fallback = ColoredBox(
+    color: Color(0xFFE5F4EB),
+    child: Center(
+      child: Icon(Icons.person_rounded, size: 40, color: Color(0xFF078A55)),
+    ),
+  );
+  final value = doctor['profilePhotoUrl']?.toString().trim() ?? '';
   Uri? uri;
   if (value.isNotEmpty) {
-    final origin = PPClientConfig.origin.toString().replaceAll(RegExp(r'/+$'), '');
-    uri = Uri.parse('$origin/').resolve(value);
+    final relative = Uri.tryParse(value);
+    if (relative != null) {
+      final origin = PPClientConfig.origin.toString().replaceAll(RegExp(r'/+$'), '');
+      uri = Uri.parse('$origin/').resolveUri(relative);
+    }
   }
-  return ClipOval(child: SizedBox(width: 58, height: 58, child: uri != null &&
-    (uri.scheme == 'https' || (uri.scheme == 'http' && uri.host == PPClientConfig.origin.host))
-      ? Image.network(uri.toString(), fit: BoxFit.cover, cacheWidth: 144,
-          errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, size: 38, color: Color(0xFF078A55)))
-      : const Icon(Icons.person_rounded, size: 38, color: Color(0xFF078A55))));
+  final valid = uri != null && uri.hasAuthority && uri.userInfo.isEmpty &&
+      (uri.scheme == 'https' ||
+          (uri.scheme == 'http' && uri.host == PPClientConfig.origin.host));
+  return Semantics(
+    image: true,
+    label: '${doctor['doctorName'] ?? 'Doctor'} profile photo',
+    child: ClipOval(
+      child: SizedBox(
+        width: 58,
+        height: 58,
+        child: valid
+            ? Image.network(
+                uri.toString(),
+                fit: BoxFit.cover,
+                cacheWidth: 174,
+                excludeFromSemantics: true,
+                frameBuilder: (_, child, frame, synchronous) =>
+                    synchronous || frame != null ? child : fallback,
+                errorBuilder: (_, __, ___) => fallback,
+              )
+            : fallback,
+      ),
+    ),
+  );
 }
 
 Future<void> _directions(BuildContext context, Map<String, dynamic> doctor) async {

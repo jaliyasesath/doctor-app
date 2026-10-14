@@ -901,6 +901,57 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen>
     );
   }
 
+  Widget _mobileQueueTab(String value, String label, IconData icon) {
+    final selected = _selectedTab == value;
+    final foreground = selected
+        ? const Color(0xFF075E54)
+        : const Color(0xFF52635E);
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        excludeSemantics: true,
+        child: Material(
+          color: selected ? const Color(0xFFD7EEEA) : Colors.transparent,
+          borderRadius: BorderRadius.circular(13),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => _changeTab(value),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: SizedBox(
+                height: 48,
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icon, size: 18, color: foreground),
+                        const SizedBox(width: 5),
+                        Text(
+                          label,
+                          maxLines: 1,
+                          softWrap: false,
+                          style: TextStyle(
+                            color: foreground,
+                            fontSize: 14,
+                            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final title = _selectedTab == 'completed'
@@ -996,36 +1047,16 @@ class _DoctorQueueScreenState extends State<DoctorQueueScreen>
                   ),
                 ],
               ),
-              child: SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(
-                    value: 'waiting',
-                    label: Text('Waiting'),
-                    icon: Icon(Icons.queue),
+              child: Row(
+                children: [
+                  _mobileQueueTab('waiting', 'Waiting', Icons.queue),
+                  const SizedBox(width: 4),
+                  _mobileQueueTab(
+                    'completed', 'Completed', Icons.check_circle_outline,
                   ),
-                  ButtonSegment(
-                    value: 'completed',
-                    label: Text('Completed'),
-                    icon: Icon(Icons.check_circle_outline),
-                  ),
-                  ButtonSegment(
-                    value: 'skipped',
-                    label: Text('Skipped'),
-                    icon: Icon(Icons.skip_next),
-                  ),
+                  const SizedBox(width: 4),
+                  _mobileQueueTab('skipped', 'Skipped', Icons.skip_next),
                 ],
-                selected: {_selectedTab},
-                showSelectedIcon: false,
-                style: ButtonStyle(
-                  visualDensity: VisualDensity.compact,
-                  side: WidgetStateProperty.all(BorderSide.none),
-                  shape: WidgetStateProperty.all(
-                    RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(13),
-                    ),
-                  ),
-                ),
-                onSelectionChanged: (value) => _changeTab(value.first),
               ),
             ),
             Expanded(child: _body()),
