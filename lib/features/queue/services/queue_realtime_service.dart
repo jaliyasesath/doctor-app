@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:signalr_netcore/signalr_client.dart';
 
 import '../../net_service/api_config.dart';
+import '../../net_service/api_client.dart';
 import '../../net_service/token_storage.dart';
 import 'queue_sync_service.dart';
 
@@ -58,8 +60,7 @@ class QueueRealtimeService {
           .withUrl(
             hubUrl,
             options: HttpConnectionOptions(
-              accessTokenFactory: () async =>
-                  await TokenStorage.getToken() ?? '',
+              accessTokenFactory: _accessTokenForHub,
               requestTimeout: 10000,
             ),
           )
@@ -121,14 +122,37 @@ class QueueRealtimeService {
     unawaited(_syncThenEmit(event));
   }
 
+  Future<String> _accessTokenForHub() async {
+    var token = await TokenStorage.getToken();
+    var needsRefresh = token == null || token.isEmpty;
+    if (!needsRefresh) {
+      try {
+        final parts = token!.split('.');
+        final payload = jsonDecode(utf8.decode(base64Url.decode(
+          base64Url.normalize(parts[1]),
+        )));
+        final expiry = (payload['exp'] as num).toInt();
+        needsRefresh = expiry <=
+            DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000 + 60;
+      } catch (_) {
+        needsRefresh = true;
+      }
+    }
+    if (needsRefresh && await ApiClient.refreshSession()) {
+      token = await TokenStorage.getToken();
+    }
+    return token ?? '';
+  }
+
   Future<void> _syncThenEmit(Map<String, dynamic> event) async {
+    // The cloud booking is already committed. Refresh dashboard counts now,
+    // independently of potentially slow paged synchronization into SQLite.
+    _events.add(event);
     try {
       await QueueSyncService.instance.syncChanges();
+      _events.add({...event, 'localCacheUpdated': true});
     } catch (_) {
-      // The screen still receives the event and can show its current local
-      // cache. App resume/connectivity recovery will retry the delta sync.
-    } finally {
-      _events.add(event);
+      // Resume/connectivity recovery retries local synchronization later.
     }
   }
 

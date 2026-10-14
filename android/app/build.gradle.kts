@@ -48,6 +48,19 @@ android {
         versionName = flutter.versionName
     }
 
+    flavorDimensions += "audience"
+    productFlavors {
+        create("pp") {
+            dimension = "audience"
+            manifestPlaceholders["ppAppLabel"] = "Private Practice"
+        }
+        create("client") {
+            dimension = "audience"
+            applicationIdSuffix = ".client"
+            manifestPlaceholders["ppAppLabel"] = "PP Client"
+        }
+    }
+
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
@@ -84,4 +97,17 @@ dependencies {
 
 flutter {
     source = "../.."
+}
+
+val dartTarget = (project.findProperty("target") as String?) ?: "lib/main.dart"
+tasks.configureEach {
+    if (name.startsWith("compileFlutterBuild")) {
+        doFirst {
+            val clientTarget = dartTarget.replace('\\', '/').endsWith("lib/main_client.dart")
+            val clientVariant = name.contains("client", ignoreCase = true)
+            if (clientTarget != clientVariant) {
+                throw GradleException("Use --flavor client -t lib/main_client.dart for PP Client; --flavor pp -t lib/main.dart for PP App.")
+            }
+        }
+    }
 }

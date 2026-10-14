@@ -3312,6 +3312,145 @@ is_favorite INTEGER DEFAULT 0,
     );
   }
 
+  Future<Map<String, dynamic>> getBillingSummaryByDoctorRange(
+    int doctorId, {
+    required String dateFrom,
+    required String dateTo,
+    String paymentStatus = 'all',
+    String paymentMethod = 'all',
+  }) async {
+    final db = await database;
+    final clauses = <String>[
+      'doctor_id = ?',
+      'is_deleted = 0',
+      'date(created_at) >= date(?)',
+      'date(created_at) <= date(?)',
+    ];
+    final args = <Object?>[doctorId, dateFrom, dateTo];
+    if (paymentStatus != 'all') {
+      clauses.add('LOWER(payment_status) = LOWER(?)');
+      args.add(paymentStatus);
+    }
+    if (paymentMethod != 'all') {
+      clauses.add('LOWER(payment_method) = LOWER(?)');
+      args.add(paymentMethod);
+    }
+
+    final rows = await db.rawQuery('''
+      SELECT
+        COUNT(*) AS bill_count,
+        COALESCE(SUM(total_amount), 0) AS total_income,
+        COALESCE(SUM(consultation_fee), 0) AS consultation_income,
+        COALESCE(SUM(medicine_charges), 0) AS medicine_income,
+        COALESCE(SUM(paid_amount), 0) AS paid_total,
+        COALESCE(SUM(balance_amount), 0) AS balance_total
+      FROM prescription_bills
+      WHERE ${clauses.join(' AND ')}
+    ''', args);
+    return rows.isEmpty ? <String, dynamic>{} : rows.first;
+  }
+
+  Future<int> countBillsByDoctorRange(
+    int doctorId, {
+    required String dateFrom,
+    required String dateTo,
+    String query = '',
+    String paymentStatus = 'all',
+    String paymentMethod = 'all',
+  }) async {
+    final result = await _queryBillsByDoctorRange(
+      doctorId,
+      dateFrom: dateFrom,
+      dateTo: dateTo,
+      query: query,
+      paymentStatus: paymentStatus,
+      paymentMethod: paymentMethod,
+      countOnly: true,
+    );
+    if (result.isEmpty) return 0;
+    return (result.first['record_count'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<List<Map<String, dynamic>>> getBillsByDoctorRangePaged(
+    int doctorId, {
+    required String dateFrom,
+    required String dateTo,
+    String query = '',
+    String paymentStatus = 'all',
+    String paymentMethod = 'all',
+    int limit = 50,
+    int offset = 0,
+  }) =>
+      _queryBillsByDoctorRange(
+        doctorId,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        query: query,
+        paymentStatus: paymentStatus,
+        paymentMethod: paymentMethod,
+        limit: limit,
+        offset: offset,
+      );
+
+  Future<List<Map<String, dynamic>>> _queryBillsByDoctorRange(
+    int doctorId, {
+    required String dateFrom,
+    required String dateTo,
+    String query = '',
+    String paymentStatus = 'all',
+    String paymentMethod = 'all',
+    int limit = 50,
+    int offset = 0,
+    bool countOnly = false,
+  }) async {
+    final db = await database;
+    final clauses = <String>[
+      'b.doctor_id = ?',
+      'b.is_deleted = 0',
+      'date(b.created_at) >= date(?)',
+      'date(b.created_at) <= date(?)',
+    ];
+    final args = <Object?>[doctorId, dateFrom, dateTo];
+    final normalizedQuery = query.trim();
+    if (normalizedQuery.isNotEmpty) {
+      clauses.add('''(
+        b.prescription_no LIKE ? OR
+        b.payment_method LIKE ? OR
+        b.payment_status LIKE ? OR
+        COALESCE(p.patient_name, '') LIKE ?
+      )''');
+      final like = '%$normalizedQuery%';
+      args.addAll([like, like, like, like]);
+    }
+    if (paymentStatus != 'all') {
+      clauses.add('LOWER(b.payment_status) = LOWER(?)');
+      args.add(paymentStatus);
+    }
+    if (paymentMethod != 'all') {
+      clauses.add('LOWER(b.payment_method) = LOWER(?)');
+      args.add(paymentMethod);
+    }
+
+    if (countOnly) {
+      return db.rawQuery('''
+        SELECT COUNT(*) AS record_count
+        FROM prescription_bills b
+        LEFT JOIN prescriptions p ON p.id = b.prescription_id
+        WHERE ${clauses.join(' AND ')}
+      ''', args);
+    }
+
+    args.addAll([limit, offset]);
+    return db.rawQuery('''
+      SELECT b.*, COALESCE(p.patient_name, '') AS patient_name
+      FROM prescription_bills b
+      LEFT JOIN prescriptions p ON p.id = b.prescription_id
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY b.created_at DESC, b.id DESC
+      LIMIT ? OFFSET ?
+    ''', args);
+  }
+
   Future<List<Map<String, dynamic>>> getAllBills() async {
     final db = await database;
     final doctorId = await DoctorSession.getActiveDoctorIdForData();

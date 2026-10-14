@@ -1683,6 +1683,11 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
         'frequency': e.frequency,
         'duration': e.duration,
         'instructions': e.instructions,
+        'medicine_id': e.medicineId,
+        'prescription_only': e.prescriptionOnly,
+        'unit_price': e.unitPrice,
+        'quantity': e.quantity,
+        'line_total': e.lineTotal,
       };
     }).toList();
 
@@ -1734,11 +1739,27 @@ class _PrescriptionListScreenState extends State<PrescriptionListScreen> {
       for (final item in items) {
         PrescriptionStore.add(
           PrescriptionItem(
+            medicineId: int.tryParse(item['medicine_id']?.toString() ?? ''),
             medicineName: item['name']?.toString() ?? '',
             dosage: item['dosage']?.toString() ?? '',
             frequency: item['frequency']?.toString() ?? '',
             duration: item['duration']?.toString() ?? '',
             instructions: item['instructions']?.toString() ?? '',
+            prescriptionOnly: item['prescription_only'] == true ||
+                item['prescription_only'] == 1 ||
+                item['prescription_only']?.toString() == '1',
+            unitPrice:
+                double.tryParse(item['unit_price']?.toString() ?? '') ?? 0,
+            quantity:
+                double.tryParse(item['quantity']?.toString() ?? '') ?? 1,
+            lineTotal:
+                double.tryParse(item['line_total']?.toString() ?? '') ??
+                    ((double.tryParse(
+                                item['unit_price']?.toString() ?? '') ??
+                            0) *
+                        (double.tryParse(
+                                item['quantity']?.toString() ?? '') ??
+                            1)),
           ),
         );
       }

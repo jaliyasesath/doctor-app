@@ -1,3 +1,6 @@
+import '../../../core/errors/app_error_handler.dart';
+import '../../../core/widgets/desktop_login_layout.dart';
+import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -489,8 +492,89 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _desktopLogin() async {
+    if (_isLoading) return;
+    try {
+      await _login();
+    } catch (error, stackTrace) {
+      AppErrorHandler.recordUnawaited(StateError('desktop_login_operation'),
+          stackTrace, source: 'DesktopAuthentication');
+      if (mounted) AppErrorUi.show(context, error, onRetry: _desktopLogin);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Widget _buildDesktopLogin() {
+    final biometric = _biometricEnabledForLastDoctor &&
+        _deviceSupportsBiometric && _lastDoctorName.isNotEmpty;
+    return DesktopLoginLayout(
+      busy: _isLoading,
+      child: AutofillGroup(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          TextField(
+            controller: _emailController,
+            enabled: !_isLoading,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.email],
+            decoration: const InputDecoration(labelText: 'Email address',
+                prefixIcon: Icon(Icons.mail_outline_rounded)),
+          ),
+          const SizedBox(height: 18),
+          TextField(
+            controller: _passwordController,
+            enabled: !_isLoading,
+            obscureText: _obscurePassword,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.password],
+            onSubmitted: (_) => _desktopLogin(),
+            decoration: InputDecoration(
+              labelText: 'Password',
+              prefixIcon: const Icon(Icons.lock_outline_rounded),
+              suffixIcon: IconButton(
+                tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                onPressed: _isLoading ? null : () => setState(
+                    () => _obscurePassword = !_obscurePassword),
+                icon: Icon(_obscurePassword
+                    ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: _isLoading ? null : _desktopLogin,
+            style: FilledButton.styleFrom(padding: const EdgeInsets.all(18)),
+            icon: _isLoading
+                ? const SizedBox(width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.login_rounded),
+            label: Text(_isLoading ? 'Signing in...' : 'Sign in'),
+          ),
+          if (_isLoading && _loginStage.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(_loginStage, textAlign: TextAlign.center),
+          ],
+          if (biometric) ...[
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: _isLoading ? null : _loginWithBiometric,
+              icon: const Icon(Icons.fingerprint),
+              label: Text('Continue as $_lastDoctorName',
+                  maxLines: 2, overflow: TextOverflow.ellipsis),
+            ),
+          ],
+          const SizedBox(height: 18),
+          TextButton(onPressed: _isLoading ? null : _openRegistration,
+              child: const Text('Create a doctor account')),
+        ]),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (Platform.isWindows) return _buildDesktopLogin();
     final showBiometricButton = _biometricEnabledForLastDoctor &&
         _deviceSupportsBiometric &&
         _lastDoctorName.isNotEmpty;

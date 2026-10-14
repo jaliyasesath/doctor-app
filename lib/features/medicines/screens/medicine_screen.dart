@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -6,6 +7,7 @@ import '../../../core/widgets/app_error_ui.dart';
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 import '../../sync/services/auto_sync_service.dart';
+import 'desktop_medicine_view.dart';
 
 class MedicineScreen extends StatefulWidget {
   const MedicineScreen({super.key});
@@ -183,19 +185,41 @@ class _MedicineScreenState extends State<MedicineScreen> {
   }
 
   Future<void> _openMedicineForm({Map<String, dynamic>? medicine}) async {
-    final result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => FractionallySizedBox(
-        heightFactor: 0.94,
-        child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          child: MedicineFormScreen(medicine: medicine),
-        ),
-      ),
-    );
+    final desktop =
+        Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000;
+    final result = desktop
+        ? await showDialog<bool>(
+            context: context,
+            useRootNavigator: false,
+            barrierDismissible: false,
+            builder: (dialogContext) => Dialog(
+              clipBehavior: Clip.antiAlias,
+              insetPadding: const EdgeInsets.all(32),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: SizedBox(
+                width: 760,
+                height: MediaQuery.sizeOf(dialogContext).height * .86,
+                child: MedicineFormScreen(medicine: medicine),
+              ),
+            ),
+          )
+        : await showModalBottomSheet<bool>(
+            context: context,
+            useRootNavigator: false,
+            isScrollControlled: true,
+            useSafeArea: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => FractionallySizedBox(
+              heightFactor: 0.94,
+              child: ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(24)),
+                child: MedicineFormScreen(medicine: medicine),
+              ),
+            ),
+          );
 
     if (result == true) {
       await _loadMedicines();
@@ -222,17 +246,18 @@ class _MedicineScreenState extends State<MedicineScreen> {
     }
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      useRootNavigator: false,
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Medicine'),
         content: const Text('Are you sure you want to delete this medicine?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Delete'),
           ),
         ],
@@ -607,6 +632,25 @@ class _MedicineScreenState extends State<MedicineScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000) {
+      return DesktopMedicineView(
+        medicines: medicines,
+        loading: loading,
+        loadingMore: _isLoadingMore,
+        isReception: isReception,
+        searchController: _searchController,
+        scrollController: _scrollController,
+        onSearchChanged: _onSearchChanged,
+        onClearSearch: _clearSearch,
+        onRefresh: _loadMedicines,
+        onLoadMore: _loadMoreMedicines,
+        onAdd: () => _openMedicineForm(),
+        onEdit: (medicine) => _openMedicineForm(medicine: medicine),
+        onDelete: (id) => _deleteMedicine(id),
+        onToggleFavorite: _toggleFavorite,
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF3F7F6),
       appBar: AppBar(

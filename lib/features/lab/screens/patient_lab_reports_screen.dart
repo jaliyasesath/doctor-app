@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 
 import '../../../core/widgets/app_error_ui.dart';
 import '../data/lab_report_api_service.dart';
+import 'desktop_lab_reports_view.dart';
 
 class PatientLabReportsScreen extends StatefulWidget {
   final int? serverPatientId;
@@ -114,7 +117,8 @@ class _PatientLabReportsScreenState extends State<PatientLabReportsScreen> {
     final notes = TextEditingController();
     final confirmed = await showDialog<bool>(
             context: context,
-            builder: (context) => AlertDialog(
+            useRootNavigator: false,
+            builder: (dialogContext) => AlertDialog(
                   title: Text(status == 'Reviewed'
                       ? 'Mark report reviewed'
                       : 'Reject report'),
@@ -128,10 +132,10 @@ class _PatientLabReportsScreenState extends State<PatientLabReportsScreen> {
                           border: const OutlineInputBorder())),
                   actions: [
                     TextButton(
-                        onPressed: () => Navigator.pop(context, false),
+                        onPressed: () => Navigator.pop(dialogContext, false),
                         child: const Text('Cancel')),
                     FilledButton(
-                        onPressed: () => Navigator.pop(context, true),
+                        onPressed: () => Navigator.pop(dialogContext, true),
                         child: const Text('Confirm'))
                   ],
                 )) ??
@@ -162,7 +166,25 @@ class _PatientLabReportsScreenState extends State<PatientLabReportsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final useDesktopLayout =
+        Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000;
+    if (useDesktopLayout) {
+      return DesktopLabReportsView(
+        reports: _reports,
+        loading: _loading,
+        loadingMore: _loadingMore,
+        hasMore: _hasMore,
+        openingId: _openingId,
+        patientName: widget.patientName,
+        scrollController: _scrollController,
+        onRefresh: _load,
+        onLoadMore: _loadMore,
+        onOpen: _open,
+        onReview: _review,
+      );
+    }
+    return Scaffold(
         backgroundColor: const Color(0xFFF4F7FC),
         appBar: AppBar(
             title:
@@ -292,4 +314,5 @@ class _PatientLabReportsScreenState extends State<PatientLabReportsScreen> {
                       ),
               ),
       );
+  }
 }

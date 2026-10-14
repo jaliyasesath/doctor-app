@@ -71,7 +71,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Timer? _licenseTimer;
   StreamSubscription<Map<String, dynamic>>? _queueEventSubscription;
+  Timer? _queueRecoveryTimer;
   bool _queueSummaryLoading = false;
+  bool _queueSummaryPending = false;
 
   Map<String, dynamic> _queueSummary = {
     'waiting': 0,
@@ -110,6 +112,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
     unawaited(QueueRealtimeService.instance.connect());
     unawaited(QueueSyncService.instance.syncChanges());
+
+    // Push updates are immediate; bounded polling also recovers missed events
+    // when a proxy, network interruption or expired hub connection blocks push.
+    _queueRecoveryTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted ||
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        return;
+      }
+      unawaited(QueueRealtimeService.instance.connect());
+      unawaited(_loadQueueSummary());
+    });
 
     _licenseTimer = Timer.periodic(
       const Duration(minutes: 1),
@@ -653,18 +666,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _loadQueueSummary() async {
-    if (_queueSummaryLoading) return;
+    if (_queueSummaryLoading) {
+      // Preserve a booking event received while an older request is in flight.
+      _queueSummaryPending = true;
+      return;
+    }
     _queueSummaryLoading = true;
     try {
-      final summary = await ApiPatientService().getQueueSummary();
-
-      if (!mounted) return;
-
-      setState(() {
-        _queueSummary = summary;
-      });
-    } catch (e) {
-      debugPrint('Queue summary load failed: $e');
+      do {
+        _queueSummaryPending = false;
+        try {
+          final summary = await ApiPatientService().getQueueSummary();
+          if (!mounted) return;
+          setState(() {
+            _queueSummary = summary;
+          });
+        } catch (_) {
+          // Retain the last valid summary; recovery will retry automatically.
+        }
+      } while (mounted && _queueSummaryPending);
     } finally {
       _queueSummaryLoading = false;
     }
@@ -1147,6 +1167,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          Text('PP Client Bookings: ${_queueSummary['clientBookings'] ?? '—'}',
+              style: const TextStyle(color: _primaryGreen, fontWeight: FontWeight.w700)),
         ],
       ),
     );
@@ -1830,6 +1853,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_queueEventSubscription?.cancel());
     _licenseTimer?.cancel();
+    _queueRecoveryTimer?.cancel();
     super.dispose();
   }
 

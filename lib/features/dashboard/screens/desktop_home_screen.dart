@@ -301,7 +301,7 @@ class DesktopHomeScreen extends StatelessWidget {
       (label: 'Completed', value: _asInt(queueSummary['completed']), icon: Icons.check_circle_rounded, color: const Color(0xFF2563A8)),
       (label: 'Skipped', value: _asInt(queueSummary['skipped']), icon: Icons.cancel_rounded, color: const Color(0xFFD34F5F)),
     ];
-    return Row(
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [Row(
       children: [
         for (var i = 0; i < items.length; i++) ...[
           if (i > 0) const SizedBox(width: 12),
@@ -336,7 +336,12 @@ class DesktopHomeScreen extends StatelessWidget {
           ),
         ],
       ],
-    );
+    ), const SizedBox(height: 12),
+      _DesktopCard(padding: const EdgeInsets.all(16), child: Text(
+        'PP Client Bookings: ${queueSummary['clientBookings'] ?? '—'}',
+        style: const TextStyle(color: _teal, fontWeight: FontWeight.w700))),
+    ]);
+
   }
 
   Widget _queuePanel() {

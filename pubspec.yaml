@@ -46,6 +46,9 @@ dependencies:
   # DEVICE INFO
   device_info_plus: ^10.1.0
 
+  # PP CLIENT GOOGLE IDENTITY (only used by main_client.dart)
+  google_sign_in: 7.2.0
+
   # BIOMETRIC AUTH
   local_auth: ^3.0.1
 
@@ -60,6 +63,10 @@ dependencies:
   # BLUETOOTH PRINTER
   print_bluetooth_thermal: 1.2.1
   esc_pos_utils_plus: ^2.0.4
+
+  # Windows PDF preview / installed printer support
+  printing: 5.14.2
+  file_selector: 1.0.3
 
   # PDF
   pdf: ^3.10.8

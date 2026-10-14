@@ -1,6 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:pdf/pdf.dart';
+import '../desktop/windows_document_pdf.dart';
+import '../desktop/windows_print_screen.dart';
+import '../../../core/errors/app_error_handler.dart';
 
 //import 'package:blue_thermal_printer/blue_thermal_printer.dart';
 import 'package:flutter/material.dart';
@@ -41,6 +45,8 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
   final BluetoothThermalPrinterService _bluetoothPrinter =
       BluetoothThermalPrinterService();
 
+  String? _desktopInitError;
+  bool _desktopInitializing = false;
   bool _isLoadingRx = true;
   bool _isLoadingDoctor = true;
   bool _isSharingPdf = false;
@@ -72,7 +78,63 @@ class _PrintPreviewScreenState extends State<PrintPreviewScreen> {
   @override
   void initState() {
     super.initState();
-    _initScreen();
+    if (Platform.isWindows) {
+      _initDesktopScreen();
+    } else {
+      _initScreen();
+    }
+  }
+
+  Future<void> _initDesktopScreen() async {
+    if (_desktopInitializing) return;
+    _desktopInitializing = true;
+    if (mounted) setState(() => _desktopInitError = null);
+    try {
+      await _initScreen();
+    } catch (_, stack) {
+      AppErrorHandler.recordUnawaited(StateError('Windows print document initialization failed.'),
+        stack, source: 'WindowsPrinting', context: 'Initialize');
+      if (mounted) setState(() => _desktopInitError = 'Document could not be loaded. Please retry.');
+    } finally {
+      _desktopInitializing = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<Uint8List> _desktopPdf(PdfPageFormat format, bool bill) async {
+    Uint8List? signature = _signatureBytes;
+    if ((signature == null || signature.isEmpty) && signaturePath.isNotEmpty) {
+      final file = File(signaturePath);
+      if (await file.exists()) signature = await file.readAsBytes();
+    }
+    final items = PrescriptionStore.items.map((item) => <String, String>{
+      'medicineName': item.medicineName, 'dosage': item.dosage,
+      'frequency': item.frequency, 'duration': item.duration,
+      'instructions': item.instructions, 'prescriptionOnly': '${item.prescriptionOnly}',
+      'quantity': '${item.quantity}', 'unitPrice': 'Rs. ${item.unitPrice.toStringAsFixed(2)}',
+      'lineTotal': 'Rs. ${item.lineTotal.toStringAsFixed(2)}',
+    }).toList();
+    final medicineTotal = PrescriptionStore.items.where((i) => !i.prescriptionOnly)
+        .fold<double>(0, (total, item) => total + item.lineTotal);
+    final consultation = _savedBillAmount('consultation_fee', PrescriptionStore.consultationFee);
+    final total = _savedBillAmount('total_amount', consultation + medicineTotal);
+    return WindowsDocumentPdf.build(format: format, bill: bill, items: items,
+      logo: _logoBytes, signature: signature,
+      header: {'center': medicalCenterName, 'doctor': doctorName,
+        'specialization': specialization, 'address': clinicAddress,
+        'rx': rxNo, 'date': widget.passedDate ?? DateTime.now().toString().substring(0,10),
+        'patient': PrescriptionStore.patientName, 'age': PrescriptionStore.patientAge,
+        'gender': PrescriptionStore.patientGender, 'qr': qrValue,
+        'qualifications': qualifications, 'profession': profession,
+        'slmc': slmcRegNo.isEmpty ? '' : 'SLMC Reg. No: $slmcRegNo',
+        'affiliation': affiliation, 'contact': contactNumber,
+        'saved': _alreadyBilled ? 'Existing bill totals are used; no new bill is created by printing.' : 'Bill preview'},
+      totals: {'Consultation': consultation,
+        'Medicines': _savedBillAmount('medicine_charges', medicineTotal),
+        'Other charges': _savedBillAmount('other_charges', 0),
+        'Discount': _savedBillAmount('discount_amount', 0), 'Total': total,
+        'Paid': _savedBillAmount('paid_amount', total),
+        'Balance': _savedBillAmount('balance_amount', 0)});
   }
 
   Future<void> _initScreen() async {
@@ -666,6 +728,22 @@ GET WELL SOON
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isWindows) {
+      if (_desktopInitError != null) {
+        return Scaffold(appBar: AppBar(title: const Text('Print Preview')),
+          body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(_desktopInitError!), const SizedBox(height: 12),
+            FilledButton(onPressed: _initDesktopScreen, child: const Text('Retry'))])));
+      }
+      if (_desktopInitializing || _isLoadingRx || _isLoadingDoctor) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      return WindowsPrintScreen(key: ValueKey(rxNo), documentName: rxNo,
+        buildPdf: _desktopPdf, onBillMode: () async {
+          await _saveBillIfNeeded();
+          await _checkAlreadyBilled();
+        });
+    }
     final items = PrescriptionStore.items;
     final currentDate =
         widget.passedDate ?? DateTime.now().toString().substring(0, 10);

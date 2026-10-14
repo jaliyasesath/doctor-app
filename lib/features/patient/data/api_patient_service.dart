@@ -47,6 +47,7 @@ class ApiPatientService {
           'serving': data['serving'] ?? 0,
           'completed': data['completed'] ?? 0,
           'skipped': data['skipped'] ?? 0,
+          'clientBookings': data['clientBookings'],
         };
       }
 

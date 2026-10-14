@@ -1,3 +1,5 @@
+import 'dart:io';
+import '../desktop/windows_print_screen.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -29,7 +31,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    if (!Platform.isWindows) _load();
   }
 
   Future<void> _load() async {
@@ -186,6 +188,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isWindows) return const WindowsPrintScreen(settingsOnly: true);
     return Scaffold(
       appBar: AppBar(title: const Text('Thermal Printer')),
       body: _loading

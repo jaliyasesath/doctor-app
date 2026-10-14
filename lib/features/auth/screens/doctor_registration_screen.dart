@@ -1,3 +1,5 @@
+import '../../../core/errors/app_error_handler.dart';
+import '../../../core/widgets/desktop_auth_frame.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -113,7 +115,9 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     } catch (error) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Logo could not be selected: $error')));
+            SnackBar(content: Text(Platform.isWindows
+                ? 'Logo could not be selected. Please try another file.'
+                : 'Logo could not be selected: $error')));
     }
   }
 
@@ -210,7 +214,9 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Document image could not be selected: $error')),
+        SnackBar(content: Text(Platform.isWindows
+            ? 'Document image could not be selected. Please try another file.'
+            : 'Document image could not be selected: $error')),
       );
     }
   }
@@ -319,7 +325,9 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
       setState(() => _isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registration error: $e')),
+        SnackBar(content: Text(Platform.isWindows
+            ? 'Registration could not be completed. Please retry.'
+            : 'Registration error: $e')),
       );
     }
   }
@@ -721,8 +729,168 @@ class _DoctorRegistrationScreenState extends State<DoctorRegistrationScreen> {
     );
   }
 
+  Future<void> _desktopRegister() async {
+    if (_isLoading) return;
+    try {
+      await _registerDoctor();
+    } catch (_, stackTrace) {
+      AppErrorHandler.recordUnawaited(StateError('desktop_auth_operation'),
+          stackTrace, source: 'DesktopAuthentication');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Registration could not be completed. Please retry.'),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Widget _buildDesktopRegistration() => DesktopAuthFrame(
+    title: 'Create your account',
+    subtitle: 'Complete your practice details and submit documents for verification.',
+    maxWidth: 720,
+    busy: _isLoading,
+    onBack: () => Navigator.pop(context),
+    child: AbsorbPointer(absorbing: _isLoading, child: Form(
+              key: _formKey,
+              onChanged: () => setState(() {}),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(
+                    Icons.local_hospital,
+                    size: 60,
+                    color: Colors.blue,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Create Doctor Account',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  _field(
+                    controller: _doctorNameController,
+                    label: 'Doctor Name',
+                    icon: Icons.person_outline,
+                  ),
+                  const SizedBox(height: 14),
+                  _field(
+                    controller: _emailController,
+                    label: 'Email',
+                    icon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 14),
+                  _passwordField(),
+                  const SizedBox(height: 14),
+                  _field(
+                    controller: _contactNumberController,
+                    label: 'Contact Number',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 14),
+                  _field(
+                    controller: _medicalCenterNameController,
+                    label: 'Medical Centre Name',
+                    icon: Icons.local_hospital_outlined,
+                  ),
+                  const SizedBox(height: 14),
+                  _medicalCenterLogoPicker(),
+                  const SizedBox(height: 14),
+                  _field(
+                    controller: _specializationController,
+                    label: 'Specialization',
+                    icon: Icons.medical_information_outlined,
+                    requiredField: false,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Doctor Stamp Details',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _field(
+                    controller: _qualificationsController,
+                    label: 'Qualifications',
+                    icon: Icons.school_outlined,
+                    requiredField: false,
+                  ),
+                  const SizedBox(height: 14),
+                  _field(
+                    controller: _professionController,
+                    label: 'Profession / Specialty',
+                    icon: Icons.badge_outlined,
+                    requiredField: false,
+                  ),
+                  const SizedBox(height: 14),
+                  _field(
+                    controller: _slmcRegNoController,
+                    label: 'SLMC Registration Number',
+                    icon: Icons.confirmation_number_outlined,
+                  ),
+                  const SizedBox(height: 14),
+                  _field(
+                    controller: _affiliationController,
+                    label: 'Affiliation / Hospital / Clinic',
+                    icon: Icons.apartment_outlined,
+                    requiredField: false,
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 16),
+                  _signaturePicker(),
+                  const SizedBox(height: 18),
+                  _verificationSection(),
+                  const SizedBox(height: 16),
+                  _stampPreview(),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ||
+                              !_doctorDeclarationAccepted ||
+                              !_termsAccepted
+                          ? null
+                          : _desktopRegister,
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.app_registration),
+                      label: Text(
+                        _isLoading
+                            ? 'Submitting...'
+                            : 'Submit for Verification',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: _isLoading ? null : () => Navigator.pop(context),
+                    child: const Text('Already have an account? Login'),
+                  ),
+                ],
+              ),
+            )),
+  );
+
   @override
   Widget build(BuildContext context) {
+    if (Platform.isWindows) return _buildDesktopRegistration();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Register Doctor'),

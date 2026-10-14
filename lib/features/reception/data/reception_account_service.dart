@@ -29,6 +29,21 @@ class ReceptionAccountService {
     });
   }
 
+  // Contract required from the deployed API; the Flutter ZIP contains no
+  // controller implementation. The desktop UI reports 404/405 as unsupported.
+  Future<void> updateAccount({
+    required int receptionId,
+    required String name,
+    required String email,
+    required String contactNumber,
+  }) async {
+    await _api.put('/reception-accounts/$receptionId', {
+      'name': name,
+      'email': email,
+      'contactNumber': contactNumber,
+    });
+  }
+
   Future<void> updateStatus({
     required int receptionId,
     required String status,

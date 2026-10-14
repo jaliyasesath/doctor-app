@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../data/lab_api_service.dart';
+import 'desktop_laboratory_list_view.dart';
 
 class LaboratoryListScreen extends StatefulWidget {
   const LaboratoryListScreen({super.key});
@@ -14,6 +17,7 @@ class _LaboratoryListScreenState extends State<LaboratoryListScreen> {
   final _api = LabApiService();
   List<Map<String, dynamic>> _labs = [];
   bool _loading = true;
+  String? _loadError;
 
   @override
   void initState() {
@@ -22,12 +26,17 @@ class _LaboratoryListScreenState extends State<LaboratoryListScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
       final data = await _api.getLabs();
       if (mounted) setState(() => _labs = data);
-    } catch (e) {
-      if (mounted) _message('Unable to load laboratories: $e');
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadError = 'Laboratories could not be loaded.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -59,6 +68,7 @@ class _LaboratoryListScreenState extends State<LaboratoryListScreen> {
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
+      useRootNavigator: false,
       builder: (dialogContext) =>
           StatefulBuilder(builder: (context, setDialogState) {
         Future<void> useLocation() async {
@@ -152,8 +162,8 @@ class _LaboratoryListScreenState extends State<LaboratoryListScreen> {
       await _api.saveLab(result);
       await _load();
       if (mounted) _message('Laboratory saved');
-    } catch (e) {
-      if (mounted) _message('Save failed: $e');
+    } catch (_) {
+      if (mounted) _message('Laboratory could not be saved. Please retry.');
     }
   }
 
@@ -171,15 +181,16 @@ class _LaboratoryListScreenState extends State<LaboratoryListScreen> {
   Future<void> _delete(Map<String, dynamic> lab) async {
     final yes = await showDialog<bool>(
             context: context,
-            builder: (_) => AlertDialog(
+            useRootNavigator: false,
+            builder: (dialogContext) => AlertDialog(
                     title: const Text('Remove laboratory?'),
                     content: Text(lab['name']?.toString() ?? ''),
                     actions: [
                       TextButton(
-                          onPressed: () => Navigator.pop(context, false),
+                          onPressed: () => Navigator.pop(dialogContext, false),
                           child: const Text('Cancel')),
                       FilledButton(
-                          onPressed: () => Navigator.pop(context, true),
+                          onPressed: () => Navigator.pop(dialogContext, true),
                           child: const Text('Remove'))
                     ])) ??
         false;
@@ -187,8 +198,8 @@ class _LaboratoryListScreenState extends State<LaboratoryListScreen> {
     try {
       await _api.deleteLab(lab['id'] as int, lab['version'] as int);
       await _load();
-    } catch (e) {
-      if (mounted) _message('Delete failed: $e');
+    } catch (_) {
+      if (mounted) _message('Laboratory could not be removed. Please retry.');
     }
   }
 
@@ -196,13 +207,28 @@ class _LaboratoryListScreenState extends State<LaboratoryListScreen> {
     try {
       await _api.sendTestEmail(lab['id'] as int);
       if (mounted) _message('Test email sent to ${lab['email']}');
-    } catch (e) {
-      if (mounted) _message('Test email failed: $e');
+    } catch (_) {
+      if (mounted) _message('Test email could not be sent. Please retry.');
     }
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final useDesktopLayout =
+        Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000;
+    if (useDesktopLayout) {
+      return DesktopLaboratoryListView(
+        labs: _labs,
+        loading: _loading,
+        errorMessage: _loadError,
+        onRefresh: _load,
+        onAdd: () => _edit(),
+        onEdit: _edit,
+        onDelete: _delete,
+        onTestEmail: _testEmail,
+      );
+    }
+    return Scaffold(
         appBar: AppBar(title: const Text('Laboratories')),
         floatingActionButton: FloatingActionButton.extended(
             onPressed: () => _edit(),
@@ -254,4 +280,5 @@ class _LaboratoryListScreenState extends State<LaboratoryListScreen> {
                                   )));
                         })),
       );
+  }
 }

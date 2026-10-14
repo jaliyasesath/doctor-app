@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 import 'patient_profile_screen.dart';
+import 'desktop_patient_history_view.dart';
 
 class PatientHistoryScreen extends StatefulWidget {
   const PatientHistoryScreen({super.key});
@@ -205,6 +207,21 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
       _visitFilter = 'all';
       _alertsOnly = false;
       _sort = 'recent';
+    });
+    unawaited(_search());
+  }
+
+  void _applyDesktopFilters(
+    String gender,
+    String visits,
+    String selectedSort,
+    bool alerts,
+  ) {
+    setState(() {
+      _genderFilter = gender;
+      _visitFilter = visits;
+      _sort = selectedSort;
+      _alertsOnly = alerts;
     });
     unawaited(_search());
   }
@@ -512,6 +529,34 @@ class _PatientHistoryScreenState extends State<PatientHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final useDesktopLayout =
+        Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000;
+    if (useDesktopLayout) {
+      return DesktopPatientHistoryView(
+        searchController: _searchController,
+        scrollController: _scrollController,
+        patients: _results,
+        total: _total,
+        isLoading: _isLoading,
+        isLoadingMore: _isLoadingMore,
+        hasMore: _hasMore,
+        gender: _genderFilter,
+        visitFilter: _visitFilter,
+        sort: _sort,
+        alertsOnly: _alertsOnly,
+        onSearchChanged: _onSearchChanged,
+        onSearchSubmitted: (_) => unawaited(_search()),
+        onClearSearch: () {
+          _searchController.clear();
+          setState(() => _offset = 0);
+          unawaited(_search());
+        },
+        onFiltersChanged: _applyDesktopFilters,
+        onResetFilters: _resetFilters,
+        onOpenPatient: _openPatientProfile,
+        onLoadMore: _loadMore,
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF3F7F6),
       appBar: AppBar(

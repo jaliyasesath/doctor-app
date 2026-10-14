@@ -1,10 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/widgets/app_error_ui.dart';
 import '../../auth/data/doctor_session.dart';
 import '../data/doctor_profile_api_service.dart';
+import 'desktop_doctor_profile_view.dart';
 
 class DoctorProfileScreen extends StatefulWidget {
   const DoctorProfileScreen({super.key});
@@ -35,7 +39,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
       );
       if (mounted) setState(() => _profile = profile);
     } catch (error) {
-      if (mounted) _message('Unable to load profile: $error');
+      if (mounted) AppErrorUi.show(context, error, onRetry: _load);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -58,7 +62,13 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
       await _load();
       if (mounted) _message('${_kindLabel(kind)} updated');
     } catch (error) {
-      if (mounted) _message('Upload failed: $error');
+      if (mounted) {
+        AppErrorUi.show(
+          context,
+          error,
+          onRetry: () => _pickMedia(kind, source),
+        );
+      }
     } finally {
       if (mounted) setState(() => _uploadingKind = null);
     }
@@ -70,7 +80,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
       await _load();
       if (mounted) _message('${_kindLabel(kind)} removed');
     } catch (error) {
-      if (mounted) _message('Unable to remove image: $error');
+      if (mounted) {
+        AppErrorUi.show(context, error, onRetry: () => _removeMedia(kind));
+      }
     }
   }
 
@@ -99,7 +111,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
             title: Text(hasImage ? 'Replace image' : 'Choose from gallery'),
             onTap: () => Navigator.pop(context, 'gallery'),
           ),
-          if (kind == 'profile')
+          if (kind == 'profile' && !Platform.isWindows)
             ListTile(
               leading: const Icon(Icons.camera_alt_outlined),
               title: const Text('Take a photo'),
@@ -166,6 +178,18 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     final cover = _v('coverPhotoUrl');
     final logo = _v('medicalCenterLogoUrl');
     final completeness = int.tryParse(_v('profileCompleteness')) ?? 0;
+    final useDesktopLayout =
+        Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000;
+    if (useDesktopLayout) {
+      return DesktopDoctorProfileView(
+        profile: _profile!,
+        uploadingKind: _uploadingKind,
+        onRefresh: _load,
+        onEdit: _edit,
+        onOpenMap: _openMap,
+        onMedia: _mediaMenu,
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FC),
       appBar: AppBar(
@@ -541,16 +565,18 @@ class _DoctorProfileEditScreenState extends State<_DoctorProfileEditScreen> {
       await widget.api.updateProfile(payload);
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
-      if (mounted)
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Update failed: $error')));
+      if (mounted) AppErrorUi.show(context, error, onRetry: _save);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) {
+    final useDesktopLayout =
+        Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000;
+    if (useDesktopLayout) return _desktopBuild(context);
+    return Scaffold(
         appBar: AppBar(title: const Text('Edit Profile'), actions: [
           TextButton(
               onPressed: _saving ? null : _save, child: const Text('SAVE'))
@@ -605,6 +631,209 @@ class _DoctorProfileEditScreenState extends State<_DoctorProfileEditScreen> {
           ]),
         ),
       );
+  }
+
+  Widget _desktopBuild(BuildContext context) => Scaffold(
+        backgroundColor: const Color(0xFFF4F7FB),
+        body: SafeArea(
+          child: Form(
+            key: _formKey,
+            child: Column(children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(28, 20, 28, 18),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(
+                    bottom: BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                ),
+                child: Row(children: [
+                  IconButton(
+                    tooltip: 'Back to profile',
+                    onPressed: _saving ? null : () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Edit Doctor Profile',
+                            style: TextStyle(
+                                fontSize: 25,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF0F172A))),
+                        SizedBox(height: 3),
+                        Text(
+                          'Update professional and medical centre information.',
+                          style: TextStyle(color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  OutlinedButton(
+                    onPressed: _saving ? null : () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox.square(
+                            dimension: 17,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.save_outlined),
+                    label: Text(_saving ? 'Saving...' : 'Save changes'),
+                  ),
+                ]),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(28),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _desktopCard(
+                          'Professional identity',
+                          Icons.workspace_premium_outlined,
+                          [
+                            _desktopField('doctorName', 'Doctor name',
+                                required: true),
+                            _desktopPair(
+                              _field('contactNumber', 'Contact number',
+                                  keyboard: TextInputType.phone),
+                              _field('yearsOfExperience', 'Years of experience',
+                                  keyboard: TextInputType.number),
+                            ),
+                            _desktopPair(
+                              _field('qualifications', 'Qualifications'),
+                              _field('profession', 'Profession'),
+                            ),
+                            _field('specialization', 'Specialization'),
+                            _field('affiliation', 'Professional affiliation'),
+                            _field('professionalBio', 'Professional bio', lines: 4),
+                            _desktopPair(
+                              _field('languages', 'Languages'),
+                              _field('specialInterests', 'Special interests', lines: 2),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.all(13),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Row(children: [
+                                Icon(Icons.lock_outline,
+                                    color: Color(0xFF2563EB), size: 20),
+                                SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'SLMC number and verified email are protected by the identity change process.',
+                                    style: TextStyle(color: Color(0xFF1E3A8A)),
+                                  ),
+                                ),
+                              ]),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: _desktopCard(
+                          'Medical centre',
+                          Icons.local_hospital_outlined,
+                          [
+                            _field('medicalCenterName', 'Medical centre name'),
+                            _field('clinicAddress', 'Clinic address', lines: 3),
+                            _desktopPair(
+                              _field('city', 'City'),
+                              _field('websiteUrl', 'Website',
+                                  keyboard: TextInputType.url),
+                            ),
+                            _field('clinicHours', 'Clinic hours', lines: 3),
+                            OutlinedButton.icon(
+                              onPressed: _saving ? null : _locate,
+                              icon: const Icon(Icons.my_location_rounded),
+                              label: const Text('Use current GPS location'),
+                            ),
+                            if (_latitude != null && _longitude != null)
+                              Container(
+                                margin: const EdgeInsets.only(top: 12),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Row(children: [
+                                  const Icon(Icons.location_on_outlined,
+                                      color: Color(0xFF0F766E)),
+                                  const SizedBox(width: 9),
+                                  Text(
+                                    '${_latitude!.toStringAsFixed(6)}, ${_longitude!.toStringAsFixed(6)}',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                ]),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ),
+      );
+
+  Widget _desktopCard(String title, IconData icon, List<Widget> children) =>
+      Container(
+        padding: const EdgeInsets.all(22),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE6F7F4),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: const Color(0xFF0F766E), size: 21),
+            ),
+            const SizedBox(width: 11),
+            Text(title,
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A))),
+          ]),
+          const SizedBox(height: 20),
+          ...children,
+        ]),
+      );
+
+  Widget _desktopPair(Widget left, Widget right) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: 12),
+          Expanded(child: right),
+        ],
+      );
+
+  Widget _desktopField(String key, String label, {bool required = false}) =>
+      _field(key, label, required: required);
 
   Widget _heading(String value) => Padding(
       padding: const EdgeInsets.only(top: 14, bottom: 12),

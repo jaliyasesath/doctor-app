@@ -44,6 +44,8 @@ class _DesktopWorkspaceScreenState extends State<DesktopWorkspaceScreen> {
   final GlobalKey<NavigatorState> _contentNavigatorKey =
       GlobalKey<NavigatorState>();
 
+  final ScrollController _sidebarScrollController = ScrollController();
+
   String _selected = 'Dashboard';
   bool _collapsed = false;
   bool _navigationLocked = false;
@@ -68,6 +70,25 @@ class _DesktopWorkspaceScreenState extends State<DesktopWorkspaceScreen> {
     _DesktopNavItem('Reception Accounts', Icons.support_agent_rounded),
     _DesktopNavItem('Doctor Profile', Icons.account_circle_rounded),
   ];
+
+  // Sidebar visibility is separate from routes: Follow-ups remains available
+  // to existing dashboard shortcuts and its module code is retained.
+  static const _groups = <_DesktopNavGroup>[
+    _DesktopNavGroup('Clinic', ['Dashboard', 'Today Queue', 'Patients']),
+    _DesktopNavGroup('Clinical Records', [
+      'Prescriptions', 'Prescription History', 'Patient History',
+    ]),
+    _DesktopNavGroup('Medicines', ['Medicines', 'Stock']),
+    _DesktopNavGroup('Finance & Reports', ['Billing', 'Analytics']),
+    _DesktopNavGroup('Laboratories', ['Laboratories', 'Lab Reports']),
+    _DesktopNavGroup('Administration', ['Reception Accounts', 'Doctor Profile']),
+  ];
+
+  @override
+  void dispose() {
+    _sidebarScrollController.dispose();
+    super.dispose();
+  }
 
   void _openLegacyModule(String title) {
     const aliases = <String, String>{
@@ -193,10 +214,23 @@ class _DesktopWorkspaceScreenState extends State<DesktopWorkspaceScreen> {
                 children: [
                   _brand(),
                   Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      itemCount: _items.length,
-                      itemBuilder: (_, index) => _navItem(_items[index]),
+                    child: Scrollbar(
+                      controller: _sidebarScrollController,
+                      thumbVisibility: true,
+                      child: ListView(
+                        controller: _sidebarScrollController,
+                        primary: false,
+                        padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+                        children: [
+                          for (final group in _groups) ...[
+                            _groupHeading(group.title),
+                            for (final title in group.modules)
+                              _navItem(_items.firstWhere(
+                                (item) => item.title == title,
+                              )),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                   _footer(),
@@ -251,12 +285,35 @@ class _DesktopWorkspaceScreenState extends State<DesktopWorkspaceScreen> {
     );
   }
 
+  Widget _groupHeading(String title) {
+    if (_collapsed) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        child: Divider(height: 1, color: Color(0xFF284159)),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(13, 16, 8, 8),
+      child: Text(
+        title.toUpperCase(),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: Color(0xFF9FB2C5),
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: .7,
+        ),
+      ),
+    );
+  }
+
   Widget _navItem(_DesktopNavItem item) {
     final selected = item.title == _selected;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Tooltip(
-        message: _collapsed ? item.title : '',
+        message: item.title,
         child: Material(
           color: selected ? _teal : Colors.transparent,
           borderRadius: BorderRadius.circular(11),
@@ -285,6 +342,7 @@ class _DesktopWorkspaceScreenState extends State<DesktopWorkspaceScreen> {
                     Expanded(
                       child: Text(
                         item.title,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: selected
@@ -360,6 +418,13 @@ class _DesktopWorkspaceScreenState extends State<DesktopWorkspaceScreen> {
       ),
     );
   }
+}
+
+class _DesktopNavGroup {
+  const _DesktopNavGroup(this.title, this.modules);
+
+  final String title;
+  final List<String> modules;
 }
 
 class _DesktopNavItem {

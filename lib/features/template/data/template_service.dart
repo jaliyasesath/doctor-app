@@ -85,7 +85,16 @@ class TemplateService {
   }
 
   static List<Map<String, dynamic>> decodeItems(String jsonStr) {
-    return List<Map<String, dynamic>>.from(jsonDecode(jsonStr));
+    try {
+      final decoded = jsonDecode(jsonStr);
+      if (decoded is! List) return [];
+      return decoded
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } on FormatException {
+      return [];
+    }
   }
 
   static String encodeItems(List<Map<String, dynamic>> items) {

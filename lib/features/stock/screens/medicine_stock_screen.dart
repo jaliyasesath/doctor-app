@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/widgets/app_error_ui.dart';
+import '../../../core/widgets/desktop_module_shell.dart';
 import '../../auth/data/doctor_session.dart';
 import '../../notifications/services/local_notification_service.dart';
 import '../../sync/services/auto_sync_service.dart';
@@ -395,6 +397,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     DateTime? expiry;
     final result = await showDialog<bool>(
       context: context,
+      useRootNavigator: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Receive Stock'),
@@ -524,6 +527,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     final reason = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
+      useRootNavigator: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: Text('Adjust ${_text(item['medicineName'])}'),
@@ -660,6 +664,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     loadItems(prescription);
     final ok = await showDialog<bool>(
       context: context,
+      useRootNavigator: false,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('Dispense Prescription'),
@@ -763,6 +768,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     final reason = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
+      useRootNavigator: false,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Reverse Dispense'),
         content: Column(
@@ -810,6 +816,7 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
     final days = TextEditingController(text: '$_expiringWithinDays');
     final ok = await showDialog<bool>(
       context: context,
+      useRootNavigator: false,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Stock Alert Settings'),
         content: Column(
@@ -1243,6 +1250,10 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000) {
+      return _buildDesktop(context);
+    }
+
     return Theme(
       data: Theme.of(context).copyWith(
         colorScheme: ColorScheme.fromSeed(seedColor: _green),
@@ -1391,6 +1402,152 @@ class _MedicineStockScreenState extends State<MedicineStockScreen>
                     controller: _tabs,
                     children: [_overview(), _batchList(), _movementList()],
                   ),
+      ),
+    );
+  }
+
+  Widget _buildDesktop(BuildContext context) {
+    final body = _loading
+        ? const Center(child: CircularProgressIndicator())
+        : _error != null
+            ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.cloud_off_rounded,
+                        size: 52, color: Colors.redAccent),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Stock data could not be loaded.',
+                      style: TextStyle(
+                        color: DesktopModuleShell.ink,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    FilledButton.icon(
+                      onPressed: _load,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Try Again'),
+                    ),
+                  ],
+                ),
+              )
+            : Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 20, 22, 0),
+                    child: DesktopPanel(
+                      padding: const EdgeInsets.fromLTRB(8, 7, 8, 0),
+                      child: TabBar(
+                        controller: _tabs,
+                        labelColor: DesktopModuleShell.teal,
+                        unselectedLabelColor: DesktopModuleShell.muted,
+                        indicatorColor: DesktopModuleShell.teal,
+                        indicatorWeight: 3,
+                        tabs: const [
+                          Tab(icon: Icon(Icons.dashboard_outlined), text: 'Overview'),
+                          Tab(icon: Icon(Icons.inventory_2_outlined), text: 'Batches'),
+                          Tab(icon: Icon(Icons.history_rounded), text: 'History'),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_showingOfflineCache)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.fromLTRB(22, 12, 22, 0),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF4D8),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFF1D28B)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.cloud_off_outlined,
+                              color: Color(0xFF9A6812)),
+                          SizedBox(width: 9),
+                          Text(
+                            'Offline cache is being shown. Stock-changing actions require a connection.',
+                            style: TextStyle(
+                              color: Color(0xFF7A5310),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(22),
+                      child: TabBarView(
+                        controller: _tabs,
+                        children: [_overview(), _batchList(), _movementList()],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: ColorScheme.fromSeed(seedColor: _green),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: DesktopModuleShell.line),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: _green, width: 1.6),
+          ),
+        ),
+      ),
+      child: DesktopModuleShell(
+        title: 'Medicine Stock',
+        subtitle: 'Monitor inventory, batches, expiry alerts and dispensing history',
+        icon: Icons.inventory_2_rounded,
+        embedded: true,
+        onBack: () {},
+        actions: [
+          OutlinedButton.icon(
+            onPressed: _mutationInProgress ? null : () => _dispense(),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white54),
+            ),
+            icon: const Icon(Icons.medication_liquid_outlined),
+            label: const Text('Dispense'),
+          ),
+          if (_canManageStock) ...[
+            const SizedBox(width: 10),
+            OutlinedButton.icon(
+              onPressed: _mutationInProgress ? null : _configureAlerts,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white54),
+              ),
+              icon: const Icon(Icons.tune_rounded),
+              label: const Text('Alerts'),
+            ),
+            const SizedBox(width: 10),
+            FilledButton.icon(
+              onPressed: _mutationInProgress ? null : _receive,
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: DesktopModuleShell.teal,
+              ),
+              icon: const Icon(Icons.add_box_outlined),
+              label: const Text('Receive Stock'),
+            ),
+          ],
+        ],
+        body: body,
       ),
     );
   }

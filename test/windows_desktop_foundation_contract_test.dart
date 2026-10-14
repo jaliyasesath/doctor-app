@@ -26,15 +26,27 @@ void main() {
     expect(source, contains('EncryptedDatabaseMigrator.openOrMigrate'));
   });
 
-  test('desktop dashboard uses adaptive rail and guards camera scanning', () {
-    final source = File(
-      'lib/features/dashboard/screens/home_screen.dart',
-    ).readAsStringSync();
+  test('desktop dashboard uses permanent workspace and guards camera scanning', () {
+  final homeSource = File(
+    'lib/features/dashboard/screens/home_screen.dart',
+  ).readAsStringSync();
 
-    expect(source, contains('width >= 1000'));
-    expect(source, contains('NavigationRail('));
-    expect(source, contains("Platform.isWindows && title == 'Scan Prescription'"));
-  });
+  final workspaceSource = File(
+    'lib/core/widgets/desktop_workspace_screen.dart',
+  ).readAsStringSync();
+
+  expect(homeSource, contains('width >= 1000'));
+  expect(homeSource, contains('DesktopWorkspaceScreen('));
+  expect(
+    homeSource,
+    contains("Platform.isWindows && title == 'Scan Prescription'"),
+  );
+
+  expect(workspaceSource, contains('class DesktopWorkspaceScreen'));
+  expect(workspaceSource, contains('Navigator('));
+  expect(workspaceSource, contains('Prescription History'));
+  expect(workspaceSource, contains('Patient History'));
+});
 
   test('pubspec selects the Dart 3.11-compatible encrypted native build', () {
     final source = File('pubspec.yaml').readAsStringSync();

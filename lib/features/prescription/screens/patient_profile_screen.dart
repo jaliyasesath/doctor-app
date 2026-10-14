@@ -320,8 +320,47 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     }).toList();
   }
 
-  void _openPrescription(Map<String, dynamic> item) {
-    final items = _parseItemsText((item['items_text'] ?? '').toString());
+  Future<List<PrescriptionItem>> _loadPrescriptionItems(
+    Map<String, dynamic> item,
+  ) async {
+    final prescriptionId = (item['id'] as num?)?.toInt();
+    if (prescriptionId == null) {
+      return _parseItemsText((item['items_text'] ?? '').toString());
+    }
+
+    final storedItems =
+        await DatabaseHelper.instance.getPrescriptionItems(prescriptionId);
+    if (storedItems.isEmpty) {
+      return _parseItemsText((item['items_text'] ?? '').toString());
+    }
+
+    return storedItems.map((storedItem) {
+      final unitPrice =
+          (storedItem['unit_price'] as num?)?.toDouble() ?? 0.0;
+      final quantity =
+          (storedItem['quantity'] as num?)?.toDouble() ?? 1.0;
+      final storedLineTotal =
+          (storedItem['line_total'] as num?)?.toDouble() ?? 0.0;
+      return PrescriptionItem(
+        medicineId: (storedItem['medicine_id'] as num?)?.toInt(),
+        medicineName: storedItem['medicine_name']?.toString() ?? '',
+        dosage: storedItem['dosage']?.toString() ?? '',
+        frequency: storedItem['frequency']?.toString() ?? '',
+        duration: storedItem['duration']?.toString() ?? '',
+        instructions: storedItem['instructions']?.toString() ?? '',
+        prescriptionOnly:
+            (storedItem['prescription_only'] as num?)?.toInt() == 1,
+        unitPrice: unitPrice,
+        quantity: quantity,
+        lineTotal:
+            storedLineTotal > 0 ? storedLineTotal : unitPrice * quantity,
+      );
+    }).toList(growable: false);
+  }
+
+  Future<void> _openPrescription(Map<String, dynamic> item) async {
+    final items = await _loadPrescriptionItems(item);
+    if (!mounted) return;
 
     PrescriptionStore.setPatientDetails(
       name: _getPatientName(),
@@ -351,8 +390,9 @@ class _PatientProfileScreenState extends State<PatientProfileScreen> {
     );
   }
 
-  void _repeatPrescription(Map<String, dynamic> item) {
-    final items = _parseItemsText((item['items_text'] ?? '').toString());
+  Future<void> _repeatPrescription(Map<String, dynamic> item) async {
+    final items = await _loadPrescriptionItems(item);
+    if (!mounted) return;
 
     PrescriptionStore.setPatientDetails(
       name: _getPatientName(),

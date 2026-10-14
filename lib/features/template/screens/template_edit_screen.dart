@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import '../../../core/widgets/desktop_module_shell.dart';
 import '../data/template_service.dart';
 import '../models/template_model.dart';
 
@@ -112,7 +115,8 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) {
+      useRootNavigator: false,
+      builder: (dialogContext) {
         return AlertDialog(
           title: Text(existing == null ? 'Add Medicine' : 'Edit Medicine'),
           content: SingleChildScrollView(
@@ -133,11 +137,11 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false),
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
+              onPressed: () => Navigator.pop(dialogContext, true),
               child: Text(existing == null ? 'Add' : 'Update'),
             ),
           ],
@@ -152,6 +156,15 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
         'frequency': frequencyController.text.trim(),
         'duration': durationController.text.trim(),
         'instructions': instructionsController.text.trim(),
+        if (existing?['medicine_id'] != null)
+          'medicine_id': existing!['medicine_id'],
+        'prescription_only': existing?['prescription_only'] ?? false,
+        'unit_price': existing?['unit_price'] ?? 0,
+        'quantity': existing?['quantity'] ?? 1,
+        'line_total': existing?['line_total'] ??
+            ((double.tryParse(existing?['unit_price']?.toString() ?? '') ?? 0) *
+                (double.tryParse(existing?['quantity']?.toString() ?? '') ??
+                    1)),
       };
 
       if (item['name']!.isEmpty) {
@@ -270,6 +283,10 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000) {
+      return _buildDesktop(context);
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Template'),
@@ -385,6 +402,177 @@ class _TemplateEditScreenState extends State<TemplateEditScreen> {
               ),
             ),
             const SizedBox(height: 90),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDesktop(BuildContext context) {
+    InputDecoration decoration(String label, IconData icon) {
+      return InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: DesktopModuleShell.teal),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: DesktopModuleShell.line),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: DesktopModuleShell.line),
+        ),
+      );
+    }
+
+    return DesktopModuleShell(
+      title: 'Edit Template',
+      subtitle: 'Update reusable clinical details and medicine instructions',
+      icon: Icons.edit_note_rounded,
+      embedded: true,
+      onBack: () => Navigator.pop(context),
+      actions: [
+        OutlinedButton.icon(
+          onPressed: _isSaving
+              ? null
+              : () => setState(() => _isFavorite = !_isFavorite),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.white,
+            side: const BorderSide(color: Colors.white54),
+          ),
+          icon: Icon(_isFavorite ? Icons.star_rounded : Icons.star_border_rounded),
+          label: Text(_isFavorite ? 'Favourite' : 'Mark Favourite'),
+        ),
+        const SizedBox(width: 10),
+        FilledButton.icon(
+          onPressed: _isSaving ? null : _save,
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: DesktopModuleShell.teal,
+          ),
+          icon: _isSaving
+              ? const SizedBox(
+                  width: 17,
+                  height: 17,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.save_outlined),
+          label: Text(_isSaving ? 'Saving...' : 'Save Changes'),
+        ),
+      ],
+      body: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              width: 420,
+              child: DesktopPanel(
+                padding: const EdgeInsets.all(24),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Template information',
+                        style: TextStyle(
+                          color: DesktopModuleShell.ink,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'These details are copied into the prescription when this template is used.',
+                        style: TextStyle(color: DesktopModuleShell.muted),
+                      ),
+                      const SizedBox(height: 22),
+                      TextField(
+                        controller: _nameController,
+                        decoration: decoration(
+                          'Template Name *',
+                          Icons.drive_file_rename_outline,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _complaintController,
+                        maxLines: 3,
+                        decoration: decoration(
+                          'Complaint',
+                          Icons.chat_bubble_outline_rounded,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _diagnosisController,
+                        maxLines: 3,
+                        decoration: decoration(
+                          'Diagnosis',
+                          Icons.medical_information_outlined,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 18),
+            Expanded(
+              child: DesktopPanel(
+                padding: const EdgeInsets.all(22),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.medication_outlined,
+                            color: DesktopModuleShell.teal),
+                        const SizedBox(width: 9),
+                        Text(
+                          'Medicines (${_items.length})',
+                          style: const TextStyle(
+                            color: DesktopModuleShell.ink,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const Spacer(),
+                        FilledButton.icon(
+                          onPressed: _isSaving ? null : () => _openMedicineDialog(),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: DesktopModuleShell.teal,
+                          ),
+                          icon: const Icon(Icons.add_rounded),
+                          label: const Text('Add Medicine'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: _items.isEmpty
+                          ? const Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.medication_liquid_outlined,
+                                      size: 52, color: Color(0xFFA2B5B1)),
+                                  SizedBox(height: 10),
+                                  Text('No medicines added yet'),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _items.length,
+                              itemBuilder: (context, index) =>
+                                  _buildMedicineCard(_items[index], index),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),

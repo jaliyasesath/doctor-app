@@ -110,16 +110,17 @@ class _CreateLabOrderScreenState extends State<CreateLabOrderScreen> {
       if (!mounted) return;
       final send = await showDialog<bool>(
               context: context,
-              builder: (_) => AlertDialog(
+              useRootNavigator: false,
+              builder: (dialogContext) => AlertDialog(
                       title: const Text('Lab request saved'),
                       content: Text(
                           'Order $orderNo\n\nSend the professional email to the selected laboratory now?'),
                       actions: [
                         TextButton(
-                            onPressed: () => Navigator.pop(context, false),
+                            onPressed: () => Navigator.pop(dialogContext, false),
                             child: const Text('Later')),
                         FilledButton(
-                            onPressed: () => Navigator.pop(context, true),
+                            onPressed: () => Navigator.pop(dialogContext, true),
                             child: const Text('Send Email'))
                       ])) ??
           false;
@@ -131,17 +132,18 @@ class _CreateLabOrderScreenState extends State<CreateLabOrderScreen> {
         final notify = mounted &&
             (await showDialog<bool>(
                     context: context,
-                    builder: (_) => AlertDialog(
+                    useRootNavigator: false,
+                    builder: (dialogContext) => AlertDialog(
                             title: const Text('WhatsApp notification'),
                             content: const Text(
                                 'Open WhatsApp with a short notification? Patient medical details will not be included.'),
                             actions: [
                               TextButton(
                                   onPressed: () =>
-                                      Navigator.pop(context, false),
+                                      Navigator.pop(dialogContext, false),
                                   child: const Text('No')),
                               FilledButton(
-                                  onPressed: () => Navigator.pop(context, true),
+                                  onPressed: () => Navigator.pop(dialogContext, true),
                                   child: const Text('Open WhatsApp'))
                             ])) ??
                 false);
@@ -260,6 +262,7 @@ class _CreateLabOrderScreenState extends State<CreateLabOrderScreen> {
             onTap: () async {
               final d = await showDatePicker(
                   context: context,
+                  useRootNavigator: false,
                   firstDate: DateTime.now(),
                   lastDate: DateTime.now().add(const Duration(days: 365)));
               if (d != null) setState(() => _sampleDate = d);

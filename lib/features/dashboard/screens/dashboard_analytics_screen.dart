@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import '../../../data/local/database_helper.dart';
+import 'desktop_analytics_screen.dart';
 
 class DashboardAnalyticsScreen extends StatefulWidget {
   const DashboardAnalyticsScreen({super.key});
@@ -20,7 +23,7 @@ class _DashboardAnalyticsScreenState extends State<DashboardAnalyticsScreen> {
   @override
   void initState() {
     super.initState();
-    loadData();
+    if (!Platform.isWindows) loadData();
   }
 
   Future<void> loadData() async {
@@ -64,6 +67,7 @@ class _DashboardAnalyticsScreenState extends State<DashboardAnalyticsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isWindows) return const DesktopAnalyticsScreen();
     return Scaffold(
       appBar: AppBar(
         title: const Text("Analytics Dashboard"),

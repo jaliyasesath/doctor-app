@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';
+import 'dart:io';
 import '../../../data/local/database_helper.dart';
 import '../../auth/data/doctor_session.dart';
 import '../data/prescription_store.dart';
@@ -10,6 +11,7 @@ import '../../reception/screens/reception_prescription_edit_screen.dart';
 import '../../sync/services/auto_sync_service.dart';
 import '../../sync/services/network_service.dart';
 import '../../sync/services/sync_service.dart';
+import 'desktop_prescription_history_view.dart';
 
 class PrescriptionHistoryScreen extends StatefulWidget {
   final bool receptionMode;
@@ -482,6 +484,23 @@ class _PrescriptionHistoryScreenState extends State<PrescriptionHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final useDesktopLayout =
+        Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000;
+    if (useDesktopLayout) {
+      return DesktopPrescriptionHistoryView(
+        prescriptions: _prescriptions,
+        isLoading: _isLoading,
+        isLoadingMore: _isLoadingMore,
+        hasMore: _hasMore,
+        receptionMode: widget.receptionMode,
+        scrollController: _scrollController,
+        onRefresh: _refresh,
+        onOpen: _open,
+        onEdit: _openReceptionEdit,
+        onDelete: _confirmDelete,
+        onLoadMore: _loadMorePrescriptions,
+      );
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF3F7F6),
       appBar: AppBar(

@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import '../../../core/widgets/app_error_ui.dart';
 import '../data/template_service.dart';
 import '../models/template_model.dart';
 import '../../prescription/data/prescription_store.dart';
 import '../../prescription/models/prescription_item.dart';
 import 'template_edit_screen.dart';
+import 'desktop_template_list_view.dart';
 
 class TemplateListScreen extends StatefulWidget {
   const TemplateListScreen({super.key});
@@ -23,14 +27,21 @@ class _TemplateListScreenState extends State<TemplateListScreen> {
   }
 
   Future<void> _loadTemplates() async {
-    final data = await TemplateService.getTemplates();
+    if (mounted) setState(() => _isLoading = true);
+    try {
+      final data = await TemplateService.getTemplates();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _templates = data;
-      _isLoading = false;
-    });
+      setState(() {
+        _templates = data;
+        _isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      AppErrorUi.show(context, error, onRetry: _loadTemplates);
+    }
   }
 
   void _applyTemplate(TemplateModel template) {
@@ -45,11 +56,21 @@ class _TemplateListScreenState extends State<TemplateListScreen> {
     PrescriptionStore.setItems(
       items.map((e) {
         return PrescriptionItem(
+          medicineId: int.tryParse(e['medicine_id']?.toString() ?? ''),
           medicineName: e['name']?.toString() ?? '',
           dosage: e['dosage']?.toString() ?? '',
           frequency: e['frequency']?.toString() ?? '',
           duration: e['duration']?.toString() ?? '',
           instructions: e['instructions']?.toString() ?? '',
+          prescriptionOnly: e['prescription_only'] == true ||
+              e['prescription_only'] == 1 ||
+              e['prescription_only']?.toString() == '1',
+          unitPrice:
+              double.tryParse(e['unit_price']?.toString() ?? '') ?? 0,
+          quantity: double.tryParse(e['quantity']?.toString() ?? '') ?? 1,
+          lineTotal: double.tryParse(e['line_total']?.toString() ?? '') ??
+              ((double.tryParse(e['unit_price']?.toString() ?? '') ?? 0) *
+                  (double.tryParse(e['quantity']?.toString() ?? '') ?? 1)),
         );
       }).toList(),
     );
@@ -58,14 +79,43 @@ class _TemplateListScreenState extends State<TemplateListScreen> {
   }
 
   Future<void> _deleteTemplate(int id) async {
-    await TemplateService.deleteTemplate(id);
-    await _loadTemplates();
-
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Template deleted')),
+    final confirmed = await showDialog<bool>(
+      context: context,
+      useRootNavigator: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Template'),
+        content: const Text(
+          'Delete this prescription template? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
+
+    if (confirmed != true) return;
+
+    try {
+      await TemplateService.deleteTemplate(id);
+      await _loadTemplates();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Template deleted')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      AppErrorUi.show(context, error, onRetry: () => _deleteTemplate(id));
+    }
   }
 
   Future<void> _openEditTemplate(TemplateModel template) async {
@@ -143,6 +193,21 @@ class _TemplateListScreenState extends State<TemplateListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isWindows && MediaQuery.sizeOf(context).width >= 1000) {
+      return DesktopTemplateListView(
+        templates: _templates,
+        loading: _isLoading,
+        onRefresh: _loadTemplates,
+        onUse: _applyTemplate,
+        onEdit: _openEditTemplate,
+        onDelete: (template) {
+          final id = template.id;
+          if (id != null) _deleteTemplate(id);
+        },
+        onBack: () => Navigator.pop(context),
+      );
+    }
+
     final favorites = _templates.where((t) => t.isFavorite).toList();
     final others = _templates.where((t) => !t.isFavorite).toList();
 

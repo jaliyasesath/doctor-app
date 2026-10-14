@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/errors/app_exception.dart';
 import '../data/reception_account_service.dart';
+import 'desktop_reception_accounts_screen.dart';
 
 class ManageReceptionAccountsScreen extends StatefulWidget {
   const ManageReceptionAccountsScreen({super.key});
@@ -25,7 +28,7 @@ class _ManageReceptionAccountsScreenState
   @override
   void initState() {
     super.initState();
-    _load();
+    if (!Platform.isWindows) _load();
   }
 
   String _message(Object error) {
@@ -410,6 +413,9 @@ class _ManageReceptionAccountsScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isWindows) {
+      return const DesktopReceptionAccountsScreen();
+    }
     return Scaffold(
       backgroundColor: _surface,
       appBar: AppBar(

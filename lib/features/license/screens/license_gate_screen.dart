@@ -1,3 +1,6 @@
+import '../../../core/errors/app_error_handler.dart';
+import '../../../core/widgets/desktop_auth_frame.dart';
+import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 
@@ -13,6 +16,7 @@ class LicenseGateScreen extends StatefulWidget {
 }
 
 class _LicenseGateScreenState extends State<LicenseGateScreen> {
+  String? _desktopStatusError;
   bool _loading = true;
   bool _activated = false;
   bool _expired = false;
@@ -27,7 +31,11 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
   @override
   void initState() {
     super.initState();
-    _loadStatus();
+    if (Platform.isWindows) {
+      _desktopLoadStatus();
+    } else {
+      _loadStatus();
+    }
   }
 
   @override
@@ -83,6 +91,12 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
           if (expired) {
             _timer?.cancel();
           }
+        } catch (error) {
+          if (!Platform.isWindows) rethrow;
+          _timer?.cancel();
+          if (mounted) setState(() {
+            _desktopStatusError = 'Trial status could not be checked. Please retry.';
+          });
         } finally {
           _timerTickRunning = false;
         }
@@ -99,7 +113,11 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
     );
 
     if (result == true) {
-      await _loadStatus();
+      if (Platform.isWindows) {
+        await _desktopLoadStatus();
+      } else {
+        await _loadStatus();
+      }
     }
   }
 
@@ -126,8 +144,92 @@ class _LicenseGateScreenState extends State<LicenseGateScreen> {
     );
   }
 
+  Future<void> _desktopLoadStatus() async {
+    _timer?.cancel();
+    if (mounted) setState(() {
+      _loading = true;
+      _desktopStatusError = null;
+    });
+    try {
+      await _loadStatus();
+    } catch (_, stackTrace) {
+      AppErrorHandler.recordUnawaited(StateError('desktop_auth_operation'),
+          stackTrace, source: 'DesktopAuthentication');
+      if (mounted) setState(() {
+        _loading = false;
+        _desktopStatusError = 'License status could not be loaded. Please retry.';
+      });
+    }
+  }
+
+  Future<void> _desktopRefreshSubscription() async {
+    if (_checkingSubscription) return;
+    try {
+      await _refreshSubscription();
+    } catch (_, stackTrace) {
+      AppErrorHandler.recordUnawaited(StateError('desktop_auth_operation'),
+          stackTrace, source: 'DesktopAuthentication');
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Subscription could not be checked. Please retry.'),
+      ));
+    } finally {
+      if (mounted) setState(() => _checkingSubscription = false);
+    }
+  }
+
+  Widget _buildDesktopGate() {
+    if (!_loading && _desktopStatusError == null &&
+        ((_activated && _deviceAuthorized) || _subscriptionActive) &&
+        !(_activated && !_deviceAuthorized)) return const LoginScreen();
+    final mismatch = _activated && !_deviceAuthorized;
+    return DesktopAuthFrame(
+      title: _loading ? 'Checking license'
+          : _desktopStatusError != null ? 'License check unavailable'
+          : mismatch ? 'License device mismatch'
+          : _expired ? 'Trial expired' : 'Trial active',
+      subtitle: mismatch
+          ? 'This license is bound to another device. Contact the administrator.'
+          : 'View your trial status or activate your license to continue.',
+      busy: _checkingSubscription,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (_loading) const Center(child: CircularProgressIndicator())
+        else if (_desktopStatusError != null) ...[
+          Text(_desktopStatusError!),
+          const SizedBox(height: 16),
+          FilledButton.icon(onPressed: _desktopLoadStatus,
+              icon: const Icon(Icons.refresh), label: const Text('Retry')),
+        ] else if (!mismatch) ...[
+          Text(_expired ? 'Your trial period has ended.'
+              : 'Time remaining: ${LicenseService.formatDuration(_remaining)}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 20),
+          if (!_expired) ...[
+            FilledButton(onPressed: _checkingSubscription ? null : () {
+              Navigator.pushReplacement(context, MaterialPageRoute(
+                builder: (_) => const LoginScreen()));
+            }, child: const Text('Continue trial')),
+            const SizedBox(height: 12),
+          ],
+          OutlinedButton.icon(
+            onPressed: _checkingSubscription ? null : _desktopRefreshSubscription,
+            icon: _checkingSubscription
+                ? const SizedBox(width: 18, height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.refresh),
+            label: Text(_checkingSubscription ? 'Checking...' : 'Refresh subscription')),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(onPressed: _checkingSubscription ? null : _openActivation,
+              icon: const Icon(Icons.verified_outlined), label: const Text('Activate license')),
+          const SizedBox(height: 16),
+          const Text('Monthly / Yearly plans: contact the administrator after payment.'),
+        ],
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (Platform.isWindows) return _buildDesktopGate();
     if (_loading) {
       return const Scaffold(
         body: Center(
