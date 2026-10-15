@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'pp_client_config.dart';
 import 'pp_client_session.dart';
 import 'pp_client_theme.dart';
+import 'pp_client_identity_display.dart';
 
 String _error(Object e) => e is PPClientError ? e.message : 'Unable to load this information. Please try again.';
 Color _traffic(int count, {bool dark = false}) => count <= 10
@@ -41,7 +42,7 @@ Widget _photo(Map<String, dynamic> doctor, {double size = 58}) {
           (uri.scheme == 'http' && uri.host == PPClientConfig.origin.host));
   return Semantics(
     image: true,
-    label: '${doctor['doctorName'] ?? 'Doctor'} profile photo',
+    label: '${ppClientDoctorName(doctor['doctorName'])} profile photo',
     child: ClipOval(
       child: SizedBox(
         width: size,
@@ -159,16 +160,30 @@ class _DoctorBrowserState extends State<PPClientDoctorBrowser> {
     textInputAction: TextInputAction.search,
     onSubmitted: (_) => _load(),
     decoration: InputDecoration(
-      counterText: '', hintText: 'Search doctor, specialty or town',
+      counterText: '', hintText: 'Search doctors or town',
       hintStyle: TextStyle(fontSize: 14, color: PPClientTheme.muted(context)),
       prefixIcon: Icon(Icons.search, color: PPClientTheme.muted(context)),
       suffixIcon: IconButton(
         tooltip: 'Search', onPressed: _loading ? null : () => _load(),
         icon: Icon(Icons.tune_rounded, color: PPClientTheme.accent(context)),
       ),
-      contentPadding: const EdgeInsets.symmetric(vertical: 18),
+      contentPadding: const EdgeInsets.symmetric(vertical: 14),
     ),
   );
+
+  Widget _patientAvatar() {
+    final fallback = Icon(Icons.person_rounded, color: PPClientTheme.accent(context));
+    final url = widget.session.googlePhotoUrl;
+    if (url == null) return fallback;
+    return ClipOval(child: SizedBox(width: 32, height: 32,
+      child: Image.network(url, fit: BoxFit.cover, cacheWidth: 96,
+        excludeFromSemantics: true,
+        frameBuilder: (_, child, frame, synchronous) =>
+            synchronous || frame != null ? child : Center(child: fallback),
+        errorBuilder: (_, __, ___) => Center(child: fallback),
+      ),
+    ));
+  }
 
   Widget _header() {
     final dark = PPClientTheme.isDark(context);
@@ -177,7 +192,7 @@ class _DoctorBrowserState extends State<PPClientDoctorBrowser> {
         ? 'Good afternoon!' : 'Good evening!';
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft, end: Alignment.bottomRight,
@@ -216,17 +231,13 @@ class _DoctorBrowserState extends State<PPClientDoctorBrowser> {
           IconButton.filledTonal(
             tooltip: 'Your profile', onPressed: widget.onProfile,
             style: IconButton.styleFrom(backgroundColor: PPClientTheme.tint(context)),
-            icon: Icon(Icons.person_rounded, color: PPClientTheme.accent(context)),
+            icon: _patientAvatar(),
           ),
         ]),
-        const SizedBox(height: 20),
-        Text(greeting, style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800,
+        const SizedBox(height: 12),
+        Text(greeting, style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800,
             color: PPClientTheme.ink(context))),
-        const SizedBox(height: 6),
-        Text('Find and book queues for doctors near you.',
-            style: TextStyle(fontSize: 14, height: 1.45,
-                color: PPClientTheme.muted(context))),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         _locationCard(),
         const SizedBox(height: 12),
         _searchField(),
@@ -235,15 +246,15 @@ class _DoctorBrowserState extends State<PPClientDoctorBrowser> {
   }
 
   Widget _locationCard() => Container(
-    padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
+    padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
     decoration: BoxDecoration(
       color: PPClientTheme.surface(context), borderRadius: BorderRadius.circular(18),
       border: Border.all(color: PPClientTheme.border(context)),
     ),
     child: Row(children: [
-      CircleAvatar(radius: 21, backgroundColor: PPClientTheme.tint(context),
+      CircleAvatar(radius: 18, backgroundColor: PPClientTheme.tint(context),
           child: Icon(Icons.location_on_rounded,
-              color: PPClientTheme.accent(context), size: 25)),
+              color: PPClientTheme.accent(context), size: 22)),
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Your location', style: TextStyle(fontSize: 12,
@@ -264,7 +275,7 @@ class _DoctorBrowserState extends State<PPClientDoctorBrowser> {
   Widget _servicesGrid({bool closeSheet = false}) => LayoutBuilder(
     builder: (context, constraints) {
       final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
-      final columns = constraints.maxWidth >= 320 && scale < 1.4 ? 3 : 2;
+      final columns = constraints.maxWidth >= 300 && scale <= 1.2 ? 3 : 2;
       final items = <({IconData icon, String title, String subtitle, Color color, VoidCallback action})>[
         (icon: Icons.person_search_rounded, title: 'Find Doctor',
           subtitle: 'Book your queue', color: const Color(0xFF3B82F6),
@@ -302,11 +313,12 @@ class _DoctorBrowserState extends State<PPClientDoctorBrowser> {
       var tileHeight = tileWidth;
       for (final item in items) {
         final titleHeight = textHeight(item.title,
-            const TextStyle(fontSize: 13, height: 1.2, fontWeight: FontWeight.w800));
+            const TextStyle(fontSize: 12, height: 1.2, fontWeight: FontWeight.w800));
         final subtitleHeight = textHeight(item.subtitle,
             const TextStyle(fontSize: 11, height: 1.3));
         // Padding + avatar + gaps + measured labels + rounding headroom.
-        tileHeight = max(tileHeight, (24 + 46 + 10 + titleHeight + 5 + subtitleHeight + 8).ceilToDouble());
+        tileHeight = max(tileHeight, (20 + 40 + 8 + titleHeight +
+            (closeSheet ? 5 + subtitleHeight : 0) + 8).ceilToDouble());
       }
       return GridView.builder(
         shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
@@ -329,20 +341,22 @@ class _DoctorBrowserState extends State<PPClientDoctorBrowser> {
             child: InkWell(
               onTap: () { if (closeSheet) Navigator.pop(context); item.action(); },
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 10),
                 child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                   CircleAvatar(
-                    radius: 23, backgroundColor: item.color.withValues(alpha: .14),
-                    child: Icon(item.icon, color: item.color, size: 27),
+                    radius: 20, backgroundColor: item.color.withValues(alpha: .14),
+                    child: Icon(item.icon, color: item.color, size: 25),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Text(item.title, textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 13, height: 1.2,
+                      style: TextStyle(fontSize: 12, height: 1.2,
                           color: PPClientTheme.ink(context), fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 5),
-                  Text(item.subtitle, textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 11, height: 1.3,
-                          color: PPClientTheme.muted(context))),
+                  if (closeSheet) ...[
+                    const SizedBox(height: 5),
+                    Text(item.subtitle, textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 11, height: 1.3,
+                            color: PPClientTheme.muted(context))),
+                  ],
                 ]),
               ),
             ),
@@ -426,7 +440,7 @@ class _DoctorBrowserState extends State<PPClientDoctorBrowser> {
                 _photo(doctor, size: 48),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(doctor['doctorName']?.toString() ?? '',
+                  Text(ppClientDoctorName(doctor['doctorName']),
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
                           color: PPClientTheme.ink(context))),
                   if ((doctor['specialization']?.toString() ?? '').trim().isNotEmpty) ...[
@@ -445,7 +459,7 @@ class _DoctorBrowserState extends State<PPClientDoctorBrowser> {
                 Expanded(child: _queueMetric('Waiting', '$waiting patients', Icons.groups_rounded, traffic)),
                 Padding(padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: VerticalDivider(width: 1, color: PPClientTheme.border(context))),
-                Expanded(child: _queueMetric('Now serving', '#${_number(doctor['nowServing'])}',
+                Expanded(child: _queueMetric('Now serving', (_number(doctor['nowServing']) > 0 ? '#${_number(doctor['nowServing'])}' : '—'),
                     Icons.person_outline, PPClientTheme.ink(context))),
               ])),
             ]),
@@ -583,11 +597,11 @@ class _DoctorDetailsState extends State<_DoctorDetails> {
     return Scaffold(appBar: AppBar(title: const Text('Doctor details')), body: ListView(padding: const EdgeInsets.all(24), children: [
       if (_loading) const LinearProgressIndicator(),
       if (doctor != null) ...[
-        Text(doctor['doctorName']?.toString() ?? '', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
+        Text(ppClientDoctorName(doctor['doctorName']), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
         for (final field in ['specialization','qualifications','medicalCenterName','clinicAddress','city','professionalBio','languages','clinicHours','contactNumber'])
           if ((doctor[field]?.toString() ?? '').trim().isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(doctor[field].toString())),
         const SizedBox(height: 20),
-        Text('${_data!['waitingCount']} waiting • Now serving ${_data!['nowServing']}',
+        Text('${_data!['waitingCount']} waiting • Now serving ${_number(_data!['nowServing']) > 0 ? _data!['nowServing'] : '—'}',
           style: TextStyle(fontWeight: FontWeight.w700, color: _traffic(_number(_data!['waitingCount']), dark: PPClientTheme.isDark(context)))),
         const SizedBox(height: 20),
         OutlinedButton.icon(onPressed: () => _directions(context, doctor), icon: const Icon(Icons.directions), label: const Text('Directions in Google Maps')),
@@ -653,10 +667,10 @@ class _MyQueueState extends State<PPClientMyQueue> with WidgetsBindingObserver {
       final day = DateTime.tryParse(b['queueDate']?.toString() ?? '');
       final today = DateUtils.isSameDay(day, DateTime.now());
       return Card(child: Padding(padding: const EdgeInsets.all(18), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(b['doctorName']?.toString() ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        Text(ppClientDoctorName(b['doctorName']), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         Text(b['medicalCenterName']?.toString() ?? ''), const SizedBox(height: 12),
         Text('Queue ${b['queueNo']} • ${b['status']}', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-        if (today && ['Waiting', 'Serving'].contains(b['status'])) Text('Now serving ${b['nowServing']} • ${b['peopleAhead']} ahead'),
+        if (today && ['Waiting', 'Serving'].contains(b['status'])) Text('Now serving ${_number(b['nowServing']) > 0 ? b['nowServing'] : '—'} • ${b['peopleAhead']} ahead'),
         Text(day == null ? '' : '${day.year}-${day.month.toString().padLeft(2,'0')}-${day.day.toString().padLeft(2,'0')}'),
         TextButton.icon(onPressed: () => _directions(context, b), icon: const Icon(Icons.directions), label: const Text('Directions')),
         if (today && b['status'] == 'Waiting') OutlinedButton(onPressed: _cancelling != null ? null : () => _cancel(b),

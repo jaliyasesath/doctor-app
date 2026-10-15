@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'pp_client_config.dart';
+import 'pp_client_identity_display.dart';
 
 /// Serializes all session mutations: no overlapping refresh, logout or login.
 /// Only a single session JSON record is persisted; profile stays in memory.
@@ -16,6 +17,9 @@ class PPClientSession extends ChangeNotifier {
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
   );
   static const _storageKey = 'pp_client_identity_session_v1';
+  static const _photoKey = 'pp_client_google_photo_v1';
+  String? _googlePhotoUrl;
+  String? get googlePhotoUrl => _googlePhotoUrl;
   Future<void> _tail = Future<void>.value();
   Future<void>? _googleInitialization;
   String? _access, _refresh;
@@ -79,8 +83,10 @@ class PPClientSession extends ChangeNotifier {
 
   Future<void> _clear() async {
     _access = null; _refresh = null; _expires = null; profile = null;
+    _googlePhotoUrl = null;
     notifyListeners();
     await _storage.delete(key: _storageKey);
+    try { await _storage.delete(key: _photoKey); } catch (_) { /* Optional display metadata only. */ }
   }
 
   Future<void> _accept(Map<String, dynamic> data) async {
@@ -99,9 +105,11 @@ class PPClientSession extends ChangeNotifier {
     } catch (_) {
       // Rotation may already have committed server-side: fail closed locally.
       _access = null; _refresh = null; _expires = null; profile = null;
+    _googlePhotoUrl = null;
       notifyListeners();
       throw const PPClientError('Secure session storage failed. Please sign in again.');
     }
+    if (profile?['patientAccountId'] != p['patientAccountId']) { _googlePhotoUrl = null; }
     _access = access; _refresh = refresh; _expires = expires; profile = p;
     notifyListeners();
   }
@@ -149,8 +157,35 @@ class PPClientSession extends ChangeNotifier {
     _access = data['access'] as String; _refresh = data['refresh'] as String;
     _expires = DateTime.tryParse(data['expires'] as String);
     profile = await _authorized('GET', 'profile');
+    await _restoreGooglePhoto();
     notifyListeners();
   });
+
+  Future<void> _restoreGooglePhoto() async {
+    _googlePhotoUrl = null;
+    try {
+      final stored = await _storage.read(key: _photoKey);
+      if (stored == null) return;
+      final data = jsonDecode(stored);
+      if (data is Map<String, dynamic> &&
+          data['origin'] == PPClientConfig.origin.toString() &&
+          data['patientAccountId'] == profile?['patientAccountId']) {
+        _googlePhotoUrl = ppClientPhotoUrl(data['url']);
+      }
+    } catch (_) { /* A missing photo must never prevent session restore. */ }
+  }
+
+  Future<void> _saveGooglePhoto(String? value) async {
+    _googlePhotoUrl = ppClientPhotoUrl(value);
+    notifyListeners();
+    try {
+      await _storage.write(key: _photoKey, value: jsonEncode({
+        'origin': PPClientConfig.origin.toString(),
+        'patientAccountId': profile?['patientAccountId'],
+        'url': _googlePhotoUrl,
+      }));
+    } catch (_) { /* Photo caching is optional; authentication already succeeded. */ }
+  }
 
   Future<void> signInWithGoogle() => _serial(() async {
     PPClientConfig.origin;
@@ -180,6 +215,7 @@ class PPClientSession extends ChangeNotifier {
         throw const PPClientError('This Google account could not sign in. Please check the configuration.');
       }
       await _accept(_object(response));
+      await _saveGooglePhoto(user.photoUrl);
     } on GoogleSignInException catch (error) {
       if (error.code == GoogleSignInExceptionCode.canceled) {
         throw const PPClientError('Sign-in was cancelled.');
