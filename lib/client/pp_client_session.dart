@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
@@ -187,6 +188,23 @@ class PPClientSession extends ChangeNotifier {
     } catch (_) { /* Photo caching is optional; authentication already succeeded. */ }
   }
 
+  // Show only a bounded code, never native descriptions, details or tokens.
+  static String diagnosticReference(Object error, String stage) {
+    String code;
+    if (error is PlatformException) {
+      code = RegExp(r'^[A-Za-z0-9_.-]{1,64}$').hasMatch(error.code)
+          ? error.code : 'platform_error';
+    } else if (error is GoogleSignInException) {
+      code = error.code.name;
+    } else {
+      code = error.runtimeType.toString();
+      if (!RegExp(r'^[A-Za-z0-9_]{1,64}$').hasMatch(code)) {
+        code = 'unexpected_error';
+      }
+    }
+    return 'PPLOGIN-1 / $stage / $code';
+  }
+
   Future<void> signInWithGoogle() => _serial(() async {
     PPClientConfig.origin;
     if (!PPClientConfig.googleWebClientId.endsWith('.apps.googleusercontent.com')) {
@@ -199,28 +217,40 @@ class PPClientSession extends ChangeNotifier {
       throw const PPClientError('iOS Google sign-in configuration is required.');
     }
     final google = GoogleSignIn.instance;
-    _googleInitialization ??= google.initialize(
-      serverClientId: PPClientConfig.googleWebClientId,
-      clientId: defaultTargetPlatform == TargetPlatform.iOS ? PPClientConfig.googleIosClientId : null,
-    );
+    var stage = 'google-initialize';
     try {
+      _googleInitialization ??= google.initialize(
+        serverClientId: PPClientConfig.googleWebClientId,
+        clientId: defaultTargetPlatform == TargetPlatform.iOS ? PPClientConfig.googleIosClientId : null,
+      );
       await _googleInitialization;
+      stage = 'google-authenticate';
       final user = await google.authenticate();
+      stage = 'google-token';
       final token = user.authentication.idToken;
       if (token == null || token.isEmpty) {
         throw const PPClientError('Google could not verify this account. Please try again.');
       }
+      stage = 'api-google';
       final response = await _send('POST', 'google', bearer: token);
+      stage = 'api-google-http-${response.statusCode}';
       if ([401, 403].contains(response.statusCode)) {
         throw const PPClientError('This Google account could not sign in. Please check the configuration.');
       }
-      await _accept(_object(response));
+      final payload = _object(response);
+      stage = 'session-save';
+      await _accept(payload);
+      stage = 'photo-cache';
       await _saveGooglePhoto(user.photoUrl);
+    } on PPClientError catch (error) {
+      throw PPClientError('${error.message} [PPLOGIN-1 / $stage]');
     } on GoogleSignInException catch (error) {
       if (error.code == GoogleSignInExceptionCode.canceled) {
-        throw const PPClientError('Sign-in was cancelled.');
+        throw PPClientError('Sign-in was cancelled. [${diagnosticReference(error, stage)}]');
       }
-      throw const PPClientError('Google sign-in failed. Check the app registration and try again.');
+      throw PPClientError('Google sign-in failed. [${diagnosticReference(error, stage)}]');
+    } catch (error) {
+      throw PPClientError('Unable to sign in. [${diagnosticReference(error, stage)}]');
     }
   });
 

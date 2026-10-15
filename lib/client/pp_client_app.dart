@@ -53,13 +53,18 @@ class _IdentityScreenState extends State<_IdentityScreen> {
   String? _error;
   @override
   void initState() { super.initState(); _restore(); }
-  Future<void> _restore() => _run(_session.restore);
-  Future<void> _run(Future<void> Function() action) async {
+  Future<void> _restore() => _run(_session.restore, phase: 'session-restore');
+  Future<void> _run(Future<void> Function() action, {String phase = 'screen-action'}) async {
     if (mounted) { setState(() { _busy = true; _error = null; }); }
     try { await action(); } catch (error) {
-      if (mounted) setState(() {
-        _error = error is PPClientError ? error.message : 'Unable to complete this action. Please try again.';
-      });
+      if (mounted) {
+        setState(() {
+          _error = error is PPClientError
+              ? error.message
+              : 'Unable to complete this action. '
+                  '[${PPClientSession.diagnosticReference(error, phase)}]';
+        });
+      }
     } finally { if (mounted) setState(() { _busy = false; }); }
   }
   @override
