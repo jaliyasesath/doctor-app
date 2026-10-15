@@ -1,35 +1,42 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'pp_client_config.dart';
 import 'pp_client_session.dart';
 import 'pp_client_queue_screens.dart';
+import 'pp_client_theme.dart';
 
-const _green = Color(0xFF078A55);
-const _ink = Color(0xFF192641);
+const _green = Color(0xFF2563EB);
 
-class PPClientApp extends StatelessWidget {
+class PPClientApp extends StatefulWidget {
   const PPClientApp({super.key});
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'PP Client', debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      useMaterial3: true, scaffoldBackgroundColor: const Color(0xFFF2F9F5),
-      colorScheme: ColorScheme.fromSeed(seedColor: _green),
-      navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: Colors.white, indicatorColor: const Color(0xFFE0F3E8),
-        labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
-          color: states.contains(WidgetState.selected) ? _green : _ink,
-          fontSize: 12, fontWeight: states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500)),
+  State<PPClientApp> createState() => _PPClientAppState();
+}
+
+class _PPClientAppState extends State<PPClientApp> {
+  late final PPClientThemeClock _clock;
+  @override
+  void initState() {
+    super.initState();
+    _clock = PPClientThemeClock();
+  }
+  @override
+  void dispose() { _clock.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: _clock,
+    builder: (context, _) => MaterialApp(
+      title: 'PP Client', debugShowCheckedModeBanner: false,
+      theme: PPClientTheme.build(Brightness.light),
+      darkTheme: PPClientTheme.build(Brightness.dark),
+      themeMode: _clock.mode,
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: PPClientTheme.isDark(context)
+            ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+        child: child ?? const SizedBox.shrink(),
       ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true, fillColor: Colors.white,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-      filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(
-        minimumSize: const Size(0, 52),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      )),
+      home: const _IdentityScreen(),
     ),
-    home: const _IdentityScreen(),
   );
 }
 
@@ -48,7 +55,7 @@ class _IdentityScreenState extends State<_IdentityScreen> {
   void initState() { super.initState(); _restore(); }
   Future<void> _restore() => _run(_session.restore);
   Future<void> _run(Future<void> Function() action) async {
-    if (mounted) setState(() { _busy = true; _error = null; });
+    if (mounted) { setState(() { _busy = true; _error = null; }); }
     try { await action(); } catch (error) {
       if (mounted) setState(() {
         _error = error is PPClientError ? error.message : 'Unable to complete this action. Please try again.';
@@ -67,10 +74,9 @@ class _IdentityScreenState extends State<_IdentityScreen> {
           onPressed: _busy ? null : () => _run(_session.reloadProfile), icon: const Icon(Icons.refresh))],
       ),
       bottomNavigationBar: _session.profile == null ? null : NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: _busy ? null : (value) => setState(() { _tab = value; _error = null; }),
+        selectedIndex: _tab == 2 ? 1 : _tab == 3 ? 2 : 0,
+        onDestinationSelected: _busy ? null : (value) => setState(() { _tab = const [0, 2, 3][value]; _error = null; }),
         destinations: const [NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.search), label: 'Find Doctor'),
           NavigationDestination(icon: Icon(Icons.format_list_numbered), label: 'My Queue'),
           NavigationDestination(icon: Icon(Icons.person_outline), label: 'Profile')],
       ),
@@ -90,7 +96,7 @@ class _IdentityScreenState extends State<_IdentityScreen> {
             if (_session.profile == null) ...[
               Container(padding: const EdgeInsets.all(28),
                 decoration: BoxDecoration(borderRadius: BorderRadius.circular(28),
-                  gradient: const LinearGradient(colors: [_green, Color(0xFF23A375)])),
+                  gradient: const LinearGradient(colors: [_green, Color(0xFF0EA5E9)])),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Container(padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
@@ -102,15 +108,15 @@ class _IdentityScreenState extends State<_IdentityScreen> {
                   const Text('Your care, closer to you.', style: TextStyle(fontSize: 18, color: Colors.white)),
                 ])),
               const SizedBox(height: 32),
-              const Text('Welcome', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: _ink)),
+              Text('Welcome', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: PPClientTheme.ink(context))),
               const SizedBox(height: 8),
               const Text('Sign in with your Google account to access your patient profile.', style: TextStyle(fontSize: 16, height: 1.5)),
               const SizedBox(height: 24),
               FilledButton.icon(onPressed: _busy ? null : () => _run(() async { await _session.signInWithGoogle(); if (mounted) setState(() { _tab = 0; }); }),
                 icon: const Icon(Icons.account_circle_outlined), label: const Text('Continue with Google')),
               const SizedBox(height: 14),
-              const Text('Your Google password is never shared with PP Client.',
-                textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.black54)),
+              Text('Your Google password is never shared with PP Client.',
+                textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: PPClientTheme.muted(context))),
             ] else ...[
               _ProfileForm(key: ValueKey(_session.profile!['patientAccountId']),
                 profile: _session.profile!, busy: _busy,
@@ -180,12 +186,12 @@ class _ProfileFormState extends State<_ProfileForm> {
   @override
   Widget build(BuildContext context) => Form(key: _form, child: Column(
     crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Text('Your patient profile', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: _ink)),
+      Text('Your patient profile', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: PPClientTheme.ink(context))),
       const SizedBox(height: 8),
-      Text(widget.profile['email']?.toString() ?? '', style: const TextStyle(color: Colors.black54)),
+      Text(widget.profile['email']?.toString() ?? '', style: TextStyle(color: PPClientTheme.muted(context))),
       const SizedBox(height: 18),
       Container(padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+        decoration: BoxDecoration(color: PPClientTheme.surface(context), borderRadius: BorderRadius.circular(16), border: Border.all(color: PPClientTheme.border(context))),
         child: Text(widget.profile['profileComplete'] == true
           ? 'Your profile details are saved.' : 'Complete your details before making your first booking.')),
       const SizedBox(height: 20),
@@ -199,8 +205,8 @@ class _ProfileFormState extends State<_ProfileForm> {
         decoration: const InputDecoration(labelText: 'Mobile number', hintText: '+94771234567'),
         validator: (value) => RegExp(r'^\+?[0-9]{9,15}$').hasMatch((value ?? '').trim())
           ? null : 'Enter a valid mobile number.'),
-      const Text('Mobile number verification is pending; saving does not verify ownership.',
-        style: TextStyle(fontSize: 12, color: Colors.black54)),
+      Text('Mobile number verification is pending; saving does not verify ownership.',
+        style: TextStyle(fontSize: 12, color: PPClientTheme.muted(context))),
       const SizedBox(height: 18),
       FormField<DateTime>(validator: (_) => _dob == null ? 'Select your date of birth.' : null,
         builder: (field) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -217,7 +223,7 @@ class _ProfileFormState extends State<_ProfileForm> {
           if (field.hasError) Text(field.errorText!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
         ])),
       const SizedBox(height: 18),
-      DropdownButtonFormField<String>(value: _gender, isExpanded: true,
+      DropdownButtonFormField<String>(key: ValueKey(_gender), initialValue: _gender, isExpanded: true,
         decoration: const InputDecoration(labelText: 'Gender'),
         items: _genders.map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(),
         onChanged: widget.busy ? null : (value) => setState(() { _gender = value; }),
