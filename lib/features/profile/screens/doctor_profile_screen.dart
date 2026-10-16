@@ -1,3 +1,4 @@
+import '../../health_posts/doctor_health_posts_screen.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -293,6 +294,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                     ]),
                   ]),
             ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: DoctorHealthPostsCard(),
+            ),
             _section('About', _v('professionalBio'), Icons.person_outline),
             _detailsCard(),
             _centreCard(logo),
@@ -532,16 +537,20 @@ class _DoctorProfileEditScreenState extends State<_DoctorProfileEditScreen> {
 
   Future<void> _locate() async {
     var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied)
+    if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
+    }
     if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) return;
+        permission == LocationPermission.deniedForever) {
+      return;
+    }
     final position = await Geolocator.getCurrentPosition();
-    if (mounted)
+    if (mounted) {
       setState(() {
         _latitude = position.latitude;
         _longitude = position.longitude;
       });
+    }
   }
 
   Future<void> _save() async {

@@ -52,7 +52,7 @@ class PPClientSession extends ChangeNotifier {
     }
   }
 
-  Map<String, dynamic> _object(http.Response response) {
+  Map<String, dynamic> _object(http.Response response, {bool health = false}) {
     if (response.statusCode == 429) {
       throw const PPClientError('Too many requests. Please wait before trying again.');
     }
@@ -60,10 +60,10 @@ class PPClientSession extends ChangeNotifier {
       throw const PPClientError('The service is temporarily unavailable. Please try again.');
     }
     if (response.statusCode == 409) {
-      throw const PPClientError('The queue changed or this booking is unavailable. Refresh and try again.');
+      throw PPClientError(health ? 'This post changed or is unavailable. Refresh and try again.' : 'The queue changed or this booking is unavailable. Refresh and try again.');
     }
     if (response.statusCode == 404) {
-      throw const PPClientError('Patient access is unavailable on this API.');
+      throw PPClientError(health ? 'This post or feed is unavailable. Refresh and try again.' : 'Patient access is unavailable on this API.');
     }
     if (response.statusCode >= 300 && response.statusCode < 400) {
       throw const PPClientError('The API connection must use its final secure address.');
@@ -127,7 +127,7 @@ class PPClientSession extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> _authorized(String method, String action,
-      {Map<String, dynamic>? body}) async {
+      {Map<String, dynamic>? body, bool health = false}) async {
     if (_access == null) throw const PPClientError('Please sign in again.');
     if (_expires == null || _expires!.isBefore(DateTime.now().toUtc().add(const Duration(minutes: 1)))) {
       await _rotate();
@@ -142,7 +142,7 @@ class PPClientSession extends ChangeNotifier {
       throw const PPClientError('Your session has ended. Please sign in again.');
     }
     if (response.statusCode == 204) return <String, dynamic>{};
-    return _object(response);
+    return _object(response, health: health);
   }
 
   Future<void> restore() => _serial(() async {
@@ -283,6 +283,52 @@ class PPClientSession extends ChangeNotifier {
     body: {'doctorId': id, 'requestId': requestId}));
   Future<Map<String, dynamic>> myBookings({int page = 1}) => _serial(() => _authorized('GET', '/api/client/bookings?page=$page&pageSize=20'));
   Future<Map<String, dynamic>> cancelBooking(int id) => _serial(() => _authorized('POST', '/api/client/bookings/$id/cancel'));
+
+  Future<Map<String,dynamic>> _healthRequest(String method,String path,{Map<String,dynamic>? body}) =>
+      _authorized(method,path,body:body,health:true);
+  // Health Feed uses the existing serialized patient refresh/session boundary.
+  Future<Map<String, dynamic>> healthFeed({String mode = 'latest', String? topic,
+      String? language, String? cursor}) => _serial(() {
+    final query = Uri(queryParameters: {'mode': mode, 'pageSize': '10',
+      if (topic != null) 'topic': topic, if (language != null) 'language': language,
+      if (cursor != null) 'cursor': cursor}).query;
+    return _healthRequest('GET', '/api/client/health-feed?$query');
+  });
+  Future<Map<String, dynamic>> healthTopics() => _serial(() => _healthRequest('GET', '/api/client/health-feed/topics'));
+  Future<void> healthAction(int id, String action, bool value) => _serial(() async {
+    if (!['helpful', 'save'].contains(action)) throw const PPClientError('Invalid post action.');
+    await _healthRequest('PUT', '/api/client/health-feed/$id/$action', body: {'value':value});
+  });
+  Future<void> healthFollow(int doctorId, bool value) => _serial(() async {
+    await _healthRequest('PUT', '/api/client/health-feed/doctors/$doctorId/follow', body: {'value':value});
+  });
+  Future<void> healthReport(int id, String reason) => _serial(() async {
+    await _healthRequest('PUT', '/api/client/health-feed/$id/report', body: {'reason':reason});
+  });
+  Future<Uint8List> healthPhoto(int id) async {
+    // Only token preparation is serialized. A slow photo must not queue up
+    // behind, or block, booking/profile operations on the shared session.
+    final lease = await _serial(() async {
+      if (_access == null) throw const PPClientError('Please sign in again.');
+      if (_expires == null || _expires!.isBefore(DateTime.now().toUtc().add(const Duration(minutes:1)))) await _rotate();
+      return (_access!, profile?['patientAccountId']);
+    });
+    final path = '/api/client/health-feed/$id/photo';
+    var response = await _send('GET', path, bearer:lease.$1);
+    if (response.statusCode == 401) {
+      final token = await _serial(() async {
+        if (_access == null || profile?['patientAccountId'] != lease.$2) throw const PPClientError('Please sign in again.');
+        if (_access == lease.$1) await _rotate();
+        return _access!;
+      });
+      response = await _send('GET', path, bearer:token);
+    }
+    if (_access == null || profile?['patientAccountId'] != lease.$2 || response.statusCode != 200 ||
+        !(response.headers['content-type'] ?? '').startsWith('image/jpeg') || response.bodyBytes.length > 200000) {
+      throw const PPClientError('This photo is unavailable.');
+    }
+    return response.bodyBytes;
+  }
 
   @override
   void dispose() { _http.close(); super.dispose(); }

@@ -1,3 +1,4 @@
+import '../../health_posts/doctor_health_posts_screen.dart';
 import 'package:flutter/material.dart';
 
 class DesktopDoctorProfileView extends StatelessWidget {
@@ -45,6 +46,10 @@ class DesktopDoctorProfileView extends StatelessWidget {
                 sliver: SliverToBoxAdapter(
                   child: _identityCard(context, completeness),
                 ),
+              ),
+              const SliverPadding(
+                padding: EdgeInsets.fromLTRB(24, 12, 24, 0),
+                sliver: SliverToBoxAdapter(child: DoctorHealthPostsCard()),
               ),
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(28, 18, 28, 32),

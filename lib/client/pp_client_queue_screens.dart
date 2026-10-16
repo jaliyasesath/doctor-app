@@ -1,3 +1,4 @@
+import 'pp_client_health_feed.dart';
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -289,9 +290,9 @@ class _DoctorBrowserState extends State<PPClientDoctorBrowser> {
         (icon: Icons.science_outlined, title: 'Lab Search',
           subtitle: 'Find test centres', color: const Color(0xFF8B5CF6),
           action: () => _service('Lab Search', 'Laboratory search is not available yet. Verified laboratory listings will be added in the laboratory module.')),
-        (icon: Icons.article_outlined, title: 'Medical News',
+        (icon: Icons.article_outlined, title: 'Health Feed',
           subtitle: 'Health tips & updates', color: const Color(0xFFF59E0B),
-          action: () => _service('Medical News', 'Medical news will be available when the content service is connected.')),
+          action: _openHealthFeed),
         (icon: Icons.folder_outlined, title: 'Health Records',
           subtitle: 'Coming soon', color: const Color(0xFF6492CB),
           action: () => _service('Health Records', 'Your health records are not available in PP Client yet. Secure record access will be added in the health records module.')),
@@ -365,6 +366,27 @@ class _DoctorBrowserState extends State<PPClientDoctorBrowser> {
       );
     },
   );
+
+  Future<void> _openHealthFeed() async {
+    final session = widget.session;
+    final onBooked = widget.onBooked;
+    final onProfileRequired = widget.onProfileRequired;
+    final onMyQueue = widget.onMyQueue;
+    final onProfile = widget.onProfile;
+    await Navigator.push<void>(context, MaterialPageRoute(builder: (feedContext) => PPClientHealthFeed(
+      session: session, onMyQueue: onMyQueue, onProfile: onProfile,
+      onDoctor: (id) async {
+        var needsProfile = false;
+        final booked = await Navigator.of(feedContext).push<bool>(MaterialPageRoute(builder: (_) => _DoctorDetails(
+          session: session, doctorId: id, onProfileRequired: () { needsProfile = true; })));
+        if (!feedContext.mounted) return;
+        if (booked == true || needsProfile) {
+          Navigator.of(feedContext).pop();
+          if (booked == true) { onBooked(); } else { onProfileRequired(); }
+        }
+      },
+    )));
+  }
 
   Future<void> _openDoctor(Map<String, dynamic> doctor) async {
     final booked = await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => _DoctorDetails(
@@ -641,8 +663,10 @@ class _MyQueueState extends State<PPClientMyQueue> with WidgetsBindingObserver {
     final page = next ? _page + 1 : 1;
     try {
       final data = await widget.session.myBookings(page: page);
-      if (mounted) setState(() { final rows = (data['items'] as List).cast<Map<String, dynamic>>();
+      if (mounted) {
+        setState(() { final rows = (data['items'] as List).cast<Map<String, dynamic>>();
         _items = next ? [..._items, ...rows] : rows; _page = page; _more = data['hasMore'] == true; _failure = null; });
+      }
     } catch (e) { if (mounted) setState(() { _failure = _error(e); }); }
     finally { if (mounted) setState(() { _loading = false; }); }
   }
