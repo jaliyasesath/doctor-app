@@ -18,12 +18,10 @@ dependencies:
   signalr_netcore: ^1.4.4
 
   # DATABASE
-  # SQLCipher-backed drop-in replacement for sqflite on Android/iOS/macOS.
-  # Windows uses a separate encrypted adapter in the desktop milestone.
+  # SQLCipher-backed database for Android/iOS/macOS.
   sqflite_sqlcipher: ^3.4.1
-  # Windows database adapter. sqlite3 is built with SQLite3 Multiple Ciphers;
-  # the adapter selects its SQLCipher-compatible AES-256 scheme before opening.
-  # Pinned to the newest releases compatible with the current Dart 3.11 SDK.
+
+  # Encrypted Windows database adapter.
   sqflite_common_ffi: 2.4.0+3
   sqlite3: 3.5.2
   path: ^1.9.0
@@ -46,14 +44,14 @@ dependencies:
   # DEVICE INFO
   device_info_plus: ^10.1.0
 
-  # PP CLIENT GOOGLE IDENTITY (only used by main_client.dart)
+  # PP CLIENT GOOGLE IDENTITY
   google_sign_in: 7.2.0
 
   # BIOMETRIC AUTH
   local_auth: ^3.0.1
 
   # QR
-  mobile_scanner: ^5.1.1
+  mobile_scanner: 6.0.11
   qr_flutter: ^4.1.0
 
   # SHARE / URL
@@ -64,7 +62,7 @@ dependencies:
   print_bluetooth_thermal: 1.2.1
   esc_pos_utils_plus: ^2.0.4
 
-  # Windows PDF preview / installed printer support
+  # WINDOWS PRINTING / FILE SELECTION
   printing: 5.14.2
   file_selector: 1.0.3
 
@@ -107,9 +105,9 @@ flutter:
     - assets/images/private_practices_logo.jpeg
     - assets/images/app_icon.png
 
-# sqlite3 3.5.2 (the Dart 3.11-compatible release) provides the encrypted
-# SQLite3 Multiple Ciphers native build. The Windows adapter explicitly selects
-# its SQLCipher-compatible AES-256 scheme before applying the database key.
+# Build SQLite with SQLite3 Multiple Ciphers.
+# The Windows adapter selects SQLCipher-compatible AES-256
+# before applying the database key.
 hooks:
   user_defines:
     sqlite3:
