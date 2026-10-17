@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_selector/file_selector.dart';
 import '../../core/widgets/app_error_ui.dart';
-import 'health_post_labels.dart';
+import 'package:doctor_app/core/health_posts/health_post_labels.dart';
 import 'health_posts_service.dart';
 
 const _teal = Color(0xFF0F766E);
