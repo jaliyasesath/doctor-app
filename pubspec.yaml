@@ -104,6 +104,8 @@ flutter:
   assets:
     - assets/images/private_practices_logo.jpeg
     - assets/images/app_icon.png
+    - assets/images/pp_care_icon.png
+    - assets/images/pp_care_logo.png
 
 # Build SQLite with SQLite3 Multiple Ciphers.
 # The Windows adapter selects SQLCipher-compatible AES-256

@@ -163,8 +163,8 @@ class _PPClientHealthFeedState extends State<PPClientHealthFeed> {
     final field = action == 'follow'
         ? 'isFollowing'
         : action == 'save'
-            ? 'isSaved'
-            : 'isHelpful';
+        ? 'isSaved'
+        : 'isHelpful';
     final value = post[field] != true;
     try {
       if (action == 'follow') {
@@ -261,9 +261,10 @@ class _PPClientHealthFeedState extends State<PPClientHealthFeed> {
       final box = origin.findRenderObject() as RenderBox?;
       // Share public post text only. Never share authenticated media URLs or bearer tokens.
       await Share.share(
-        '${ppClientDoctorName(p['doctorName'])}\n${p['title']}\n${p['content']}${p['sourceUrl'].toString().isEmpty ? '' : '\n${p['sourceUrl']}'}',
-        sharePositionOrigin:
-            box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+        '${p['isOfficial'] == true ? 'PP Health Team · Official' : ppClientDoctorName(p['doctorName'])}\n${p['title']}\n${p['content']}${p['sourceUrl'].toString().isEmpty ? '' : '\n${p['sourceUrl']}'}',
+        sharePositionOrigin: box == null
+            ? null
+            : box.localToGlobal(Offset.zero) & box.size,
       );
     } catch (_) {
       if (mounted) {
@@ -281,251 +282,272 @@ class _PPClientHealthFeedState extends State<PPClientHealthFeed> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: PPClientTheme.isDark(context)
-            ? const Color(0xFF080D16)
-            : const Color(0xFFF5F8FF),
-        appBar: AppBar(
-          title: Text(l.t(_mode == 'saved' ? 'saved' : 'feed')),
-          actions: [
-            PopupMenuButton<String>(
-              tooltip: 'Interface language',
-              icon: const Icon(Icons.translate),
-              onSelected: _language,
-              itemBuilder: (_) => healthLanguages.entries
-                  .map((e) => PopupMenuItem(value: e.key, child: Text(e.value)))
-                  .toList(),
-            ),
-            IconButton(
-              tooltip: l.t('saved'),
-              icon: Icon(
-                _mode == 'saved' ? Icons.bookmark : Icons.bookmark_outline,
-              ),
-              onPressed: () {
-                setState(() => _mode = _mode == 'saved' ? 'latest' : 'saved');
-                _load();
-              },
-            ),
-          ],
+    backgroundColor: PPClientTheme.isDark(context)
+        ? const Color(0xFF080D16)
+        : const Color(0xFFF5F8FF),
+    appBar: AppBar(
+      title: Text(l.t(_mode == 'saved' ? 'saved' : 'feed')),
+      actions: [
+        PopupMenuButton<String>(
+          tooltip: 'Interface language',
+          icon: const Icon(Icons.translate),
+          onSelected: _language,
+          itemBuilder: (_) => healthLanguages.entries
+              .map((e) => PopupMenuItem(value: e.key, child: Text(e.value)))
+              .toList(),
         ),
-        body: RefreshIndicator(
-          onRefresh: () async {
-            await _loadTopics();
-            await _load();
+        IconButton(
+          tooltip: l.t('saved'),
+          icon: Icon(
+            _mode == 'saved' ? Icons.bookmark : Icons.bookmark_outline,
+          ),
+          onPressed: () {
+            setState(() => _mode = _mode == 'saved' ? 'latest' : 'saved');
+            _load();
           },
-          child: CustomScrollView(
-            controller: _scroll,
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 760),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+        ),
+      ],
+    ),
+    body: RefreshIndicator(
+      onRefresh: () async {
+        await _loadTopics();
+        await _load();
+      },
+      child: CustomScrollView(
+        controller: _scroll,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        l.t('topics'),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
-                          Text(
-                            l.t('topics'),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          ChoiceChip(
+                            label: Text(l.t('all')),
+                            selected: _topic == null,
+                            onSelected: (_) {
+                              setState(() => _topic = null);
+                              _load();
+                            },
                           ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            children: [
-                              ChoiceChip(
-                                label: Text(l.t('all')),
-                                selected: _topic == null,
-                                onSelected: (_) {
-                                  setState(() => _topic = null);
-                                  _load();
-                                },
+                          for (final t in _topics)
+                            ChoiceChip(
+                              label: Text(
+                                t[_uiLanguage]?.toString() ??
+                                    t['en'].toString(),
                               ),
-                              for (final t in _topics)
-                                ChoiceChip(
-                                  label: Text(
-                                    t[_uiLanguage]?.toString() ??
-                                        t['en'].toString(),
-                                  ),
-                                  selected: _topic == t['id'],
-                                  onSelected: (_) {
-                                    setState(() => _topic = t['id'] as String);
-                                    _load();
-                                  },
-                                ),
-                            ],
-                          ),
-                          if (_topicsError)
-                            TextButton(
-                              onPressed: _loadTopics,
-                              child: Text(l.t('retry')),
+                              selected: _topic == t['id'],
+                              onSelected: (_) {
+                                setState(() => _topic = t['id'] as String);
+                                _load();
+                              },
                             ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              for (final mode in ['latest', 'following'])
-                                TextButton(
-                                  onPressed: () {
-                                    setState(() => _mode = mode);
-                                    _load();
-                                  },
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: _mode == mode
-                                        ? PPClientTheme.accent(context)
-                                        : PPClientTheme.muted(context),
-                                  ),
+                        ],
+                      ),
+                      if (_topicsError)
+                        TextButton(
+                          onPressed: _loadTopics,
+                          child: Text(l.t('retry')),
+                        ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          for (final mode in ['latest', 'following'])
+                            TextButton(
+                              onPressed: () {
+                                setState(() => _mode = mode);
+                                _load();
+                              },
+                              style: TextButton.styleFrom(
+                                foregroundColor: _mode == mode
+                                    ? PPClientTheme.accent(context)
+                                    : PPClientTheme.muted(context),
+                              ),
+                              child: Text(
+                                l.t(mode),
+                                style: TextStyle(
+                                  fontWeight: _mode == mode
+                                      ? FontWeight.w800
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          SizedBox(
+                            width: 220,
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: _postLanguage ?? 'all',
+                              underline: const SizedBox.shrink(),
+                              items: [
+                                DropdownMenuItem(
+                                  value: 'all',
                                   child: Text(
-                                    l.t(mode),
-                                    style: TextStyle(
-                                      fontWeight: _mode == mode
-                                          ? FontWeight.w800
-                                          : FontWeight.normal,
+                                    l.t('allLanguages'),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                ...healthLanguages.entries.map(
+                                  (e) => DropdownMenuItem(
+                                    value: e.key,
+                                    child: Text(
+                                      e.value,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ),
-                              SizedBox(
-                                  width: 220,
-                                  child: DropdownButton<String>(
-                                    isExpanded: true,
-                                    value: _postLanguage ?? 'all',
-                                    underline: const SizedBox.shrink(),
-                                    items: [
-                                      DropdownMenuItem(
-                                        value: 'all',
-                                        child: Text(l.t('allLanguages'),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis),
-                                      ),
-                                      ...healthLanguages.entries.map(
-                                        (e) => DropdownMenuItem(
-                                          value: e.key,
-                                          child: Text(e.value,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis),
-                                        ),
-                                      ),
-                                    ],
-                                    onChanged: (v) {
-                                      setState(
-                                        () => _postLanguage =
-                                            v == 'all' ? null : v,
-                                      );
-                                      _load();
-                                    },
-                                  )),
-                            ],
+                              ],
+                              onChanged: (v) {
+                                setState(
+                                  () => _postLanguage = v == 'all' ? null : v,
+                                );
+                                _load();
+                              },
+                            ),
                           ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
-              if (_busy)
-                const SliverToBoxAdapter(child: LinearProgressIndicator()),
-              if (_error != null)
-                SliverToBoxAdapter(
-                  child: ListTile(
-                    title: Text(_error!),
-                    trailing: TextButton(
-                      onPressed: () => _load(next: _items.isNotEmpty),
-                      child: Text(l.t('retry')),
-                    ),
-                  ),
+            ),
+          ),
+          if (_busy) const SliverToBoxAdapter(child: LinearProgressIndicator()),
+          if (_error != null)
+            SliverToBoxAdapter(
+              child: ListTile(
+                title: Text(_error!),
+                trailing: TextButton(
+                  onPressed: () => _load(next: _items.isNotEmpty),
+                  child: Text(l.t('retry')),
                 ),
-              if (!_busy && _error == null && _items.isEmpty)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      children: [
-                        const Icon(Icons.article_outlined, size: 48),
-                        const SizedBox(height: 16),
-                        Text(
-                          l.t(_mode == 'following' && _followingCount == 0
-                              ? 'noFollowing'
-                              : 'empty'),
-                          textAlign: TextAlign.center,
+              ),
+            ),
+          if (!_busy && _error == null && _items.isEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  children: [
+                    const Icon(Icons.article_outlined, size: 48),
+                    const SizedBox(height: 16),
+                    Text(
+                      l.t(
+                        _mode == 'following' && _followingCount == 0
+                            ? 'noFollowing'
+                            : 'empty',
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    if (_mode == 'following' && _followingCount == 0)
+                      TextButton(
+                        onPressed: () {
+                          setState(() => _mode = 'latest');
+                          _load();
+                        },
+                        child: Text(l.t('explore')),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, i) => Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: _postCard(_items[i]),
+                ),
+              ),
+              childCount: _items.length,
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Center(
+                child: _more
+                    ? TextButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _items.length >= 200
+                                  ? _load()
+                                  : _load(next: true),
+                        child: Text(
+                          l.t(_items.length >= 200 ? 'restart' : 'more'),
                         ),
-                        if (_mode == 'following' && _followingCount == 0)
-                          TextButton(
-                            onPressed: () {
-                              setState(() => _mode = 'latest');
-                              _load();
-                            },
-                            child: Text(l.t('explore')),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) => Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 760),
-                      child: _postCard(_items[i]),
-                    ),
-                  ),
-                  childCount: _items.length,
-                ),
+                      )
+                    : const SizedBox.shrink(),
               ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Center(
-                    child: _more
-                        ? TextButton(
-                            onPressed: _busy
-                                ? null
-                                : () => _items.length >= 200
-                                    ? _load()
-                                    : _load(next: true),
-                            child: Text(
-                              l.t(_items.length >= 200 ? 'restart' : 'more'),
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: 0,
-          onDestinationSelected: (i) => _navigate(
-            i == 1
-                ? widget.onMyQueue
-                : i == 2
-                    ? widget.onProfile
-                    : null,
-          ),
-          destinations: const [
-            NavigationDestination(
-                icon: Icon(Icons.home_rounded), label: 'Home'),
-            NavigationDestination(
-              icon: Icon(Icons.format_list_numbered),
-              label: 'My Queue',
             ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              label: 'Profile',
-            ),
-          ],
+          ),
+        ],
+      ),
+    ),
+    bottomNavigationBar: NavigationBar(
+      selectedIndex: 0,
+      onDestinationSelected: (i) => _navigate(
+        i == 1
+            ? widget.onMyQueue
+            : i == 2
+            ? widget.onProfile
+            : null,
+      ),
+      destinations: const [
+        NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
+        NavigationDestination(
+          icon: Icon(Icons.format_list_numbered),
+          label: 'My Queue',
         ),
-      );
+        NavigationDestination(
+          icon: Icon(Icons.person_outline),
+          label: 'Profile',
+        ),
+      ],
+    ),
+  );
+  Future<void> _officialInfo() => showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('PP Health Team'),
+      content: const Text(
+        'Official health tips and announcements from PP Care. These posts provide general information and do not replace advice from your doctor.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
   Widget _postCard(Map<String, dynamic> p) {
+    final official = p['isOfficial'] == true;
     final candidate = ppClientPhotoUrl(p['profilePhotoUrl']);
     final photoUri = candidate == null ? null : Uri.tryParse(candidate);
-    final photo = photoUri != null &&
+    final photo =
+        photoUri != null &&
             photoUri.origin == PPClientConfig.origin.origin &&
             photoUri.path.startsWith('/uploads/doctors/')
         ? candidate
@@ -533,7 +555,8 @@ class _PPClientHealthFeedState extends State<PPClientHealthFeed> {
     final date = DateTime.tryParse(
       p['publishedAt']?.toString() ?? '',
     )?.toLocal();
-    final compact = MediaQuery.sizeOf(context).width < 380 ||
+    final compact =
+        MediaQuery.sizeOf(context).width < 380 ||
         MediaQuery.textScalerOf(context).scale(1) > 1.2 ||
         _uiLanguage != 'en';
     final followButton = OutlinedButton.icon(
@@ -541,8 +564,9 @@ class _PPClientHealthFeedState extends State<PPClientHealthFeed> {
           ? null
           : () => _action(p, 'follow'),
       style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          visualDensity: VisualDensity.compact),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        visualDensity: VisualDensity.compact,
+      ),
       icon: Icon(p['isFollowing'] == true ? Icons.check : Icons.add, size: 16),
       label: Text(l.t(p['isFollowing'] == true ? 'following' : 'follow')),
     );
@@ -557,10 +581,14 @@ class _PPClientHealthFeedState extends State<PPClientHealthFeed> {
             Row(
               children: [
                 InkWell(
-                  onTap: () => widget.onDoctor(p['doctorId'] as int),
+                  onTap: () => official
+                      ? _officialInfo()
+                      : widget.onDoctor(p['doctorId'] as int),
                   child: CircleAvatar(
                     radius: 22,
-                    child: photo == null
+                    child: official
+                        ? const Icon(Icons.health_and_safety_outlined)
+                        : photo == null
                         ? const Icon(Icons.person_outline)
                         : ClipOval(
                             child: Image.network(
@@ -577,21 +605,34 @@ class _PPClientHealthFeedState extends State<PPClientHealthFeed> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: InkWell(
-                    onTap: () => widget.onDoctor(p['doctorId'] as int),
+                    onTap: () => official
+                        ? _officialInfo()
+                        : widget.onDoctor(p['doctorId'] as int),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(children: [
-                          Expanded(
-                              child: Text(ppClientDoctorName(p['doctorName']),
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w800))),
-                          const SizedBox(width: 4),
-                          Icon(Icons.verified,
-                              size: 16, color: PPClientTheme.accent(context))
-                        ]),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                official
+                                    ? 'PP Health Team'
+                                    : ppClientDoctorName(p['doctorName']),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.verified,
+                              size: 16,
+                              color: PPClientTheme.accent(context),
+                            ),
+                          ],
+                        ),
                         Text(
-                          '${p['specialization'] ?? ''}${date == null ? '' : ' · ${date.day}/${date.month}'}',
+                          '${official ? 'Official' : p['specialization'] ?? ''}${date == null ? '' : ' · ${date.day}/${date.month}'}',
                           style: TextStyle(
                             fontSize: 12,
                             color: PPClientTheme.muted(context),
@@ -601,23 +642,24 @@ class _PPClientHealthFeedState extends State<PPClientHealthFeed> {
                     ),
                   ),
                 ),
-                if (!compact) followButton,
+                if (!official && !compact) followButton,
                 PopupMenuButton<String>(
                   onSelected: (v) =>
                       v == 'report' ? _report(p) : _action(p, 'follow'),
                   itemBuilder: (_) => [
-                    PopupMenuItem(
-                      value: 'follow',
-                      child: Text(
-                        l.t(p['isFollowing'] == true ? 'unfollow' : 'follow'),
+                    if (!official)
+                      PopupMenuItem(
+                        value: 'follow',
+                        child: Text(
+                          l.t(p['isFollowing'] == true ? 'unfollow' : 'follow'),
+                        ),
                       ),
-                    ),
                     PopupMenuItem(value: 'report', child: Text(l.t('report'))),
                   ],
                 ),
               ],
             ),
-            if (compact)
+            if (!official && compact)
               Align(alignment: Alignment.centerLeft, child: followButton),
             const SizedBox(height: 10),
             if (p['title'].toString().isNotEmpty)
@@ -723,35 +765,34 @@ class _ExpandableHealthTextState extends State<_ExpandableHealthText> {
   bool _expanded = false;
   @override
   Widget build(BuildContext context) => LayoutBuilder(
-        builder: (context, constraints) {
-          final style = DefaultTextStyle.of(
-            context,
-          ).style.merge(const TextStyle(height: 1.5));
-          final painter = TextPainter(
-            text: TextSpan(text: widget.text, style: style),
-            maxLines: 4,
-            textDirection: Directionality.of(context),
-            textScaler: MediaQuery.textScalerOf(context),
-          )..layout(maxWidth: constraints.maxWidth);
-          final truncated = painter.didExceedMaxLines;
-          painter.dispose();
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.text,
-                maxLines: _expanded ? null : 4,
-                overflow:
-                    _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                style: style,
-              ),
-              if (truncated)
-                TextButton(
-                  onPressed: () => setState(() => _expanded = !_expanded),
-                  child: Text(widget.labels.t(_expanded ? 'less' : 'readMore')),
-                ),
-            ],
-          );
-        },
+    builder: (context, constraints) {
+      final style = DefaultTextStyle.of(
+        context,
+      ).style.merge(const TextStyle(height: 1.5));
+      final painter = TextPainter(
+        text: TextSpan(text: widget.text, style: style),
+        maxLines: 4,
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout(maxWidth: constraints.maxWidth);
+      final truncated = painter.didExceedMaxLines;
+      painter.dispose();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.text,
+            maxLines: _expanded ? null : 4,
+            overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+            style: style,
+          ),
+          if (truncated)
+            TextButton(
+              onPressed: () => setState(() => _expanded = !_expanded),
+              child: Text(widget.labels.t(_expanded ? 'less' : 'readMore')),
+            ),
+        ],
       );
+    },
+  );
 }

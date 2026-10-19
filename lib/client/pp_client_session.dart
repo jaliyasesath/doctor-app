@@ -289,7 +289,7 @@ class PPClientSession extends ChangeNotifier {
   // Health Feed uses the existing serialized patient refresh/session boundary.
   Future<Map<String, dynamic>> healthFeed({String mode = 'latest', String? topic,
       String? language, String? cursor}) => _serial(() {
-    final query = Uri(queryParameters: {'mode': mode, 'pageSize': '10',
+    final query = Uri(queryParameters: {'mode': mode, 'pageSize': '10', 'includeOfficial': 'true',
       if (topic != null) 'topic': topic, if (language != null) 'language': language,
       if (cursor != null) 'cursor': cursor}).query;
     return _healthRequest('GET', '/api/client/health-feed?$query');

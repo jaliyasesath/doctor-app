@@ -57,7 +57,7 @@ android {
         create("client") {
             dimension = "audience"
             applicationIdSuffix = ".client"
-            manifestPlaceholders["ppAppLabel"] = "PP Client"
+            manifestPlaceholders["ppAppLabel"] = "PP Care"
         }
     }
 
@@ -99,15 +99,18 @@ flutter {
     source = "../.."
 }
 
+// Validate the explicitly requested Android audience, rather than every
+// Flutter task: plugin dependencies can include tasks for other variants.
 val dartTarget = (project.findProperty("target") as String?) ?: "lib/main.dart"
-tasks.configureEach {
-    if (name.startsWith("compileFlutterBuild")) {
-        doFirst {
-            val clientTarget = dartTarget.replace('\\', '/').endsWith("lib/main_client.dart")
-            val clientVariant = name.contains("client", ignoreCase = true)
-            if (clientTarget != clientVariant) {
-                throw GradleException("Use --flavor client -t lib/main_client.dart for PP Client; --flavor pp -t lib/main.dart for PP App.")
-            }
-        }
-    }
+val requestedAudiences = gradle.startParameter.taskNames.mapNotNull {
+    Regex("(?:assemble|bundle|compileFlutterBuild)(Pp|Client)", RegexOption.IGNORE_CASE)
+        .find(it.substringAfterLast(':'))?.groupValues?.get(1)?.lowercase()
+}.toSet()
+val clientTarget = dartTarget.replace('\\', '/').endsWith("lib/main_client.dart")
+if (("client" in requestedAudiences && !clientTarget) ||
+    ("pp" in requestedAudiences && clientTarget)) {
+    throw GradleException(
+        "Use --flavor client -t lib/main_client.dart for PP Client; " +
+            "--flavor pp -t lib/main.dart for PP App."
+    )
 }

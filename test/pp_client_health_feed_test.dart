@@ -37,6 +37,7 @@ class _FeedSession extends PPClientSession {
 
   String? requestedMode, requestedTopic;
   int followed = 0;
+  bool official = false;
   @override
   bool get signedIn => true;
   @override
@@ -72,7 +73,8 @@ class _FeedSession extends PPClientSession {
           : [
               {
                 'id': 1,
-                'doctorId': 9,
+                'doctorId': official ? null : 9,
+                'isOfficial': official,
                 'doctorName': 'Long Doctor Name Perera',
                 'specialization': 'General Practitioner',
                 'title': 'A helpful health update',
@@ -98,6 +100,29 @@ class _FeedSession extends PPClientSession {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('official author opens team details without doctor navigation',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final session = _FeedSession()..official = true;
+    var openedDoctor = false;
+    await tester.pumpWidget(MaterialApp(
+        theme: PPClientTheme.build(Brightness.light),
+        home: PPClientHealthFeed(
+            session: session,
+            onDoctor: (_) async {
+              openedDoctor = true;
+            },
+              onMyQueue: () {},
+            onProfile: () {})));
+    await tester.pumpAndSettle();
+    expect(find.text('PP Health Team'), findsOneWidget);
+    await tester.tap(find.text('PP Health Team'));
+    await tester.pumpAndSettle();
+    expect(openedDoctor, isFalse);
+    expect(find.textContaining('Official health tips'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   test('module labels support English Sinhala and Tamil', () {
     expect(const HealthPostLabels('en').t('feed'), 'Health Feed');
     expect(const HealthPostLabels('si').t('feed'), 'සෞඛ්‍ය ලිපි');
